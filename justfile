@@ -1,0 +1,16 @@
+# default, list all just Recipe
+default: 
+  @just -q --list
+
+alias t := test
+
+# run all tests with all-features
+test filter="":
+  @cargo test --all-features {{filter}}
+
+# cargo watch for test with given filter
+watch filter="":
+  @cargo watch -q -c -x 'test {{filter}}'
+
+clippy:
+  @cargo clippy 

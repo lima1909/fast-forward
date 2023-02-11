@@ -1,2 +1,3 @@
-# fast-forward
-⏩ quering list blazing fast, a step forward 
+# Fast-Forward
+
+⏩ quering list blazing fast, the next step forward?
