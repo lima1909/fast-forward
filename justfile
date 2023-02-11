@@ -12,5 +12,6 @@ test filter="":
 watch filter="":
   @cargo watch -q -c -x 'test {{filter}}'
 
-clippy:
+# run cargo test and clippy
+clippy: test
   @cargo clippy 
