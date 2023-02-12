@@ -1,11 +1,11 @@
-//! An Index has the function to find a specific item in a list (Slice, Vec, ...) faster.
+//! An Index has the function to find faster a specific item in a list (Slice, Vec, ...).
 //! This means, it does not have to touch and compare every item in the list.
 //!
-//! An Index has two parts, a `Key` (item to search for) and a `Position` (the index in the list).
+//! An Index has two parts, a `Key` (item to search for) and a `Position` (the index in the list: [`Idx`]).
 //!
 //! There are two types of Index:
-//! - `Unique Index`: for a `Key` exist exactly one `Position`
-//! - `Ambiguous Index`: for a `Key` exists many `Position`s
+//! - [`UniqueIndex`]: for a `Key` exist exactly one `Position`
+//! - [`AmbiguousIndex`]: for a `Key` exists many `Position`s
 //!
 //! # Example for an Vec-Mulit-Index:
 //!
@@ -181,7 +181,7 @@ impl From<String> for Key {
 #[cfg(test)]
 mod tests {
     use super::{
-        uint::{UIntIndexStore, UniqueListIndex},
+        uint::{U32Index, Unique},
         *,
     };
 
@@ -192,7 +192,7 @@ mod tests {
         let mut indices = Indices::new();
         indices.add(
             "pk",
-            Box::new(UIntIndexStore::<UniqueListIndex>::default()),
+            Box::new(U32Index::<Unique>::default()),
             |p: &Person| p.0,
         );
         indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();

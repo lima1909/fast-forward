@@ -18,19 +18,19 @@ use super::{AmbiguousIndex, AsSlice, Idx, IndexError, Key, Result, Store, Unique
 ///    ...     |  ...
 /// ```
 #[derive(Debug, Default)]
-pub struct UIntIndexStore<I>(I);
+pub struct U32Index<I>(I);
 
-impl<I: ListIndex> UIntIndexStore<I> {
+impl<I: ListIndex> U32Index<I> {
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.len() == 0
+        self.0.is_empty()
     }
 }
 
-impl<I: ListIndex> Index<(Key, &'static str)> for UIntIndexStore<I> {
+impl<I: ListIndex> Index<(Key, &'static str)> for U32Index<I> {
     type Output = [Idx];
 
     fn index(&self, key: (Key, &'static str)) -> &Self::Output {
@@ -48,7 +48,7 @@ impl<I: ListIndex> Index<(Key, &'static str)> for UIntIndexStore<I> {
     }
 }
 
-impl<I: ListIndex> Store for UIntIndexStore<I> {
+impl<I: ListIndex> Store for U32Index<I> {
     fn insert(&mut self, key: &Key, idx: Idx) -> Result {
         let i = match key {
             Key::Number(super::Number::Usize(u)) => *u,
@@ -62,19 +62,22 @@ impl<I: ListIndex> Store for UIntIndexStore<I> {
 pub trait ListIndex: Default {
     fn insert(&mut self, key: Idx, idx: Idx) -> Result;
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     fn as_slice(&self, i: Idx) -> &[Idx];
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-pub struct UniqueListIndex(Vec<Option<UniqueIndex>>);
+pub struct Unique(Vec<Option<UniqueIndex>>);
 
-impl ListIndex for UniqueListIndex {
+impl ListIndex for Unique {
     fn insert(&mut self, key: Idx, idx: Idx) -> Result {
         if self.0.len() <= key {
             self.0.resize(key + 1, None);
         }
 
-        if self.0[key] != None {
+        if self.0[key].is_some() {
             return Err(IndexError::NotUnique(key.into()));
         }
 
@@ -88,19 +91,16 @@ impl ListIndex for UniqueListIndex {
 
     fn as_slice(&self, i: Idx) -> &[Idx] {
         match self.0.get(i) {
-            Some(o) => match o {
-                Some(i) => i.as_slice(),
-                None => &[],
-            },
-            None => &[],
+            Some(Some(i)) => i.as_slice(),
+            _ => &[],
         }
     }
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-pub struct AmbiguousListIndex(Vec<Option<AmbiguousIndex>>);
+pub struct Ambiguous(Vec<Option<AmbiguousIndex>>);
 
-impl ListIndex for AmbiguousListIndex {
+impl ListIndex for Ambiguous {
     fn insert(&mut self, key: Idx, idx: Idx) -> Result {
         if self.0.len() <= key {
             self.0.resize(key + 1, None);
@@ -120,11 +120,8 @@ impl ListIndex for AmbiguousListIndex {
 
     fn as_slice(&self, i: Idx) -> &[Idx] {
         match self.0.get(i) {
-            Some(o) => match o {
-                Some(i) => i.as_slice(),
-                None => &[],
-            },
-            None => &[],
+            Some(Some(i)) => i.as_slice(),
+            _ => &[],
         }
     }
 }
@@ -137,14 +134,14 @@ mod tests {
 
         #[test]
         fn empty() {
-            let idx = UIntIndexStore::<UniqueListIndex>::default();
+            let idx = U32Index::<Unique>::default();
             assert_eq!(0, idx.index((2.into(), "=")).len());
             assert!(idx.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut idx = UIntIndexStore::<UniqueListIndex>::default();
+            let mut idx = U32Index::<Unique>::default();
             idx.insert(&2.into(), 2).unwrap();
 
             assert!(idx[(2.into(), "=")].eq(&[2]));
@@ -153,7 +150,7 @@ mod tests {
 
         #[test]
         fn double_index() {
-            let mut idx = UIntIndexStore::<UniqueListIndex>::default();
+            let mut idx = U32Index::<Unique>::default();
             idx.insert(&2.into(), 2).unwrap();
 
             assert_eq!(
@@ -164,7 +161,7 @@ mod tests {
 
         #[test]
         fn out_of_bound() {
-            let idx = UIntIndexStore::<UniqueListIndex>::default();
+            let idx = U32Index::<Unique>::default();
             assert_eq!(0, idx.index((2.into(), "=")).len());
         }
     }
@@ -174,14 +171,14 @@ mod tests {
 
         #[test]
         fn empty() {
-            let idx = UIntIndexStore::<AmbiguousListIndex>::default();
+            let idx = U32Index::<Ambiguous>::default();
             assert_eq!(0, idx.index((2.into(), "=")).len());
             assert!(idx.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut idx = UIntIndexStore::<AmbiguousListIndex>::default();
+            let mut idx = U32Index::<Ambiguous>::default();
             idx.insert(&2.into(), 2).unwrap();
 
             assert!(idx[(2.into(), "=")].eq(&[2]));
@@ -190,7 +187,7 @@ mod tests {
 
         #[test]
         fn double_index() {
-            let mut idx = UIntIndexStore::<AmbiguousListIndex>::default();
+            let mut idx = U32Index::<Ambiguous>::default();
             idx.insert(&2.into(), 2).unwrap();
             idx.insert(&2.into(), 1).unwrap();
 
