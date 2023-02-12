@@ -1,25 +1,58 @@
+//! An Index has the function to find a specific item in a list (Slice, Vec, ...) faster.
+//! This means, it does not have to touch and compare every item in the list.
+//!
+//! An Index has two parts, a `Key` (item to search for) and a `Position` (the index in the list).
+//!
+//! There are two types of Index:
+//! - `Unique Index`: for a `Key` exist exactly one `Position`
+//! - `Multi Index`: for a `Key` exists many `Position`s
+//!
+//! # Example for an Vec-Mulit-Index:
+//!
+//! Map-Index:
+//!
+//! - `Key`      = name (String)
+//! - `Position` = index in Vec
+//!
+//! ```java
+//! let _names = vec!["Paul", "Jasmin", "Inge", "Paul", ...];
+//!
+//!  Key (name)   | Position (index in Vec)
+//! ----------------------------------------
+//!  "Jasmin"     |      1
+//!  "Paul"       |      0, 3
+//!  "Inge"       |      2
+//!   ...         |     ...
+//! ```
+
 #![allow(dead_code)]
+pub mod error;
 pub mod uint;
 
+pub use error::IndexError;
 use std::marker::PhantomData;
 
+type Result<T = ()> = std::result::Result<T, IndexError>;
+
 /// A wrapper for supported Index-Types.
-pub enum Index {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Key {
     Number(Number),
     String(String),
 }
-impl From<usize> for Index {
+impl From<usize> for Key {
     fn from(value: usize) -> Self {
-        Index::Number(Number::Usize(value))
+        Key::Number(Number::Usize(value))
     }
 }
 
-impl From<String> for Index {
+impl From<String> for Key {
     fn from(value: String) -> Self {
-        Index::String(value)
+        Key::String(value)
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Number {
     Usize(usize),
     I32(i32),
@@ -44,16 +77,39 @@ impl From<f32> for Number {
     }
 }
 
-/// 0, 1 or many [`Pos`]
-pub struct Positions;
-
 /// Pos is the index in a List ([`std::vec::Vec`])
 pub type Pos = usize;
 
+/// 0, 1 or many [`Pos`]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct Positions(Vec<Pos>);
+
+impl Positions {
+    fn from_vec(indices: Vec<Pos>) -> Self {
+        Self(indices)
+    }
+
+    fn is_none(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn add(&mut self, pos: Pos) {
+        self.0.push(pos);
+    }
+
+    fn pos(&self) -> &[Pos] {
+        self.0.as_slice()
+    }
+
+    fn unique(&self) -> Option<&Pos> {
+        self.0.get(0)
+    }
+}
+
 /// A Store for Indices. It's a mapping from a given [`Index`] to a position in a List.
 pub trait Store {
-    fn insert(&mut self, idx: Index, pos: Pos);
-    fn filter(&self, val: &Index, op: &str) -> Positions;
+    fn insert(&mut self, k: &Key, p: Pos) -> Result;
+    fn filter(&self, k: &Key, op: &str) -> Result<&Positions>;
 }
 
 pub struct NamedStore<T, F> {
@@ -75,46 +131,47 @@ impl<T, F> NamedStore<T, F> {
 }
 
 #[derive(Default)]
-pub struct Indices<T, F> {
-    indices: Vec<NamedStore<T, F>>,
-}
+pub struct Indices<T, F>(Vec<NamedStore<T, F>>);
 
 impl<T, F> Indices<T, F> {
     pub fn new() -> Self {
-        Self {
-            indices: Vec::new(),
-        }
+        Self(Vec::new())
     }
 
     pub fn add(&mut self, name: &'static str, store: Box<dyn Store>, get_field_value: F) {
-        self.indices
-            .push(NamedStore::new(name, store, get_field_value));
+        self.0.push(NamedStore::new(name, store, get_field_value));
     }
 
-    fn insert_index<I>(&mut self, idx_name: &str, t: &T, pos: Pos)
+    fn insert_index<I>(&mut self, idx_name: &str, t: &T, pos: Pos) -> Result
     where
-        I: Into<Index>,
+        I: Into<Key>,
         F: Fn(&T) -> I,
     {
-        for s in &mut self.indices {
+        for s in &mut self.0 {
             if s.name == idx_name {
                 let idx = (s.get_field_value)(t);
-                s.store.insert(idx.into(), pos);
+                s.store.insert(&idx.into(), pos)?;
             }
         }
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
+    use super::{uint::UIntIndexStore, *};
+
+    struct Person(usize, &'static str);
 
     #[test]
-    fn it_works() {
-        // struct Person(usize);
-
-        // let mut indices = Indices::new();
-        // indices.add("pk", Box::new(ListIndex), |p: &Person| p.0);
-        // indices.insert_index("pk", &Person(3), 0);
+    fn person_indices() {
+        let mut indices = Indices::new();
+        indices.add(
+            "pk",
+            Box::new(UIntIndexStore::new_unique()),
+            |p: &Person| p.0,
+        );
+        indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();
     }
 }
