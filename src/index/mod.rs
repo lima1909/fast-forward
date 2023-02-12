@@ -48,43 +48,56 @@ pub enum Number {
     F32(f32),
 }
 
-/// Pos is the index in a List ([`std::vec::Vec`])
-pub type Pos = usize;
+/// Idx is the index in a List ([`std::vec::Vec`])
+pub type Idx = usize;
 
-/// 0, 1 or many [`Pos`]
+pub trait AsSlice {
+    fn as_slice(&self) -> &[Idx];
+}
+
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct Positions(Vec<Pos>);
+pub struct UniqueIndex([Idx; 1]);
 
-impl Positions {
-    fn is_none(&self) -> bool {
-        self.0.is_empty()
+impl From<Idx> for UniqueIndex {
+    fn from(i: Idx) -> Self {
+        Self([i])
+    }
+}
+
+impl AsSlice for UniqueIndex {
+    fn as_slice(&self) -> &[Idx] {
+        &self.0
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct AmbiguousIndex(Vec<Idx>);
+
+impl AmbiguousIndex {
+    fn new(i: Idx) -> Self {
+        Self(vec![i])
     }
 
-    fn add(&mut self, pos: Pos) {
-        self.0.push(pos);
+    fn push(&mut self, i: Idx) {
+        self.0.push(i);
     }
+}
 
-    fn pos(&self) -> &[Pos] {
-        self.0.as_slice()
+impl From<Vec<Idx>> for AmbiguousIndex {
+    fn from(v: Vec<Idx>) -> Self {
+        Self(v)
     }
+}
 
-    fn unique(&self) -> Option<&Pos> {
-        self.0.first()
-    }
-
-    fn from_vec(indices: Vec<Pos>) -> Self {
-        Self(indices)
-    }
-
-    fn from_pos(pos: Pos) -> Self {
-        Self(vec![pos])
+impl AsSlice for AmbiguousIndex {
+    fn as_slice(&self) -> &[Idx] {
+        &self.0
     }
 }
 
 /// A Store for Indices. It's a mapping from a given [`Index`] to a position in a List.
-pub trait Store: Index<(Key, &'static str), Output = Positions> {
-    fn insert(&mut self, k: &Key, p: Pos) -> Result;
-    // fn filter(&self, k: &Key, op: &str) -> Result<&Positions>;
+pub trait Store: Index<(Key, &'static str), Output = [Idx]> {
+    fn insert(&mut self, k: &Key, i: Idx) -> Result;
 }
 
 pub struct NamedStore<T, F> {
@@ -117,15 +130,15 @@ impl<T, F> Indices<T, F> {
         self.0.push(NamedStore::new(name, store, get_field_value));
     }
 
-    fn insert_index<I>(&mut self, idx_name: &str, t: &T, pos: Pos) -> Result
+    fn insert_index<I>(&mut self, idx_name: &str, t: &T, idx: Idx) -> Result
     where
         I: Into<Key>,
         F: Fn(&T) -> I,
     {
         for s in &mut self.0 {
             if s.name == idx_name {
-                let idx = (s.get_field_value)(t);
-                s.store.insert(&idx.into(), pos)?;
+                let key = (s.get_field_value)(t);
+                s.store.insert(&key.into(), idx)?;
             }
         }
 
@@ -167,7 +180,10 @@ impl From<String> for Key {
 
 #[cfg(test)]
 mod tests {
-    use super::{uint::UIntIndexStore, *};
+    use super::{
+        uint::{UIntIndexStore, UniqueListIndex},
+        *,
+    };
 
     struct Person(usize, &'static str);
 
@@ -176,7 +192,7 @@ mod tests {
         let mut indices = Indices::new();
         indices.add(
             "pk",
-            Box::new(UIntIndexStore::new_unique()),
+            Box::new(UIntIndexStore::<UniqueListIndex>::default()),
             |p: &Person| p.0,
         );
         indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();
