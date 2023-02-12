@@ -5,7 +5,7 @@
 //!
 //! There are two types of Index:
 //! - `Unique Index`: for a `Key` exist exactly one `Position`
-//! - `Multi Index`: for a `Key` exists many `Position`s
+//! - `Ambiguous Index`: for a `Key` exists many `Position`s
 //!
 //! # Example for an Vec-Mulit-Index:
 //!
@@ -30,7 +30,7 @@ pub mod error;
 pub mod uint;
 
 pub use error::IndexError;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Index};
 
 type Result<T = ()> = std::result::Result<T, IndexError>;
 
@@ -40,41 +40,12 @@ pub enum Key {
     Number(Number),
     String(String),
 }
-impl From<usize> for Key {
-    fn from(value: usize) -> Self {
-        Key::Number(Number::Usize(value))
-    }
-}
-
-impl From<String> for Key {
-    fn from(value: String) -> Self {
-        Key::String(value)
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Number {
     Usize(usize),
     I32(i32),
     F32(f32),
-}
-
-impl From<usize> for Number {
-    fn from(value: usize) -> Self {
-        Number::Usize(value)
-    }
-}
-
-impl From<i32> for Number {
-    fn from(value: i32) -> Self {
-        Number::I32(value)
-    }
-}
-
-impl From<f32> for Number {
-    fn from(value: f32) -> Self {
-        Number::F32(value)
-    }
 }
 
 /// Pos is the index in a List ([`std::vec::Vec`])
@@ -85,10 +56,6 @@ pub type Pos = usize;
 pub struct Positions(Vec<Pos>);
 
 impl Positions {
-    fn from_vec(indices: Vec<Pos>) -> Self {
-        Self(indices)
-    }
-
     fn is_none(&self) -> bool {
         self.0.is_empty()
     }
@@ -102,14 +69,22 @@ impl Positions {
     }
 
     fn unique(&self) -> Option<&Pos> {
-        self.0.get(0)
+        self.0.first()
+    }
+
+    fn from_vec(indices: Vec<Pos>) -> Self {
+        Self(indices)
+    }
+
+    fn from_pos(pos: Pos) -> Self {
+        Self(vec![pos])
     }
 }
 
 /// A Store for Indices. It's a mapping from a given [`Index`] to a position in a List.
-pub trait Store {
+pub trait Store: Index<(Key, &'static str), Output = Positions> {
     fn insert(&mut self, k: &Key, p: Pos) -> Result;
-    fn filter(&self, k: &Key, op: &str) -> Result<&Positions>;
+    // fn filter(&self, k: &Key, op: &str) -> Result<&Positions>;
 }
 
 pub struct NamedStore<T, F> {
@@ -155,6 +130,38 @@ impl<T, F> Indices<T, F> {
         }
 
         Ok(())
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! into_key {
+    ( $as:ty : $($t:ty), + => $key_t:tt ) => {
+        $(
+        impl From<$t> for $crate::index::Number {
+            fn from(val: $t) -> Self {
+                $crate::index::Number::$key_t(val as $as)
+            }
+        }
+
+        impl From<$t> for $crate::index::Key {
+            fn from(val: $t) -> Self {
+                $crate::index::Key::Number($crate::index::Number::$key_t(val as $as))
+            }
+        }
+
+        )+
+    };
+
+}
+
+into_key!(usize : usize, u8, u32, u64  => Usize);
+into_key!(i32   : i8, i32, i64 => I32);
+into_key!(f32   : f32, f64 => F32);
+
+impl From<String> for Key {
+    fn from(value: String) -> Self {
+        Key::String(value)
     }
 }
 
