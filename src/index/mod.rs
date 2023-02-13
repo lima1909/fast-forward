@@ -172,6 +172,34 @@ into_key!(usize : usize, u8, u32, u64  => Usize);
 into_key!(i32   : i8, i32, i64 => I32);
 into_key!(f32   : f32, f64 => F32);
 
+impl Key {
+    fn get_usize(&self) -> Result<usize> {
+        match self {
+            Key::Number(n) => n.get_usize(),
+            Key::String(_) => Err(IndexError::InvalidKeyType {
+                expected: "usize",
+                got: "String",
+            }),
+        }
+    }
+}
+
+impl Number {
+    fn get_usize(&self) -> Result<usize> {
+        match self {
+            Number::Usize(u) => Ok(*u),
+            Number::I32(i) => TryFrom::try_from(*i).map_err(|_| IndexError::InvalidKeyType {
+                expected: "usize",
+                got: "i32",
+            }),
+            Number::F32(_) => Err(IndexError::InvalidKeyType {
+                expected: "usize",
+                got: "f32",
+            }),
+        }
+    }
+}
+
 impl From<String> for Key {
     fn from(value: String) -> Self {
         Key::String(value)

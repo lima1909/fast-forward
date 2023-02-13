@@ -38,24 +38,16 @@ impl<I: ListIndex> Index<(Key, &'static str)> for U32Index<I> {
             todo!()
         }
 
-        let idx = match key.0 {
-            Key::Number(super::Number::Usize(u)) => u,
-            Key::Number(super::Number::I32(i)) => usize::try_from(i).ok().unwrap(),
-            _ => todo!(),
-        };
-
-        self.0.as_slice(idx)
+        match key.0.get_usize() {
+            Ok(idx) => self.0.as_slice(idx),
+            Err(_) => &[],
+        }
     }
 }
 
 impl<I: ListIndex> Store for U32Index<I> {
     fn insert(&mut self, key: &Key, idx: Idx) -> Result {
-        let i = match key {
-            Key::Number(super::Number::Usize(u)) => *u,
-            Key::Number(super::Number::I32(i)) => usize::try_from(*i).ok().unwrap(),
-            _ => todo!(),
-        };
-        self.0.insert(i, idx)
+        self.0.insert(key.get_usize()?, idx)
     }
 }
 
