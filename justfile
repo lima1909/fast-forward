@@ -3,6 +3,7 @@ default:
   @just -q --list
 
 alias t := test
+alias l := clippy
 
 # run all tests with all-features
 test filter="":
