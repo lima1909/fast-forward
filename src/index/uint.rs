@@ -1,7 +1,7 @@
 //! Index for 32-bit unsigned integer type.
-use std::ops::{Deref, Index};
+use std::ops::{Deref, DerefMut, Index};
 
-use super::{AmbiguousIdx, AsIdxSlice, Idx, IndexError, Key, Result, Store, UniqueIdx};
+use super::{Idx, Key, Result, Store, UniformIdx};
 
 /// Index for 32-bit unsigned integer type [`u32`].
 ///
@@ -22,19 +22,9 @@ use super::{AmbiguousIdx, AsIdxSlice, Idx, IndexError, Key, Result, Store, Uniqu
 ///
 /// ```
 #[derive(Debug, Default)]
-pub struct U32Index<I>(I);
+pub struct U32Index<I: UniformIdx>(ListIndex<I>);
 
-impl<I: ListIndex> U32Index<I> {}
-
-impl<I> Deref for U32Index<I> {
-    type Target = I;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<I: ListIndex> Index<(Key, &'static str)> for U32Index<I> {
+impl<I: UniformIdx> Index<(Key, &'static str)> for U32Index<I> {
     type Output = [Idx];
 
     fn index(&self, key: (Key, &'static str)) -> &Self::Output {
@@ -43,85 +33,57 @@ impl<I: ListIndex> Index<(Key, &'static str)> for U32Index<I> {
         }
 
         match key.0.get_usize() {
-            Ok(idx) => self.as_slice(idx),
+            Ok(idx) => self.0.as_idx_slice(idx),
             Err(_) => &[],
         }
     }
 }
 
-impl<I: ListIndex> Store for U32Index<I> {
+impl<I: UniformIdx + Clone> Store for U32Index<I> {
     fn insert(&mut self, key: &Key, idx: Idx) -> Result {
-        self.0.insert(key.get_usize()?, idx)
+        self.0.insert_idx(key.get_usize()?, idx)
     }
 }
+#[derive(Debug, Default)]
+struct ListIndex<I: UniformIdx>(Vec<Option<I>>);
 
-#[allow(private_in_public)]
-trait ListIndex: Default {
-    fn insert(&mut self, key: Idx, idx: Idx) -> Result;
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-    fn as_slice(&self, i: Idx) -> &[Idx];
-}
-
-/// Unique Index.
-#[derive(Debug, Default, PartialEq, Eq)]
-pub struct Unique(Vec<Option<UniqueIdx>>);
-
-impl ListIndex for Unique {
-    fn insert(&mut self, key: Idx, idx: Idx) -> Result {
+impl<I: UniformIdx> ListIndex<I> {
+    fn insert_idx(&mut self, key: Idx, idx: Idx) -> Result
+    where
+        I: Clone,
+    {
         if self.len() <= key {
-            self.0.resize(key + 1, None);
+            self.resize(key + 1, None);
         }
 
-        if self.0[key].is_some() {
-            return Err(IndexError::NotUniqueKey(key.into()));
+        match self[key].as_mut() {
+            Some(i) => i.add(idx),
+            None => {
+                self[key] = Some(I::new(idx));
+                Ok(())
+            }
         }
-
-        self.0[key] = Some(idx.into());
-        Ok(())
     }
 
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    fn as_slice(&self, i: Idx) -> &[Idx] {
-        match self.0.get(i) {
+    fn as_idx_slice(&self, i: Idx) -> &[Idx] {
+        match self.get(i) {
             Some(Some(i)) => i.as_idx_slice(),
             _ => &[],
         }
     }
 }
 
-/// Ambiguous Index.
-#[derive(Debug, Default, PartialEq, Eq)]
-pub struct Ambiguous(Vec<Option<AmbiguousIdx>>);
+impl<I: UniformIdx> Deref for ListIndex<I> {
+    type Target = Vec<Option<I>>;
 
-impl ListIndex for Ambiguous {
-    fn insert(&mut self, key: Idx, idx: Idx) -> Result {
-        if self.0.len() <= key {
-            self.0.resize(key + 1, None);
-        }
-
-        match self.0[key].as_mut() {
-            Some(i) => i.push(idx),
-            None => self.0[key] = Some(AmbiguousIdx::new(idx)),
-        }
-
-        Ok(())
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
+}
 
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    fn as_slice(&self, i: Idx) -> &[Idx] {
-        match self.0.get(i) {
-            Some(Some(i)) => i.as_idx_slice(),
-            _ => &[],
-        }
+impl<I: UniformIdx> DerefMut for ListIndex<I> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -129,27 +91,29 @@ impl ListIndex for Ambiguous {
 mod tests {
 
     mod unique {
+        use crate::index::{IndexError, UniqueIdx};
+
         use super::super::*;
 
         #[test]
         fn empty() {
-            let idx = U32Index::<Unique>::default();
+            let idx = U32Index::<UniqueIdx>::default();
             assert_eq!(0, idx.index((2.into(), "=")).len());
-            assert!(idx.is_empty());
+            assert!(idx.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut idx = U32Index::<Unique>::default();
+            let mut idx = U32Index::<UniqueIdx>::default();
             idx.insert(&2.into(), 2).unwrap();
 
             assert!(idx[(2.into(), "=")].eq(&[2]));
-            assert_eq!(3, idx.len());
+            assert_eq!(3, idx.0.len());
         }
 
         #[test]
         fn double_index() {
-            let mut idx = U32Index::<Unique>::default();
+            let mut idx = U32Index::<UniqueIdx>::default();
             idx.insert(&2.into(), 2).unwrap();
 
             assert_eq!(
@@ -160,33 +124,35 @@ mod tests {
 
         #[test]
         fn out_of_bound() {
-            let idx = U32Index::<Unique>::default();
+            let idx = U32Index::<UniqueIdx>::default();
             assert_eq!(0, idx.index((2.into(), "=")).len());
         }
     }
 
     mod ambiguous {
+        use crate::index::AmbiguousIdx;
+
         use super::super::*;
 
         #[test]
         fn empty() {
-            let idx = U32Index::<Ambiguous>::default();
+            let idx = U32Index::<AmbiguousIdx>::default();
             assert_eq!(0, idx.index((2.into(), "=")).len());
-            assert!(idx.is_empty());
+            assert!(idx.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut idx = U32Index::<Ambiguous>::default();
+            let mut idx = U32Index::<AmbiguousIdx>::default();
             idx.insert(&2.into(), 2).unwrap();
 
             assert!(idx[(2.into(), "=")].eq(&[2]));
-            assert_eq!(3, idx.len());
+            assert_eq!(3, idx.0.len());
         }
 
         #[test]
         fn double_index() {
-            let mut idx = U32Index::<Ambiguous>::default();
+            let mut idx = U32Index::<AmbiguousIdx>::default();
             idx.insert(&2.into(), 2).unwrap();
             idx.insert(&2.into(), 1).unwrap();
 

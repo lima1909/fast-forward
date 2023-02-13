@@ -66,34 +66,50 @@ impl From<Idx> for UniqueIdx {
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct AmbiguousIdx(Vec<Idx>);
 
-impl AmbiguousIdx {
-    fn new(i: Idx) -> Self {
-        Self(vec![i])
-    }
-
-    fn push(&mut self, i: Idx) {
-        self.0.push(i);
-    }
-}
-
 impl From<Vec<Idx>> for AmbiguousIdx {
     fn from(v: Vec<Idx>) -> Self {
         Self(v)
     }
 }
 
-/// Common interface for getting the [`Idx`]s from [`UniqueIdx`] and [`AmbiguousIdx`].
-pub trait AsIdxSlice {
+/// Uniform interface for using: [`UniqueIdx`] or [`AmbiguousIdx`] in the same way.
+pub trait UniformIdx {
+    fn new(i: Idx) -> Self;
+    fn add(&mut self, i: Idx) -> Result;
     fn as_idx_slice(&self) -> &[Idx];
-}
-
-impl AsIdxSlice for UniqueIdx {
-    fn as_idx_slice(&self) -> &[Idx] {
-        &self.0
+    fn is_unique(&self) -> bool {
+        false
     }
 }
 
-impl AsIdxSlice for AmbiguousIdx {
+impl UniformIdx for UniqueIdx {
+    fn new(i: Idx) -> Self {
+        Self([i])
+    }
+
+    fn add(&mut self, i: Idx) -> Result {
+        Err(IndexError::NotUniqueKey(i.into()))
+    }
+
+    fn as_idx_slice(&self) -> &[Idx] {
+        &self.0
+    }
+
+    fn is_unique(&self) -> bool {
+        true
+    }
+}
+
+impl UniformIdx for AmbiguousIdx {
+    fn new(i: Idx) -> Self {
+        Self(vec![i])
+    }
+
+    fn add(&mut self, i: Idx) -> Result {
+        self.0.push(i);
+        Ok(())
+    }
+
     fn as_idx_slice(&self) -> &[Idx] {
         &self.0
     }
@@ -213,17 +229,16 @@ impl From<String> for Key {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        uint::{U32Index, Unique},
-        *,
-    };
+    use super::{uint::U32Index, *};
 
     struct Person(usize, &'static str);
 
     #[test]
     fn person_indices() {
         let mut indices = Indices::new();
-        indices.add("pk", Box::<U32Index<Unique>>::default(), |p: &Person| p.0);
+        indices.add("pk", Box::<U32Index<UniqueIdx>>::default(), |p: &Person| {
+            p.0
+        });
         indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();
     }
 }
