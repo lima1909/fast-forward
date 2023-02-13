@@ -2,7 +2,12 @@
 name = "fast-forward"
 version = "0.1.0"
 edition = "2021"
+authors = ["Mario Linke"]
+description = "Quering lists blazing fast."
+keywords = ["filter", "query", "index", "inmemory", "database", "embedded"]
+license = "Apache-2.0"
+documentation = "https://docs.rs/fast-forward/"
+repository = "https://github.com/lima1909/fast-forward"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
