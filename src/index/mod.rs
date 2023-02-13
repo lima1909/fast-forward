@@ -223,11 +223,7 @@ mod tests {
     #[test]
     fn person_indices() {
         let mut indices = Indices::new();
-        indices.add(
-            "pk",
-            Box::new(U32Index::<Unique>::default()),
-            |p: &Person| p.0,
-        );
+        indices.add("pk", Box::<U32Index<Unique>>::default(), |p: &Person| p.0);
         indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();
     }
 }

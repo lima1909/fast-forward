@@ -1,5 +1,5 @@
 //! Index for 32-bit unsigned integer type.
-use std::ops::Index;
+use std::ops::{Deref, Index};
 
 use super::{AmbiguousIdx, AsIdxSlice, Idx, IndexError, Key, Result, Store, UniqueIdx};
 
@@ -24,13 +24,13 @@ use super::{AmbiguousIdx, AsIdxSlice, Idx, IndexError, Key, Result, Store, Uniqu
 #[derive(Debug, Default)]
 pub struct U32Index<I>(I);
 
-impl<I: ListIndex> U32Index<I> {
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
+impl<I: ListIndex> U32Index<I> {}
 
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+impl<I> Deref for U32Index<I> {
+    type Target = I;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -43,7 +43,7 @@ impl<I: ListIndex> Index<(Key, &'static str)> for U32Index<I> {
         }
 
         match key.0.get_usize() {
-            Ok(idx) => self.0.as_slice(idx),
+            Ok(idx) => self.as_slice(idx),
             Err(_) => &[],
         }
     }
@@ -71,7 +71,7 @@ pub struct Unique(Vec<Option<UniqueIdx>>);
 
 impl ListIndex for Unique {
     fn insert(&mut self, key: Idx, idx: Idx) -> Result {
-        if self.0.len() <= key {
+        if self.len() <= key {
             self.0.resize(key + 1, None);
         }
 
