@@ -1,21 +1,25 @@
+//! Index for 32-bit unsigned integer type.
 use std::ops::Index;
 
-use super::{AmbiguousIndex, AsSlice, Idx, IndexError, Key, Result, Store, UniqueIndex};
+use super::{AmbiguousIdx, AsIdxSlice, Idx, IndexError, Key, Result, Store, UniqueIdx};
 
-/// Index for
+/// Index for 32-bit unsigned integer type [`u32`].
 ///
-/// Well suitable for `unsigned integer (u32)` ( for example Primary Keys).
-///
+/// Well suitable for for example Primary Keys
 ///```java
-/// let _primary_keys = vec![1, 2, 3, ...];
+/// let _unique_values = vec![3, 2, 4, 1, ...];
 ///
-/// PrimaryKey | Position
-/// ----------------------
-///     0      |   -
-///     1      |   0
-///     2      |   1
-///     3      |   2
-///    ...     |  ...
+/// UniqueIdx:
+///
+///  Key | Idx (_values)
+/// --------------------
+///  0   |  -
+///  1   |  3
+///  2   |  1
+///  3   |  0
+///  4   |  2
+/// ...  | ...
+///
 /// ```
 #[derive(Debug, Default)]
 pub struct U32Index<I>(I);
@@ -51,7 +55,8 @@ impl<I: ListIndex> Store for U32Index<I> {
     }
 }
 
-pub trait ListIndex: Default {
+#[allow(private_in_public)]
+trait ListIndex: Default {
     fn insert(&mut self, key: Idx, idx: Idx) -> Result;
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool {
@@ -60,8 +65,9 @@ pub trait ListIndex: Default {
     fn as_slice(&self, i: Idx) -> &[Idx];
 }
 
+/// Unique Index.
 #[derive(Debug, Default, PartialEq, Eq)]
-pub struct Unique(Vec<Option<UniqueIndex>>);
+pub struct Unique(Vec<Option<UniqueIdx>>);
 
 impl ListIndex for Unique {
     fn insert(&mut self, key: Idx, idx: Idx) -> Result {
@@ -70,7 +76,7 @@ impl ListIndex for Unique {
         }
 
         if self.0[key].is_some() {
-            return Err(IndexError::NotUnique(key.into()));
+            return Err(IndexError::NotUniqueKey(key.into()));
         }
 
         self.0[key] = Some(idx.into());
@@ -83,14 +89,15 @@ impl ListIndex for Unique {
 
     fn as_slice(&self, i: Idx) -> &[Idx] {
         match self.0.get(i) {
-            Some(Some(i)) => i.as_slice(),
+            Some(Some(i)) => i.as_idx_slice(),
             _ => &[],
         }
     }
 }
 
+/// Ambiguous Index.
 #[derive(Debug, Default, PartialEq, Eq)]
-pub struct Ambiguous(Vec<Option<AmbiguousIndex>>);
+pub struct Ambiguous(Vec<Option<AmbiguousIdx>>);
 
 impl ListIndex for Ambiguous {
     fn insert(&mut self, key: Idx, idx: Idx) -> Result {
@@ -100,7 +107,7 @@ impl ListIndex for Ambiguous {
 
         match self.0[key].as_mut() {
             Some(i) => i.push(idx),
-            None => self.0[key] = Some(AmbiguousIndex::new(idx)),
+            None => self.0[key] = Some(AmbiguousIdx::new(idx)),
         }
 
         Ok(())
@@ -112,7 +119,7 @@ impl ListIndex for Ambiguous {
 
     fn as_slice(&self, i: Idx) -> &[Idx] {
         match self.0.get(i) {
-            Some(Some(i)) => i.as_slice(),
+            Some(Some(i)) => i.as_idx_slice(),
             _ => &[],
         }
     }
@@ -146,7 +153,7 @@ mod tests {
             idx.insert(&2.into(), 2).unwrap();
 
             assert_eq!(
-                Err(IndexError::NotUnique(2usize.into())),
+                Err(IndexError::NotUniqueKey(2usize.into())),
                 idx.insert(&2.into(), 2)
             );
         }

@@ -1,28 +1,28 @@
-//! An Index has the function to find faster a specific item in a list (Slice, Vec, ...).
+//! The purpose of an Index is to find faster a specific item in a list (Slice, Vec, ...).
 //! This means, it does not have to touch and compare every item in the list.
 //!
-//! An Index has two parts, a `Key` (item to search for) and a `Position` (the index in the list: [`Idx`]).
+//! An Index has two parts, a [`Key`] (item to search for) and a position (the index in the list) [`Idx`].
 //!
 //! There are two types of Index:
-//! - [`UniqueIndex`]: for a `Key` exist exactly one `Position`
-//! - [`AmbiguousIndex`]: for a `Key` exists many `Position`s
+//! - [`UniqueIdx`]: for a given [`Key`] exist exactly one [`Idx`]
+//! - [`AmbiguousIdx`]: for a given [`Key`] exists many [`Idx`]s
 //!
-//! # Example for an Vec-Mulit-Index:
+//! # Example for an Vec-Ambiguous-Index:
 //!
 //! Map-Index:
 //!
-//! - `Key`      = name (String)
-//! - `Position` = index in Vec
+//! - [`Key`] = name (String)
+//! - [`Idx`] = index in Vec
 //!
 //! ```java
 //! let _names = vec!["Paul", "Jasmin", "Inge", "Paul", ...];
 //!
-//!  Key (name)   | Position (index in Vec)
-//! ----------------------------------------
-//!  "Jasmin"     |      1
-//!  "Paul"       |      0, 3
-//!  "Inge"       |      2
-//!   ...         |     ...
+//!  Key       | Idx
+//! -------------------
+//!  "Jasmin"  | 1
+//!  "Paul"    | 0, 3
+//!  "Inge"    | 2
+//!   ...      | ...
 //! ```
 
 #![allow(dead_code)]
@@ -34,13 +34,14 @@ use std::{marker::PhantomData, ops::Index};
 
 type Result<T = ()> = std::result::Result<T, IndexError>;
 
-/// A wrapper for supported Index-Types.
+/// Is the value and type for searching an item.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Key {
     Number(Number),
     String(String),
 }
 
+/// [`Key`] of type [`Number`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum Number {
     Usize(usize),
@@ -48,32 +49,24 @@ pub enum Number {
     F32(f32),
 }
 
-/// Idx is the index in a List ([`std::vec::Vec`])
+/// Idx is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
 
-pub trait AsSlice {
-    fn as_slice(&self) -> &[Idx];
-}
-
+/// Unique index, has one [`Idx`].
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct UniqueIndex([Idx; 1]);
+pub struct UniqueIdx([Idx; 1]);
 
-impl From<Idx> for UniqueIndex {
+impl From<Idx> for UniqueIdx {
     fn from(i: Idx) -> Self {
         Self([i])
     }
 }
 
-impl AsSlice for UniqueIndex {
-    fn as_slice(&self) -> &[Idx] {
-        &self.0
-    }
-}
-
+/// Ambiguous indices, has a list of [`Idx`]s.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct AmbiguousIndex(Vec<Idx>);
+pub struct AmbiguousIdx(Vec<Idx>);
 
-impl AmbiguousIndex {
+impl AmbiguousIdx {
     fn new(i: Idx) -> Self {
         Self(vec![i])
     }
@@ -83,14 +76,25 @@ impl AmbiguousIndex {
     }
 }
 
-impl From<Vec<Idx>> for AmbiguousIndex {
+impl From<Vec<Idx>> for AmbiguousIdx {
     fn from(v: Vec<Idx>) -> Self {
         Self(v)
     }
 }
 
-impl AsSlice for AmbiguousIndex {
-    fn as_slice(&self) -> &[Idx] {
+/// Common interface for getting the [`Idx`]s from [`UniqueIdx`] and [`AmbiguousIdx`].
+pub trait AsIdxSlice {
+    fn as_idx_slice(&self) -> &[Idx];
+}
+
+impl AsIdxSlice for UniqueIdx {
+    fn as_idx_slice(&self) -> &[Idx] {
+        &self.0
+    }
+}
+
+impl AsIdxSlice for AmbiguousIdx {
+    fn as_idx_slice(&self) -> &[Idx] {
         &self.0
     }
 }
@@ -100,7 +104,7 @@ pub trait Store: Index<(Key, &'static str), Output = [Idx]> {
     fn insert(&mut self, k: &Key, i: Idx) -> Result;
 }
 
-pub struct NamedStore<T, F> {
+struct NamedStore<T, F> {
     name: &'static str,
     store: Box<dyn Store>,
     get_field_value: F,
@@ -118,6 +122,7 @@ impl<T, F> NamedStore<T, F> {
     }
 }
 
+/// Collection of indices ([`Store`]s).
 #[derive(Default)]
 pub struct Indices<T, F>(Vec<NamedStore<T, F>>);
 
