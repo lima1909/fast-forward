@@ -32,6 +32,8 @@ pub mod uint;
 pub use error::IndexError;
 use std::{marker::PhantomData, ops::Index};
 
+use crate::Op;
+
 type Result<T = ()> = std::result::Result<T, IndexError>;
 
 /// Is the value and type for searching an item.
@@ -76,7 +78,8 @@ impl From<Vec<Idx>> for AmbiguousIdx {
 pub trait UniformIdx {
     fn new(i: Idx) -> Self;
     fn add(&mut self, i: Idx) -> Result;
-    fn as_idx_slice(&self) -> &[Idx];
+    // if it is stable, use [`core::slice::SlicePattern`] instead
+    fn as_slice(&self) -> &[Idx];
     fn is_unique(&self) -> bool {
         false
     }
@@ -91,7 +94,7 @@ impl UniformIdx for UniqueIdx {
         Err(IndexError::NotUniqueKey(i.into()))
     }
 
-    fn as_idx_slice(&self) -> &[Idx] {
+    fn as_slice(&self) -> &[Idx] {
         &self.0
     }
 
@@ -110,13 +113,13 @@ impl UniformIdx for AmbiguousIdx {
         Ok(())
     }
 
-    fn as_idx_slice(&self) -> &[Idx] {
+    fn as_slice(&self) -> &[Idx] {
         &self.0
     }
 }
 
 /// A Store for Indices. It's a mapping from a given [`Index`] to a position in a List.
-pub trait Store: Index<(Key, &'static str), Output = [Idx]> {
+pub trait Store: Index<(Key, Op), Output = [Idx]> {
     fn insert(&mut self, k: &Key, i: Idx) -> Result;
 }
 
