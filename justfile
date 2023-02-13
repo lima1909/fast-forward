@@ -15,4 +15,4 @@ watch filter="":
 
 # run cargo test and clippy
 clippy: test
-  @cargo clippy 
+  @cargo clippy --tests --workspace -- -D warnings
