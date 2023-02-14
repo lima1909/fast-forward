@@ -4,7 +4,7 @@ use index::{Idx, Key};
 
 pub mod index;
 
-/// Id for operations. The default operations are [`DefaultOp`]
+/// Id for operations.
 pub type Op = u8;
 
 /// Filter is a given query key: [`Key`] and operation: [`Op`]
