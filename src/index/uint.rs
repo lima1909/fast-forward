@@ -1,7 +1,7 @@
 //! Index for 32-bit unsigned integer type.
 use std::ops::{Deref, DerefMut, Index};
 
-use crate::Op;
+use crate::{ops, Filter};
 
 use super::{Idx, Key, Result, Store, UniformIdx};
 
@@ -26,14 +26,13 @@ use super::{Idx, Key, Result, Store, UniformIdx};
 #[derive(Debug, Default)]
 pub struct U32Index<I: UniformIdx>(ListIndex<I>);
 
-impl<I: UniformIdx> Index<(Key, Op)> for U32Index<I> {
+impl<I: UniformIdx> Index<Filter> for U32Index<I> {
     type Output = [Idx];
 
-    fn index(&self, kop: (Key, Op)) -> &Self::Output {
+    fn index(&self, kop: Filter) -> &Self::Output {
         match kop.0.get_usize() {
             Ok(idx) => match kop.1 {
-                // DefaultOp::Eq
-                1 => self.0.as_idx_slice(idx),
+                ops::EQ => self.0.as_idx_slice(idx),
                 _ => &[],
             },
             Err(_) => &[],
@@ -92,26 +91,47 @@ impl<I: UniformIdx> DerefMut for ListIndex<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::DefaultOp::*;
 
     mod unique {
         use super::*;
-        use crate::index::{IndexError, UniqueIdx};
+        use crate::{
+            index::{IndexError, UniqueIdx},
+            ops::eq,
+            Query,
+        };
 
         #[test]
         fn empty() {
             let idx = U32Index::<UniqueIdx>::default();
-            assert_eq!(0, idx.index((2.into(), Eq.as_u8())).len());
+            assert_eq!(0, idx[eq(2usize)].len());
             assert!(idx.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
             let mut idx = U32Index::<UniqueIdx>::default();
-            idx.insert(&2.into(), 2).unwrap();
+            idx.insert(&2.into(), 4).unwrap();
 
-            assert!(idx[(2.into(), Eq.as_u8())].eq(&[2]));
+            assert_eq!(idx.filter(eq(2)), &[4]);
             assert_eq!(3, idx.0.len());
+        }
+
+        #[test]
+        fn or_find_idx_3_4() {
+            let mut idx = U32Index::<UniqueIdx>::default();
+            idx.insert(&2.into(), 4).unwrap();
+            idx.insert(&4.into(), 8).unwrap();
+            idx.insert(&3.into(), 6).unwrap();
+
+            let r = idx.or(eq(3), eq(4));
+            assert!(r.contains(&&8));
+            assert!(r.contains(&&6));
+
+            let r = idx.or(eq(3), eq(99));
+            assert!(r.contains(&&6));
+
+            let r = idx.or(eq(99), eq(4));
+            assert!(r.contains(&&8));
         }
 
         #[test]
@@ -128,18 +148,18 @@ mod tests {
         #[test]
         fn out_of_bound() {
             let idx = U32Index::<UniqueIdx>::default();
-            assert_eq!(0, idx.index((2.into(), Eq.as_u8())).len());
+            assert_eq!(0, idx[eq(2)].len());
         }
     }
 
     mod ambiguous {
         use super::*;
-        use crate::index::AmbiguousIdx;
+        use crate::{index::AmbiguousIdx, ops::eq};
 
         #[test]
         fn empty() {
             let idx = U32Index::<AmbiguousIdx>::default();
-            assert_eq!(0, idx.index((2.into(), Eq.as_u8())).len());
+            assert_eq!(0, idx[eq(2)].len());
             assert!(idx.0.is_empty());
         }
 
@@ -148,7 +168,7 @@ mod tests {
             let mut idx = U32Index::<AmbiguousIdx>::default();
             idx.insert(&2.into(), 2).unwrap();
 
-            assert!(idx[(2.into(), Eq.as_u8())].eq(&[2]));
+            assert!(idx[eq(2)].eq(&[2]));
             assert_eq!(3, idx.0.len());
         }
 
@@ -158,7 +178,7 @@ mod tests {
             idx.insert(&2.into(), 2).unwrap();
             idx.insert(&2.into(), 1).unwrap();
 
-            assert!(idx[(2.into(), Eq.as_u8())].eq(&[2, 1]));
+            assert!(idx[eq(2)].eq(&[2, 1]));
         }
     }
 }

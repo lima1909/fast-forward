@@ -32,7 +32,7 @@ pub mod uint;
 pub use error::IndexError;
 use std::{marker::PhantomData, ops::Index};
 
-use crate::Op;
+use crate::Filter;
 
 type Result<T = ()> = std::result::Result<T, IndexError>;
 
@@ -119,7 +119,7 @@ impl UniformIdx for AmbiguousIdx {
 }
 
 /// A Store for Indices. It's a mapping from a given [`Index`] to a position in a List.
-pub trait Store: Index<(Key, Op), Output = [Idx]> {
+pub trait Store: Index<Filter, Output = [Idx]> {
     fn insert(&mut self, k: &Key, i: Idx) -> Result;
 }
 
