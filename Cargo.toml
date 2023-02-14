@@ -11,3 +11,11 @@ repository = "https://github.com/lima1909/fast-forward"
 
 
 [dependencies]
+
+
+[dev-dependencies]
+criterion = "0.4"
+
+[[bench]]
+name = "bench_index"
+harness = false

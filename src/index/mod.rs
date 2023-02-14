@@ -123,7 +123,7 @@ pub trait Store: Index<Filter, Output = [Idx]> {
     fn insert(&mut self, k: &Key, i: Idx) -> Result;
 }
 
-struct NamedStore<T, F> {
+pub struct NamedStore<T, F> {
     name: &'static str,
     store: Box<dyn Store>,
     get_field_value: F,
@@ -138,6 +138,10 @@ impl<T, F> NamedStore<T, F> {
             get_field_value,
             _type: PhantomData,
         }
+    }
+
+    pub fn filter(&self, f: Filter) -> &[Idx] {
+        self.store.index(f)
     }
 }
 
@@ -154,7 +158,11 @@ impl<T, F> Indices<T, F> {
         self.0.push(NamedStore::new(name, store, get_field_value));
     }
 
-    fn insert_index<I>(&mut self, idx_name: &str, t: &T, idx: Idx) -> Result
+    pub fn store(&self, idx_name: &str) -> &NamedStore<T, F> {
+        self.0.iter().find(|i| i.name == idx_name).unwrap()
+    }
+
+    pub fn insert_index<I>(&mut self, idx_name: &str, t: &T, idx: Idx) -> Result
     where
         I: Into<Key>,
         F: Fn(&T) -> I,
