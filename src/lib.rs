@@ -8,7 +8,19 @@ pub mod index;
 pub type Op = u8;
 
 /// Filter is a given query key: [`Key`] and operation: [`Op`]
-pub type Filter = (Key, Op);
+pub struct Filter(Key, Op);
+
+impl Filter {
+    #[inline]
+    pub fn key(&self) -> &Key {
+        &self.0
+    }
+
+    #[inline]
+    pub fn op(&self) -> Op {
+        self.1
+    }
+}
 
 pub trait Query: Index<Filter, Output = [Idx]> + Sized {
     fn filter(&self, f: Filter) -> &[Idx] {
@@ -54,12 +66,12 @@ pub mod ops {
 
     /// Equals [`Key`]
     pub fn eq<K: Into<Key>>(key: K) -> Filter {
-        (key.into(), EQ)
+        Filter(key.into(), EQ)
     }
 
     /// Not Equals [`Key`]
     pub fn ne<K: Into<Key>>(key: K) -> Filter {
-        (key.into(), NE)
+        Filter(key.into(), NE)
     }
 
     /// Combine two [`Filter`] with an logical `OR`.

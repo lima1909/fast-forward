@@ -29,9 +29,9 @@ pub struct U32Index<I: UniformIdx>(ListIndex<I>);
 impl<I: UniformIdx> Index<Filter> for U32Index<I> {
     type Output = [Idx];
 
-    fn index(&self, kop: Filter) -> &Self::Output {
-        match kop.0.get_usize() {
-            Ok(idx) => match kop.1 {
+    fn index(&self, f: Filter) -> &Self::Output {
+        match f.key().get_usize() {
+            Ok(idx) => match f.op() {
                 ops::EQ => self.0.as_idx_slice(idx),
                 _ => &[],
             },
