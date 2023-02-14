@@ -39,16 +39,9 @@ type Result<T = ()> = std::result::Result<T, IndexError>;
 /// Is the value and type for searching an item.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Key {
-    Number(Number),
-    String(String),
-}
-
-/// [`Key`] of type [`Number`].
-#[derive(Debug, Clone, PartialEq)]
-pub enum Number {
     Usize(usize),
     I32(i32),
-    F32(f32),
+    String(String),
 }
 
 /// Idx is the index/position in a List ([`std::vec::Vec`]).
@@ -183,58 +176,33 @@ impl<T, F> Indices<T, F> {
 macro_rules! into_key {
     ( $as:ty : $($t:ty), + => $key_t:tt ) => {
         $(
-        impl From<$t> for $crate::index::Number {
-            fn from(val: $t) -> Self {
-                $crate::index::Number::$key_t(val as $as)
-            }
-        }
-
         impl From<$t> for $crate::index::Key {
             fn from(val: $t) -> Self {
-                $crate::index::Key::Number($crate::index::Number::$key_t(val as $as))
+                $crate::index::Key::$key_t(val as $as)
             }
         }
-
         )+
     };
 
 }
 
-into_key!(usize : usize, u8, u32, u64  => Usize);
-into_key!(i32   : i8, i32, i64 => I32);
-into_key!(f32   : f32, f64 => F32);
+into_key!(usize  : usize, u8, u32, u64  => Usize);
+into_key!(i32    : i8, i32, i64 => I32);
+into_key!(String : String => String);
 
 impl Key {
     fn get_usize(&self) -> Result<usize> {
         match self {
-            Key::Number(n) => n.get_usize(),
+            Key::Usize(u) => Ok(*u),
+            Key::I32(i) => TryFrom::try_from(*i).map_err(|_| IndexError::InvalidKeyType {
+                expected: "usize",
+                got: "i32",
+            }),
             Key::String(_) => Err(IndexError::InvalidKeyType {
                 expected: "usize",
                 got: "String",
             }),
         }
-    }
-}
-
-impl Number {
-    fn get_usize(&self) -> Result<usize> {
-        match self {
-            Number::Usize(u) => Ok(*u),
-            Number::I32(i) => TryFrom::try_from(*i).map_err(|_| IndexError::InvalidKeyType {
-                expected: "usize",
-                got: "i32",
-            }),
-            Number::F32(_) => Err(IndexError::InvalidKeyType {
-                expected: "usize",
-                got: "f32",
-            }),
-        }
-    }
-}
-
-impl From<String> for Key {
-    fn from(value: String) -> Self {
-        Key::String(value)
     }
 }
 
