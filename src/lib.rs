@@ -1,18 +1,16 @@
-use std::ops::Index;
-
-use index::{Idx, Key};
+use index::{Idx, Indexer};
 
 pub mod index;
 
 /// Id for operations.
 pub type Op = u8;
 
-/// Filter is a given query key: [`Key`] and operation: [`Op`]
-pub struct Filter(Key, Op);
+/// Filter is a given query K: Key (value) and operation: [`Op`]
+pub struct Filter<K>(K, Op);
 
-impl Filter {
+impl<K> Filter<K> {
     #[inline]
-    pub fn key(&self) -> &Key {
+    pub fn key(&self) -> &K {
         &self.0
     }
 
@@ -22,32 +20,32 @@ impl Filter {
     }
 }
 
-pub trait Query: Index<Filter, Output = [Idx]> + Sized {
-    fn filter(&self, f: Filter) -> &[Idx] {
-        &self[f]
+pub trait Query<K>: Indexer<K> + Sized {
+    fn filter(&self, f: Filter<K>) -> &[Idx] {
+        self.index(f)
     }
 
-    fn or_rhs<'a, Rhs: Index<Filter, Output = [Idx]>>(
+    fn or_rhs<'a, Rhs: Indexer<K>>(
         &'a self,
-        l: Filter,
+        l: Filter<K>,
         ridx: &'a Rhs,
-        r: Filter,
+        r: Filter<K>,
     ) -> Vec<&'a Idx> {
         ops::or(self, l, ridx, r)
     }
 
-    fn or(&self, l: Filter, r: Filter) -> Vec<&Idx> {
-        ops::or::<Self, Self>(self, l, self, r)
+    fn or(&self, l: Filter<K>, r: Filter<K>) -> Vec<&Idx> {
+        ops::or::<K, Self, Self>(self, l, self, r)
     }
 }
 
-impl<I: Index<Filter, Output = [Idx]> + Sized> Query for I {}
+impl<K, I: Indexer<K> + Sized> Query<K> for I {}
 
 pub mod ops {
-    use std::{collections::HashSet, ops::Index};
+    use std::collections::HashSet;
 
     use crate::{
-        index::{Idx, Key},
+        index::{Idx, Indexer},
         Filter, Op,
     };
 
@@ -65,23 +63,24 @@ pub mod ops {
     pub const GE: Op = 6;
 
     /// Equals [`Key`]
-    pub fn eq<K: Into<Key>>(key: K) -> Filter {
-        Filter(key.into(), EQ)
+    pub fn eq<K>(key: K) -> Filter<K> {
+        Filter(key, EQ)
     }
 
     /// Not Equals [`Key`]
-    pub fn ne<K: Into<Key>>(key: K) -> Filter {
+    pub fn ne<K>(key: K) -> Filter<K> {
         Filter(key.into(), NE)
     }
 
     /// Combine two [`Filter`] with an logical `OR`.
-    pub fn or<'a, L, R>(lidx: &'a L, l: Filter, ridx: &'a R, r: Filter) -> Vec<&'a Idx>
-    where
-        L: Index<Filter, Output = [Idx]>,
-        R: Index<Filter, Output = [Idx]>,
-    {
-        let lr = &lidx[l];
-        let rr = &ridx[r];
+    pub fn or<'a, K, L: Indexer<K>, R: Indexer<K>>(
+        lidx: &'a L,
+        l: Filter<K>,
+        ridx: &'a R,
+        r: Filter<K>,
+    ) -> Vec<&'a Idx> {
+        let lr = lidx.index(l);
+        let rr = ridx.index(r);
 
         let mut lhs: HashSet<&Idx> = HashSet::with_capacity(lr.len());
         lhs.extend(lr);

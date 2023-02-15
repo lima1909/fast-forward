@@ -30,7 +30,7 @@ pub mod error;
 pub mod uint;
 
 pub use error::IndexError;
-use std::{marker::PhantomData, ops::Index};
+use std::marker::PhantomData;
 
 use crate::Filter;
 
@@ -47,84 +47,36 @@ pub enum Key {
 /// Idx is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
 
-/// Unique index, has one [`Idx`].
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct UniqueIdx([Idx; 1]);
-
-impl From<Idx> for UniqueIdx {
-    fn from(i: Idx) -> Self {
-        Self([i])
-    }
+pub trait Indexer<K> {
+    fn index(&self, f: Filter<K>) -> &[Idx];
+}
+/// A Store for a mapping from a given Key to an Index (a position in a List).
+pub trait KeyIdxStore<K>: Indexer<K> {
+    fn insert(&mut self, k: K, i: Idx) -> Result;
 }
 
-/// Ambiguous indices, has a list of [`Idx`]s.
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct AmbiguousIdx(Vec<Idx>);
+// fn filter(k: Key, op: crate::Op) {
+//     let _vu: Vec<&dyn KeyIdxStore<usize>> = vec![];
+//     let _vs: Vec<&dyn KeyIdxStore<String>> = vec![];
 
-impl From<Vec<Idx>> for AmbiguousIdx {
-    fn from(v: Vec<Idx>) -> Self {
-        Self(v)
-    }
-}
+//     let _r = match k {
+//         Key::Usize(u) => _vu.get(0).unwrap().filter(&u, op),
+//         Key::String(s) => _vs.get(0).unwrap().filter(&s, op),
+//         Key::I32(_) => todo!(),
+//     };
+// }
 
-/// Uniform interface for using: [`UniqueIdx`] or [`AmbiguousIdx`] in the same way.
-pub trait UniformIdx {
-    fn new(i: Idx) -> Self;
-    fn add(&mut self, i: Idx) -> Result;
-    // if it is stable, use [`core::slice::SlicePattern`] instead
-    fn as_slice(&self) -> &[Idx];
-    fn is_unique(&self) -> bool {
-        false
-    }
-}
-
-impl UniformIdx for UniqueIdx {
-    fn new(i: Idx) -> Self {
-        Self([i])
-    }
-
-    fn add(&mut self, i: Idx) -> Result {
-        Err(IndexError::NotUniqueKey(i.into()))
-    }
-
-    fn as_slice(&self) -> &[Idx] {
-        &self.0
-    }
-
-    fn is_unique(&self) -> bool {
-        true
-    }
-}
-
-impl UniformIdx for AmbiguousIdx {
-    fn new(i: Idx) -> Self {
-        Self(vec![i])
-    }
-
-    fn add(&mut self, i: Idx) -> Result {
-        self.0.push(i);
-        Ok(())
-    }
-
-    fn as_slice(&self) -> &[Idx] {
-        &self.0
-    }
-}
-
-/// A Store for Indices. It's a mapping from a given [`Index`] to a position in a List.
-pub trait Store: Index<Filter, Output = [Idx]> {
-    fn insert(&mut self, k: &Key, i: Idx) -> Result;
-}
+// --------------------------------------------------------
 
 pub struct NamedStore<T, F> {
     name: &'static str,
-    store: Box<dyn Store>,
+    store: Box<dyn KeyIdxStore<T>>,
     get_field_value: F,
     _type: PhantomData<T>,
 }
 
 impl<T, F> NamedStore<T, F> {
-    pub fn new(name: &'static str, store: Box<dyn Store>, get_field_value: F) -> Self {
+    pub fn new(name: &'static str, store: Box<dyn KeyIdxStore<T>>, get_field_value: F) -> Self {
         Self {
             name,
             store,
@@ -133,9 +85,10 @@ impl<T, F> NamedStore<T, F> {
         }
     }
 
-    pub fn filter(&self, f: Filter) -> &[Idx] {
-        self.store.index(f)
-    }
+    // pub fn filter(&self, _f: Filter) -> &[Idx] {
+    // self.store.index(f)
+    // &[]
+    // }
 }
 
 /// Collection of indices ([`Store`]s).
@@ -147,7 +100,7 @@ impl<T, F> Indices<T, F> {
         Self(Vec::new())
     }
 
-    pub fn add(&mut self, name: &'static str, store: Box<dyn Store>, get_field_value: F) {
+    pub fn add(&mut self, name: &'static str, store: Box<dyn KeyIdxStore<T>>, get_field_value: F) {
         self.0.push(NamedStore::new(name, store, get_field_value));
     }
 
@@ -155,15 +108,15 @@ impl<T, F> Indices<T, F> {
         self.0.iter().find(|i| i.name == idx_name).unwrap()
     }
 
-    pub fn insert_index<I>(&mut self, idx_name: &str, t: &T, idx: Idx) -> Result
+    pub fn insert_index<I>(&mut self, idx_name: &str, t: &T, _idx: Idx) -> Result
     where
         I: Into<Key>,
         F: Fn(&T) -> I,
     {
         for s in &mut self.0 {
             if s.name == idx_name {
-                let key = (s.get_field_value)(t);
-                s.store.insert(&key.into(), idx)?;
+                let _key = (s.get_field_value)(t);
+                // s.store.insert(&key.into(), idx)?;
             }
         }
 
@@ -190,34 +143,18 @@ into_key!(usize  : usize, u8, u32, u64  => Usize);
 into_key!(i32    : i8, i32, i64 => I32);
 into_key!(String : String => String);
 
-impl Key {
-    pub fn get_usize(&self) -> Result<usize> {
-        match self {
-            Key::Usize(u) => Ok(*u),
-            Key::I32(i) => TryFrom::try_from(*i).map_err(|_| IndexError::InvalidKeyType {
-                expected: "usize",
-                got: "i32",
-            }),
-            Key::String(_) => Err(IndexError::InvalidKeyType {
-                expected: "usize",
-                got: "String",
-            }),
-        }
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::{uint::U32Index, *};
 
-#[cfg(test)]
-mod tests {
-    use super::{uint::U32Index, *};
+//     struct Person(usize, &'static str);
 
-    struct Person(usize, &'static str);
-
-    #[test]
-    fn person_indices() {
-        let mut indices = Indices::new();
-        indices.add("pk", Box::<U32Index<UniqueIdx>>::default(), |p: &Person| {
-            p.0
-        });
-        indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();
-    }
-}
+//     #[test]
+//     fn person_indices() {
+//         let mut indices = Indices::new();
+//         indices.add("pk", Box::<U32Index<UniqueIdx>>::default(), |p: &Person| {
+//             p.0
+//         });
+//         indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();
+//     }
+// }

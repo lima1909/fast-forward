@@ -1,7 +1,9 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use fast_forward::index::{uint::U32Index, UniqueIdx};
-use fast_forward::index::{Indices, Key};
+
+use fast_forward::index::uint::UniqueUsizeIndex;
+use fast_forward::index::KeyIdxStore;
 use fast_forward::ops::eq;
+use fast_forward::Query;
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
@@ -10,15 +12,17 @@ fn list_index(c: &mut Criterion) {
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct Person(usize, &'static str);
 
-    let mut idx = Indices::new();
-    idx.add("pk", Box::<U32Index<UniqueIdx>>::default(), |p: &Person| {
-        p.0
-    });
+    // let mut idx = Indices::new();
+    // idx.add("pk", Box::<U32Index<UniqueIdx>>::default(), |p: &Person| {
+    //     p.0
+    // });
+    let mut idx = UniqueUsizeIndex::default();
 
     for i in 0..=HOW_MUCH_PERSON {
-        idx.insert_index("pk", &Person(i, "Jasmin"), i).unwrap();
+        // idx.insert("pk", &Person(i, "Jasmin"), i).unwrap();
+        idx.insert(i, i).unwrap();
     }
-    let idx = idx.store("pk");
+    // let idx = idx.store("pk");
 
     let mut v = Vec::new();
     for i in 0..=HOW_MUCH_PERSON {
@@ -39,16 +43,6 @@ fn list_index(c: &mut Criterion) {
             assert_eq!(
                 &Person(FIND_ID, "Jasmin"),
                 v.iter().find(|p| p.0 == FIND_ID).unwrap()
-            );
-        })
-    });
-
-    group.bench_function("vector key", |b| {
-        b.iter(|| {
-            let key = Key::Usize(FIND_ID);
-            assert_eq!(
-                &Person(FIND_ID, "Jasmin"),
-                v.get(key.get_usize().unwrap()).unwrap()
             );
         })
     });
