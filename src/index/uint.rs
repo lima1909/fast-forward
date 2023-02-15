@@ -2,7 +2,7 @@
 
 use crate::{ops, Filter};
 
-use super::{Idx, IndexError, Indexer, Key, KeyIdxStore, Result};
+use super::{Idx, IdxFilter, IndexError, Key, KeyIdxStore, Result};
 
 /// Index for 32-bit unsigned integer type [`u32`].
 ///
@@ -41,8 +41,8 @@ impl KeyIdxStore<Idx> for UniqueUsizeIndex {
     }
 }
 
-impl Indexer<Idx> for UniqueUsizeIndex {
-    fn index(&self, f: Filter<Idx>) -> &[Idx] {
+impl IdxFilter<Idx> for UniqueUsizeIndex {
+    fn idx(&self, f: Filter<Idx>) -> &[Idx] {
         if f.op() != ops::EQ {
             return &[];
         }
@@ -73,8 +73,8 @@ impl KeyIdxStore<Idx> for MultiUsizeIndex {
     }
 }
 
-impl Indexer<Idx> for MultiUsizeIndex {
-    fn index(&self, f: Filter<Idx>) -> &[Idx] {
+impl IdxFilter<Idx> for MultiUsizeIndex {
+    fn idx(&self, f: Filter<Idx>) -> &[Idx] {
         if f.op() != ops::EQ {
             return &[];
         }
@@ -96,53 +96,50 @@ mod tests {
 
         #[test]
         fn empty() {
-            let idx = UniqueUsizeIndex::default();
-            assert_eq!(0, idx.index(eq(2)).len());
-            assert!(idx.0.is_empty());
+            let i = UniqueUsizeIndex::default();
+            assert_eq!(0, i.idx(eq(2)).len());
+            assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut idx = UniqueUsizeIndex::default();
-            idx.insert(2, 4).unwrap();
+            let mut i = UniqueUsizeIndex::default();
+            i.insert(2, 4).unwrap();
 
-            assert_eq!(idx.index(eq(2)), &[4]);
-            assert_eq!(3, idx.0.len());
+            assert_eq!(i.idx(eq(2)), &[4]);
+            assert_eq!(3, i.0.len());
         }
 
         #[test]
         fn or_find_idx_3_4() {
-            let mut idx = UniqueUsizeIndex::default();
-            idx.insert(2, 4).unwrap();
-            idx.insert(4, 8).unwrap();
-            idx.insert(3, 6).unwrap();
+            let mut i = UniqueUsizeIndex::default();
+            i.insert(2, 4).unwrap();
+            i.insert(4, 8).unwrap();
+            i.insert(3, 6).unwrap();
 
-            let r = idx.or(eq(3), eq(4));
+            let r = i.or(eq(3), eq(4));
             assert!(r.contains(&&8));
             assert!(r.contains(&&6));
 
-            let r = idx.or(eq(3), eq(99));
+            let r = i.or(eq(3), eq(99));
             assert!(r.contains(&&6));
 
-            let r = idx.or(eq(99), eq(4));
+            let r = i.or(eq(99), eq(4));
             assert!(r.contains(&&8));
         }
 
         #[test]
         fn double_index() {
-            let mut idx = UniqueUsizeIndex::default();
-            idx.insert(2, 2).unwrap();
+            let mut i = UniqueUsizeIndex::default();
+            i.insert(2, 2).unwrap();
 
-            assert_eq!(
-                Err(IndexError::NotUniqueKey(2usize.into())),
-                idx.insert(2, 2)
-            );
+            assert_eq!(Err(IndexError::NotUniqueKey(Key::Usize(2))), i.insert(2, 2));
         }
 
         #[test]
         fn out_of_bound() {
-            let idx = UniqueUsizeIndex::default();
-            assert_eq!(0, idx.filter(eq(2)).len());
+            let i = UniqueUsizeIndex::default();
+            assert_eq!(0, i.filter(eq(2)).len());
         }
     }
 
@@ -151,27 +148,27 @@ mod tests {
 
         #[test]
         fn empty() {
-            let idx = MultiUsizeIndex::default();
-            assert_eq!(0, idx.index(eq(2)).len());
-            assert!(idx.0.is_empty());
+            let i = MultiUsizeIndex::default();
+            assert_eq!(0, i.idx(eq(2)).len());
+            assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut idx = MultiUsizeIndex::default();
-            idx.insert(2, 2).unwrap();
+            let mut i = MultiUsizeIndex::default();
+            i.insert(2, 2).unwrap();
 
-            assert!(idx.index(eq(2)).eq(&[2]));
-            assert_eq!(3, idx.0.len());
+            assert!(i.idx(eq(2)).eq(&[2]));
+            assert_eq!(3, i.0.len());
         }
 
         #[test]
         fn double_index() {
-            let mut idx = MultiUsizeIndex::default();
-            idx.insert(2, 2).unwrap();
-            idx.insert(2, 1).unwrap();
+            let mut i = MultiUsizeIndex::default();
+            i.insert(2, 2).unwrap();
+            i.insert(2, 1).unwrap();
 
-            assert!(idx.filter(eq(2)).eq(&[2, 1]));
+            assert!(i.filter(eq(2)).eq(&[2, 1]));
         }
     }
 }

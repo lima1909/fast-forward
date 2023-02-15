@@ -30,7 +30,7 @@ pub mod error;
 pub mod uint;
 
 pub use error::IndexError;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Deref};
 
 use crate::Filter;
 
@@ -47,11 +47,11 @@ pub enum Key {
 /// Idx is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
 
-pub trait Indexer<K> {
-    fn index(&self, f: Filter<K>) -> &[Idx];
+pub trait IdxFilter<K> {
+    fn idx(&self, f: Filter<K>) -> &[Idx];
 }
-/// A Store for a mapping from a given Key to an Index (a position in a List).
-pub trait KeyIdxStore<K>: Indexer<K> {
+/// A Store for a mapping from a given Key to one or many Indices.
+pub trait KeyIdxStore<K>: IdxFilter<K> {
     fn insert(&mut self, k: K, i: Idx) -> Result;
 }
 
@@ -66,17 +66,15 @@ pub trait KeyIdxStore<K>: Indexer<K> {
 //     };
 // }
 
-// --------------------------------------------------------
-
-pub struct NamedStore<T, F> {
+pub struct NamedStore<T, K, F> {
     name: &'static str,
-    store: Box<dyn KeyIdxStore<T>>,
+    store: Box<dyn KeyIdxStore<K>>,
     get_field_value: F,
     _type: PhantomData<T>,
 }
 
-impl<T, F> NamedStore<T, F> {
-    pub fn new(name: &'static str, store: Box<dyn KeyIdxStore<T>>, get_field_value: F) -> Self {
+impl<T, K, F> NamedStore<T, K, F> {
+    pub fn new(name: &'static str, store: Box<dyn KeyIdxStore<K>>, get_field_value: F) -> Self {
         Self {
             name,
             store,
@@ -84,39 +82,46 @@ impl<T, F> NamedStore<T, F> {
             _type: PhantomData,
         }
     }
+}
 
-    // pub fn filter(&self, _f: Filter) -> &[Idx] {
-    // self.store.index(f)
-    // &[]
-    // }
+impl<T, K, F> Deref for NamedStore<T, K, F> {
+    type Target = dyn KeyIdxStore<K>;
+
+    fn deref(&self) -> &Self::Target {
+        self.store.as_ref()
+    }
 }
 
 /// Collection of indices ([`Store`]s).
 #[derive(Default)]
-pub struct Indices<T, F>(Vec<NamedStore<T, F>>);
+pub struct Indices<T, F>(Vec<NamedStore<T, usize, F>>);
 
 impl<T, F> Indices<T, F> {
     pub fn new() -> Self {
         Self(Vec::new())
     }
 
-    pub fn add(&mut self, name: &'static str, store: Box<dyn KeyIdxStore<T>>, get_field_value: F) {
+    pub fn add(
+        &mut self,
+        name: &'static str,
+        store: Box<dyn KeyIdxStore<usize>>,
+        get_field_value: F,
+    ) {
         self.0.push(NamedStore::new(name, store, get_field_value));
     }
 
-    pub fn store(&self, idx_name: &str) -> &NamedStore<T, F> {
+    pub fn store(&self, idx_name: &str) -> &NamedStore<T, usize, F> {
         self.0.iter().find(|i| i.name == idx_name).unwrap()
     }
 
-    pub fn insert_index<I>(&mut self, idx_name: &str, t: &T, _idx: Idx) -> Result
+    pub fn insert_index(&mut self, idx_name: &str, t: &T, idx: Idx) -> Result
     where
-        I: Into<Key>,
-        F: Fn(&T) -> I,
+        F: Fn(&T) -> usize,
     {
         for s in &mut self.0 {
             if s.name == idx_name {
-                let _key = (s.get_field_value)(t);
-                // s.store.insert(&key.into(), idx)?;
+                let key = (s.get_field_value)(t);
+                s.store.insert(key, idx)?;
             }
         }
 
@@ -124,37 +129,26 @@ impl<T, F> Indices<T, F> {
     }
 }
 
-#[doc(hidden)]
-#[macro_export]
-macro_rules! into_key {
-    ( $as:ty : $($t:ty), + => $key_t:tt ) => {
-        $(
-        impl From<$t> for $crate::index::Key {
-            fn from(val: $t) -> Self {
-                $crate::index::Key::$key_t(val as $as)
-            }
-        }
-        )+
-    };
+#[cfg(test)]
+mod tests {
+    use crate::ops::eq;
 
+    use super::{uint::UniqueUsizeIndex, *};
+
+    struct Person(usize, &'static str);
+
+    #[test]
+    fn person_indices() {
+        let mut indices = Indices::new();
+        indices.add("pk", Box::<UniqueUsizeIndex>::default(), |p: &Person| p.0);
+
+        indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();
+        indices.insert_index("pk", &Person(41, "Mario"), 1).unwrap();
+
+        let idx = indices.store("pk");
+        assert_eq!(1, idx.idx(eq(41))[0]);
+        assert_eq!(0, idx.idx(eq(3))[0]);
+
+        assert!(idx.idx(eq(101)).eq(&[]));
+    }
 }
-
-into_key!(usize  : usize, u8, u32, u64  => Usize);
-into_key!(i32    : i8, i32, i64 => I32);
-into_key!(String : String => String);
-
-// #[cfg(test)]
-// mod tests {
-//     use super::{uint::U32Index, *};
-
-//     struct Person(usize, &'static str);
-
-//     #[test]
-//     fn person_indices() {
-//         let mut indices = Indices::new();
-//         indices.add("pk", Box::<U32Index<UniqueIdx>>::default(), |p: &Person| {
-//             p.0
-//         });
-//         indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();
-//     }
-// }

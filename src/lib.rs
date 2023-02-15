@@ -1,4 +1,4 @@
-use index::{Idx, Indexer};
+use index::{Idx, IdxFilter};
 
 pub mod index;
 
@@ -20,12 +20,12 @@ impl<K> Filter<K> {
     }
 }
 
-pub trait Query<K>: Indexer<K> + Sized {
+pub trait Query<K>: IdxFilter<K> + Sized {
     fn filter(&self, f: Filter<K>) -> &[Idx] {
-        self.index(f)
+        self.idx(f)
     }
 
-    fn or_rhs<'a, Rhs: Indexer<K>>(
+    fn or_rhs<'a, Rhs: IdxFilter<K>>(
         &'a self,
         l: Filter<K>,
         ridx: &'a Rhs,
@@ -39,13 +39,13 @@ pub trait Query<K>: Indexer<K> + Sized {
     }
 }
 
-impl<K, I: Indexer<K> + Sized> Query<K> for I {}
+impl<K, I: IdxFilter<K> + Sized> Query<K> for I {}
 
 pub mod ops {
     use std::collections::HashSet;
 
     use crate::{
-        index::{Idx, Indexer},
+        index::{Idx, IdxFilter},
         Filter, Op,
     };
 
@@ -73,14 +73,14 @@ pub mod ops {
     }
 
     /// Combine two [`Filter`] with an logical `OR`.
-    pub fn or<'a, K, L: Indexer<K>, R: Indexer<K>>(
+    pub fn or<'a, K, L: IdxFilter<K>, R: IdxFilter<K>>(
         lidx: &'a L,
         l: Filter<K>,
         ridx: &'a R,
         r: Filter<K>,
     ) -> Vec<&'a Idx> {
-        let lr = lidx.index(l);
-        let rr = ridx.index(r);
+        let lr = lidx.idx(l);
+        let rr = ridx.idx(r);
 
         let mut lhs: HashSet<&Idx> = HashSet::with_capacity(lr.len());
         lhs.extend(lr);
