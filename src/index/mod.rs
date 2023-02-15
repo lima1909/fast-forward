@@ -37,7 +37,7 @@ use crate::Filter;
 type Result<T = ()> = std::result::Result<T, IndexError>;
 
 /// Is the value and type for searching an item.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Key {
     Usize(usize),
     I32(i32),
@@ -191,7 +191,7 @@ into_key!(i32    : i8, i32, i64 => I32);
 into_key!(String : String => String);
 
 impl Key {
-    fn get_usize(&self) -> Result<usize> {
+    pub fn get_usize(&self) -> Result<usize> {
         match self {
             Key::Usize(u) => Ok(*u),
             Key::I32(i) => TryFrom::try_from(*i).map_err(|_| IndexError::InvalidKeyType {

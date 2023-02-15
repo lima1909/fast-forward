@@ -6,7 +6,7 @@ use std::{
 
 use super::Key;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IndexError {
     /// Occurs, if the Index is unique and the given key is already used.
     NotUniqueKey(Key),
