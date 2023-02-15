@@ -69,7 +69,7 @@ pub mod ops {
 
     /// Not Equals [`Key`]
     pub fn ne<K>(key: K) -> Filter<K> {
-        Filter(key.into(), NE)
+        Filter(key, NE)
     }
 
     /// Combine two [`Filter`] with an logical `OR`.
