@@ -4,13 +4,14 @@ use crate::{ops, Filter};
 
 use super::{Idx, IdxFilter, IndexError, Key, KeyIdxStore, Result};
 
-/// Index for 32-bit unsigned integer type [`u32`].
+/// Index for 32-bit unsigned integer type [`usize`].
 ///
 /// Well suitable for for example Primary Keys
+///
 ///```java
 /// let _unique_values = vec![3, 2, 4, 1, ...];
 ///
-/// UniqueIdx:
+/// Unique Index:
 ///
 ///  Key | Idx (_values)
 /// --------------------

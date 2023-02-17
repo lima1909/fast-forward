@@ -3,23 +3,29 @@ use index::{Idx, IdxFilter};
 pub mod index;
 
 /// Id for operations.
+/// Operations are primarily compare functions, like equal, greater than and so on.
 pub type Op = u8;
 
-/// Filter is a given query K: Key (value) and operation: [`Op`]
-pub struct Filter<K>(K, Op);
+/// Filter are the input data for describung a filter.
+///
+/// For example:
+/// Filter `= 5`
+/// means: Op: `=` and Key: `5`
+pub struct Filter<K>(Op, K);
 
 impl<K> Filter<K> {
     #[inline]
-    pub fn key(&self) -> &K {
-        &self.0
+    pub fn op(&self) -> Op {
+        self.0
     }
 
     #[inline]
-    pub fn op(&self) -> Op {
-        self.1
+    pub fn key(&self) -> &K {
+        &self.1
     }
 }
 
+/// Query combines different filter. Filters can be linked using `and` and `or`.
 pub trait Query<K>: IdxFilter<K> + Sized {
     fn filter(&self, f: Filter<K>) -> &[Idx] {
         self.idx(f)
@@ -49,27 +55,27 @@ pub mod ops {
         Filter, Op,
     };
 
-    /// equal =
+    /// equal `=`
     pub const EQ: Op = 1;
-    /// not equal !=
+    /// not equal `!=`
     pub const NE: Op = 2;
-    /// less than <
+    /// less than `<`
     pub const LT: Op = 3;
-    /// less equal <=
+    /// less equal `<=`
     pub const LE: Op = 4;
-    /// greater than >
+    /// greater than `>`
     pub const GT: Op = 5;
-    /// greater equal >=
+    /// greater equal `>=`
     pub const GE: Op = 6;
 
     /// Equals [`Key`]
     pub fn eq<K>(key: K) -> Filter<K> {
-        Filter(key, EQ)
+        Filter(EQ, key)
     }
 
     /// Not Equals [`Key`]
     pub fn ne<K>(key: K) -> Filter<K> {
-        Filter(key, NE)
+        Filter(NE, key)
     }
 
     /// Combine two [`Filter`] with an logical `OR`.

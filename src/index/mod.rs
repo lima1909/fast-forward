@@ -4,15 +4,15 @@
 //! An Index has two parts, a [`Key`] (item to search for) and a position (the index in the list) [`Idx`].
 //!
 //! There are two types of Index:
-//! - [`UniqueIdx`]: for a given [`Key`] exist exactly one [`Idx`]
-//! - [`AmbiguousIdx`]: for a given [`Key`] exists many [`Idx`]s
+//! - `Unique Index`: for a given [`Key`] exist exactly one [`Idx`].
+//! - `Multi Index` : for a given [`Key`] exists many [`Idx`]s.
 //!
-//! # Example for an Vec-Ambiguous-Index:
+//! # Example for an Vec-Multi-Index:
 //!
 //! Map-Index:
 //!
 //! - [`Key`] = name (String)
-//! - [`Idx`] = index in Vec
+//! - [`Idx`] = index is the position in a List (Vec)
 //!
 //! ```java
 //! let _names = vec!["Paul", "Jasmin", "Inge", "Paul", ...];
@@ -34,6 +34,7 @@ use std::{marker::PhantomData, ops::Deref};
 
 use crate::Filter;
 
+/// Default Result for index with the Ok(T) value or en [`IndexError`].
 type Result<T = ()> = std::result::Result<T, IndexError>;
 
 /// Is the value and type for searching an item.
@@ -47,6 +48,7 @@ pub enum Key {
 /// Idx is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
 
+/// Find all [`Idx`] for an given [`crate::Op`] and [`Key`].
 pub trait IdxFilter<K> {
     fn idx(&self, f: Filter<K>) -> &[Idx];
 }
