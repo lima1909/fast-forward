@@ -32,28 +32,13 @@ pub mod uint;
 pub use error::IndexError;
 use std::{marker::PhantomData, ops::Deref};
 
-use crate::Filter;
+use crate::{Idx, IdxFilter, Key};
 
 /// Default Result for index with the Ok(T) value or en [`IndexError`].
 type Result<T = ()> = std::result::Result<T, IndexError>;
 
-/// Is the value and type for searching an item.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Key {
-    Usize(usize),
-    I32(i32),
-    String(String),
-}
-
-/// Idx is the index/position in a List ([`std::vec::Vec`]).
-pub type Idx = usize;
-
-/// Find all [`Idx`] for an given [`crate::Op`] and [`Key`].
-pub trait IdxFilter<K> {
-    fn idx(&self, f: Filter<K>) -> &[Idx];
-}
 /// A Store for a mapping from a given Key to one or many Indices.
-pub trait KeyIdxStore<K>: IdxFilter<K> {
+pub trait KeyIdxStore<K: Key>: IdxFilter<K> {
     fn insert(&mut self, k: K, i: Idx) -> Result;
 }
 
@@ -94,7 +79,7 @@ impl<T, K, F> Deref for NamedStore<T, K, F> {
     }
 }
 
-/// Collection of indices ([`Store`]s).
+/// Collection of indices ([`KeyIdxStore`]s).
 #[derive(Default)]
 pub struct Indices<T, F>(Vec<NamedStore<T, usize, F>>);
 

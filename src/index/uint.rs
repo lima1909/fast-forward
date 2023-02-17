@@ -2,7 +2,7 @@
 
 use crate::{ops, Filter};
 
-use super::{Idx, IdxFilter, IndexError, Key, KeyIdxStore, Result};
+use super::{Idx, IdxFilter, IndexError, KeyIdxStore, Result};
 
 /// Index for 32-bit unsigned integer type [`usize`].
 ///
@@ -33,7 +33,7 @@ impl KeyIdxStore<Idx> for UniqueUsizeIndex {
         }
 
         match self.0[key].as_mut() {
-            Some(_i) => Err(IndexError::NotUniqueKey(Key::Usize(key))),
+            Some(_i) => Err(IndexError::NotUniqueKey),
             None => {
                 self.0[key] = Some([i]);
                 Ok(())
@@ -134,7 +134,7 @@ mod tests {
             let mut i = UniqueUsizeIndex::default();
             i.insert(2, 2).unwrap();
 
-            assert_eq!(Err(IndexError::NotUniqueKey(Key::Usize(2))), i.insert(2, 2));
+            assert_eq!(Err(IndexError::NotUniqueKey), i.insert(2, 2));
         }
 
         #[test]

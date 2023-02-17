@@ -1,6 +1,13 @@
-use index::{Idx, IdxFilter};
-
 pub mod index;
+
+/// `Key` is a unique value under which all occurring indices are stored.
+pub trait Key {}
+
+impl Key for usize {}
+impl Key for &str {}
+
+/// `Idx` is the index/position in a List ([`std::vec::Vec`]).
+pub type Idx = usize;
 
 /// Id for operations.
 /// Operations are primarily compare functions, like equal, greater than and so on.
@@ -25,8 +32,13 @@ impl<K> Filter<K> {
     }
 }
 
+/// Find all [`Idx`] for an given [`crate::Op`] and [`Key`].
+pub trait IdxFilter<K: Key> {
+    fn idx(&self, f: Filter<K>) -> &[Idx];
+}
+
 /// Query combines different filter. Filters can be linked using `and` and `or`.
-pub trait Query<K>: IdxFilter<K> + Sized {
+pub trait Query<K: Key>: IdxFilter<K> + Sized {
     fn filter(&self, f: Filter<K>) -> &[Idx] {
         self.idx(f)
     }
@@ -45,15 +57,13 @@ pub trait Query<K>: IdxFilter<K> + Sized {
     }
 }
 
-impl<K, I: IdxFilter<K> + Sized> Query<K> for I {}
+impl<K: Key, I: IdxFilter<K> + Sized> Query<K> for I {}
 
+/// Operations are primarily compare functions, like equal, greater than and so on.
 pub mod ops {
     use std::collections::HashSet;
 
-    use crate::{
-        index::{Idx, IdxFilter},
-        Filter, Op,
-    };
+    use crate::{Filter, Idx, IdxFilter, Key, Op};
 
     /// equal `=`
     pub const EQ: Op = 1;
@@ -79,7 +89,7 @@ pub mod ops {
     }
 
     /// Combine two [`Filter`] with an logical `OR`.
-    pub fn or<'a, K, L: IdxFilter<K>, R: IdxFilter<K>>(
+    pub fn or<'a, K: Key, L: IdxFilter<K>, R: IdxFilter<K>>(
         lidx: &'a L,
         l: Filter<K>,
         ridx: &'a R,
