@@ -1,17 +1,17 @@
 //! The purpose of an Index is to find faster a specific item in a list (Slice, Vec, ...).
 //! This means, it does not have to touch and compare every item in the list.
 //!
-//! An Index has two parts, a [`Key`] (item to search for) and a position (the index in the list) [`Idx`].
+//! An Index has two parts, a `Key` (item to search for) and a position (the index in the list) [`Idx`].
 //!
 //! There are two types of Index:
-//! - `Unique Index`: for a given [`Key`] exist exactly one [`Idx`].
-//! - `Multi Index` : for a given [`Key`] exists many [`Idx`]s.
+//! - `Unique Index`: for a given `Key` exist exactly one [`Idx`].
+//! - `Multi Index` : for a given `Key` exists many [`Idx`]s.
 //!
 //! # Example for an Vec-Multi-Index:
 //!
 //! Map-Index:
 //!
-//! - [`Key`] = name (String)
+//! - `Key` = name (String)
 //! - [`Idx`] = index is the position in a List (Vec)
 //!
 //! ```java
@@ -32,13 +32,13 @@ pub mod uint;
 pub use error::IndexError;
 use std::{marker::PhantomData, ops::Deref};
 
-use crate::{Idx, IdxFilter, Key};
+use crate::{Idx, IdxFilter};
 
 /// Default Result for index with the Ok(T) value or en [`IndexError`].
 type Result<T = ()> = std::result::Result<T, IndexError>;
 
 /// A Store for a mapping from a given Key to one or many Indices.
-pub trait KeyIdxStore<K: Key>: IdxFilter<K> {
+pub trait KeyIdxStore<K>: IdxFilter<K> {
     fn insert(&mut self, k: K, i: Idx) -> Result;
 }
 

@@ -73,7 +73,7 @@ impl Index for Multi {
     }
 }
 
-/// [`crate::Key`] is from type [`crate::Idx`] and the information are saved in a List (Store).
+/// `Key` is from type [`crate::Idx`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
 pub struct UIntVecIndex<I: Index>(Vec<Option<I>>);
 

@@ -1,11 +1,5 @@
 pub mod index;
 
-/// `Key` is a unique value under which all occurring indices are stored.
-pub trait Key {}
-
-impl Key for usize {}
-impl Key for &str {}
-
 /// `Idx` is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
 
@@ -13,7 +7,8 @@ pub type Idx = usize;
 /// Operations are primarily compare functions, like equal, greater than and so on.
 pub type Op = u8;
 
-/// Filter are the input data for describung a filter.
+/// Filter are the input data for describung a filter. A filter consist of a key and a operation [`Op`].
+/// Key `K` is a unique value under which all occurring indices are stored.
 ///
 /// For example:
 /// Filter `= 5`
@@ -32,13 +27,13 @@ impl<K> Filter<K> {
     }
 }
 
-/// Find all [`Idx`] for an given [`crate::Op`] and [`Key`].
-pub trait IdxFilter<K: Key> {
+/// Find all [`Idx`] for an given [`crate::Op`] and `Key`.
+pub trait IdxFilter<K> {
     fn idx(&self, f: Filter<K>) -> &[Idx];
 }
 
 /// Query combines different filter. Filters can be linked using `and` and `or`.
-pub trait Query<K: Key>: IdxFilter<K> + Sized {
+pub trait Query<K>: IdxFilter<K> + Sized {
     fn filter(&self, f: Filter<K>) -> &[Idx] {
         self.idx(f)
     }
@@ -57,13 +52,13 @@ pub trait Query<K: Key>: IdxFilter<K> + Sized {
     }
 }
 
-impl<K: Key, I: IdxFilter<K> + Sized> Query<K> for I {}
+impl<K, I: IdxFilter<K> + Sized> Query<K> for I {}
 
 /// Operations are primarily compare functions, like equal, greater than and so on.
 pub mod ops {
     use std::collections::HashSet;
 
-    use crate::{Filter, Idx, IdxFilter, Key, Op};
+    use crate::{Filter, Idx, IdxFilter, Op};
 
     /// equal `=`
     pub const EQ: Op = 1;
@@ -78,18 +73,18 @@ pub mod ops {
     /// greater equal `>=`
     pub const GE: Op = 6;
 
-    /// Equals [`Key`]
+    /// Equals `Key`
     pub fn eq<K>(key: K) -> Filter<K> {
         Filter(EQ, key)
     }
 
-    /// Not Equals [`Key`]
+    /// Not Equals `Key`
     pub fn ne<K>(key: K) -> Filter<K> {
         Filter(NE, key)
     }
 
     /// Combine two [`Filter`] with an logical `OR`.
-    pub fn or<'a, K: Key, L: IdxFilter<K>, R: IdxFilter<K>>(
+    pub fn or<'a, K, L: IdxFilter<K>, R: IdxFilter<K>>(
         lidx: &'a L,
         l: Filter<K>,
         ridx: &'a R,
