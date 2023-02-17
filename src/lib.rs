@@ -18,7 +18,7 @@ pub type Op = u8;
 /// For example:
 /// Filter `= 5`
 /// means: Op: `=` and Key: `5`
-pub struct Filter<K>(Op, K);
+pub struct Filter<K>(pub(crate) Op, pub(crate) K);
 
 impl<K> Filter<K> {
     #[inline]

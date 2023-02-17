@@ -94,11 +94,11 @@ impl<I: Index + Clone> KeyIdxStore<Idx> for UIntVecIndex<I> {
 
 impl<I: Index> IdxFilter<Idx> for UIntVecIndex<I> {
     fn idx(&self, f: Filter<Idx>) -> &[Idx] {
-        if f.op() != ops::EQ {
+        if f.0 != ops::EQ {
             return &[];
         }
 
-        match &self.0.get(*f.key()) {
+        match &self.0.get(f.1) {
             Some(Some(idx)) => idx.get(),
             _ => &[],
         }
