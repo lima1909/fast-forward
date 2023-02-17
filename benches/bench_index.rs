@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use fast_forward::index::uint::UniqueUsizeIndex;
+use fast_forward::index::uint::{UIntVecIndex, Unique};
 use fast_forward::index::Indices;
 use fast_forward::ops::eq;
 
@@ -16,8 +16,9 @@ fn list_index(c: &mut Criterion) {
     let v = create_person_vec();
 
     // create search index
+    let uint_idx = UIntVecIndex::<Unique>::with_capacity(HOW_MUCH_PERSON);
     let mut idx = Indices::new();
-    idx.add("pk", Box::<UniqueUsizeIndex>::default(), |p: &Person| p.0);
+    idx.add("pk", Box::new(uint_idx), |p: &Person| p.0);
 
     for i in 0..=HOW_MUCH_PERSON {
         idx.insert_index("pk", &Person(i, "Jasmin"), i).unwrap();

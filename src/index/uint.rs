@@ -1,5 +1,7 @@
 //! Index for 32-bit unsigned integer type.
 
+use std::ops::Deref;
+
 use crate::{ops, Filter};
 
 use super::{Idx, IdxFilter, IndexError, KeyIdxStore, Result};
@@ -23,67 +25,97 @@ use super::{Idx, IdxFilter, IndexError, KeyIdxStore, Result};
 /// ...  | ...
 ///
 /// ```
-#[derive(Debug, Default)]
-pub struct UniqueUsizeIndex(Vec<Option<[Idx; 1]>>);
 
-impl KeyIdxStore<Idx> for UniqueUsizeIndex {
+pub trait Index {
+    fn new(i: Idx) -> Self;
+    fn add(&mut self, i: Idx) -> Result;
+    fn get(&self) -> &[Idx];
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Unique([Idx; 1]);
+
+impl Index for Unique {
+    #[inline]
+    fn new(i: Idx) -> Self {
+        Unique([i])
+    }
+
+    #[inline]
+    fn add(&mut self, _i: Idx) -> Result {
+        Err(IndexError::NotUniqueKey)
+    }
+
+    #[inline]
+    fn get(&self) -> &[Idx] {
+        &self.0
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Multi(Vec<Idx>);
+
+impl Index for Multi {
+    #[inline]
+    fn new(i: Idx) -> Self {
+        Multi(vec![i])
+    }
+
+    #[inline]
+    fn add(&mut self, i: Idx) -> Result {
+        self.0.push(i);
+        Ok(())
+    }
+
+    #[inline]
+    fn get(&self) -> &[Idx] {
+        &self.0
+    }
+}
+
+/// [`crate::Key`] is from type [`crate::Idx`] and the information are saved in a List (Store).
+#[derive(Debug, Default)]
+pub struct UIntVecIndex<I: Index>(Vec<Option<I>>);
+
+impl<I: Index + Clone> KeyIdxStore<Idx> for UIntVecIndex<I> {
     fn insert(&mut self, key: Idx, i: Idx) -> Result {
         if self.0.len() <= key {
             self.0.resize(key + 1, None);
         }
 
         match self.0[key].as_mut() {
-            Some(_i) => Err(IndexError::NotUniqueKey),
-            None => {
-                self.0[key] = Some([i]);
-                Ok(())
-            }
-        }
-    }
-}
-
-impl IdxFilter<Idx> for UniqueUsizeIndex {
-    fn idx(&self, f: Filter<Idx>) -> &[Idx] {
-        if f.op() != ops::EQ {
-            return &[];
-        }
-
-        match &self.0.get(*f.key()) {
-            Some(Some(i)) => i,
-            _ => &[],
-        }
-    }
-}
-
-// -----------------------------
-#[derive(Debug, Default)]
-pub struct MultiUsizeIndex(Vec<Option<Vec<Idx>>>);
-
-impl KeyIdxStore<Idx> for MultiUsizeIndex {
-    fn insert(&mut self, key: Idx, i: Idx) -> Result {
-        if self.0.len() <= key {
-            self.0.resize(key + 1, None);
-        }
-
-        match self.0[key].as_mut() {
-            Some(v) => v.push(i),
-            None => self.0[key] = Some(vec![i]),
+            Some(idx) => idx.add(i)?,
+            None => self.0[key] = Some(I::new(i)),
         }
 
         Ok(())
     }
 }
 
-impl IdxFilter<Idx> for MultiUsizeIndex {
+impl<I: Index> IdxFilter<Idx> for UIntVecIndex<I> {
     fn idx(&self, f: Filter<Idx>) -> &[Idx] {
         if f.op() != ops::EQ {
             return &[];
         }
 
         match &self.0.get(*f.key()) {
-            Some(Some(v)) => v,
+            Some(Some(idx)) => idx.get(),
             _ => &[],
         }
+    }
+}
+
+impl<I: Index> UIntVecIndex<I> {
+    pub fn with_capacity(capacity: usize) -> Self {
+        UIntVecIndex(Vec::with_capacity(capacity))
+    }
+}
+
+impl<I: Index> Deref for UIntVecIndex<I> {
+    type Target = Vec<Option<I>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -97,14 +129,14 @@ mod tests {
 
         #[test]
         fn empty() {
-            let i = UniqueUsizeIndex::default();
+            let i = UIntVecIndex::<Unique>::default();
             assert_eq!(0, i.idx(eq(2)).len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut i = UniqueUsizeIndex::default();
+            let mut i = UIntVecIndex::<Unique>::default();
             i.insert(2, 4).unwrap();
 
             assert_eq!(i.idx(eq(2)), &[4]);
@@ -113,7 +145,7 @@ mod tests {
 
         #[test]
         fn or_find_idx_3_4() {
-            let mut i = UniqueUsizeIndex::default();
+            let mut i = UIntVecIndex::<Unique>::default();
             i.insert(2, 4).unwrap();
             i.insert(4, 8).unwrap();
             i.insert(3, 6).unwrap();
@@ -131,7 +163,7 @@ mod tests {
 
         #[test]
         fn double_index() {
-            let mut i = UniqueUsizeIndex::default();
+            let mut i = UIntVecIndex::<Unique>::default();
             i.insert(2, 2).unwrap();
 
             assert_eq!(Err(IndexError::NotUniqueKey), i.insert(2, 2));
@@ -139,7 +171,7 @@ mod tests {
 
         #[test]
         fn out_of_bound() {
-            let i = UniqueUsizeIndex::default();
+            let i = UIntVecIndex::<Unique>::default();
             assert_eq!(0, i.filter(eq(2)).len());
         }
     }
@@ -149,14 +181,14 @@ mod tests {
 
         #[test]
         fn empty() {
-            let i = MultiUsizeIndex::default();
+            let i = UIntVecIndex::<Multi>::default();
             assert_eq!(0, i.idx(eq(2)).len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut i = MultiUsizeIndex::default();
+            let mut i = UIntVecIndex::<Multi>::default();
             i.insert(2, 2).unwrap();
 
             assert!(i.idx(eq(2)).eq(&[2]));
@@ -165,7 +197,7 @@ mod tests {
 
         #[test]
         fn double_index() {
-            let mut i = MultiUsizeIndex::default();
+            let mut i = UIntVecIndex::<Multi>::default();
             i.insert(2, 2).unwrap();
             i.insert(2, 1).unwrap();
 

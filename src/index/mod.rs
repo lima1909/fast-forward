@@ -118,16 +118,22 @@ impl<T, F> Indices<T, F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ops::eq;
-
-    use super::{uint::UniqueUsizeIndex, *};
+    use super::*;
+    use crate::{
+        index::uint::{UIntVecIndex, Unique},
+        ops::eq,
+    };
 
     struct Person(usize, &'static str);
 
     #[test]
     fn person_indices() {
         let mut indices = Indices::new();
-        indices.add("pk", Box::<UniqueUsizeIndex>::default(), |p: &Person| p.0);
+        indices.add(
+            "pk",
+            Box::<UIntVecIndex<Unique>>::default(),
+            |p: &Person| p.0,
+        );
 
         indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();
         indices.insert_index("pk", &Person(41, "Mario"), 1).unwrap();
