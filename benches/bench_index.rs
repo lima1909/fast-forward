@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use fast_forward::index::uint::{UIntVecIndex, Unique};
-use fast_forward::index::Indices;
+use fast_forward::index::uint::UIntVecIndex;
+use fast_forward::index::{Indices, Unique};
 use fast_forward::ops::eq;
 
 const HOW_MUCH_PERSON: usize = 100_000;

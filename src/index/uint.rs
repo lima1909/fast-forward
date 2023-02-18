@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use crate::{ops, Filter};
 
-use super::{Idx, IdxFilter, IndexError, KeyIdxStore, Result};
+use super::{Idx, IdxFilter, Index, KeyIdxStore, Result};
 
 /// Index for 32-bit unsigned integer type [`usize`].
 ///
@@ -26,56 +26,22 @@ use super::{Idx, IdxFilter, IndexError, KeyIdxStore, Result};
 ///
 /// ```
 
-pub trait Index {
-    fn new(i: Idx) -> Self;
-    fn add(&mut self, i: Idx) -> Result;
-    fn get(&self) -> &[Idx];
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Unique([Idx; 1]);
-
-impl Index for Unique {
-    #[inline]
-    fn new(i: Idx) -> Self {
-        Unique([i])
-    }
-
-    #[inline]
-    fn add(&mut self, _i: Idx) -> Result {
-        Err(IndexError::NotUniqueKey)
-    }
-
-    #[inline]
-    fn get(&self) -> &[Idx] {
-        &self.0
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Multi(Vec<Idx>);
-
-impl Index for Multi {
-    #[inline]
-    fn new(i: Idx) -> Self {
-        Multi(vec![i])
-    }
-
-    #[inline]
-    fn add(&mut self, i: Idx) -> Result {
-        self.0.push(i);
-        Ok(())
-    }
-
-    #[inline]
-    fn get(&self) -> &[Idx] {
-        &self.0
-    }
-}
-
 /// `Key` is from type [`crate::Idx`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
 pub struct UIntVecIndex<I: Index>(Vec<Option<I>>);
+
+impl<I: Index> IdxFilter<Idx> for UIntVecIndex<I> {
+    fn idx(&self, f: Filter<Idx>) -> &[Idx] {
+        if f.op != ops::EQ {
+            return &[];
+        }
+
+        match &self.0.get(f.key) {
+            Some(Some(idx)) => idx.get(),
+            _ => &[],
+        }
+    }
+}
 
 impl<I: Index + Clone> KeyIdxStore<Idx> for UIntVecIndex<I> {
     fn insert(&mut self, key: Idx, i: Idx) -> Result {
@@ -89,19 +55,6 @@ impl<I: Index + Clone> KeyIdxStore<Idx> for UIntVecIndex<I> {
         }
 
         Ok(())
-    }
-}
-
-impl<I: Index> IdxFilter<Idx> for UIntVecIndex<I> {
-    fn idx(&self, f: Filter<Idx>) -> &[Idx] {
-        if f.op != ops::EQ {
-            return &[];
-        }
-
-        match &self.0.get(f.key) {
-            Some(Some(idx)) => idx.get(),
-            _ => &[],
-        }
     }
 }
 
@@ -125,6 +78,8 @@ mod tests {
     use crate::{ops::eq, Query};
 
     mod unique {
+        use crate::index::{IndexError, Unique};
+
         use super::*;
 
         #[test]
@@ -177,6 +132,8 @@ mod tests {
     }
 
     mod multi {
+        use crate::index::Multi;
+
         use super::*;
 
         #[test]

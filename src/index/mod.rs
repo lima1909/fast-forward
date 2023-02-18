@@ -27,15 +27,63 @@
 
 #![allow(dead_code)]
 pub mod error;
+pub mod map;
 pub mod uint;
 
 pub use error::IndexError;
-use std::{marker::PhantomData, ops::Deref};
+use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 
 use crate::{Idx, IdxFilter};
 
 /// Default Result for index with the Ok(T) value or en [`IndexError`].
 type Result<T = ()> = std::result::Result<T, IndexError>;
+
+pub trait Index: Debug {
+    fn new(i: Idx) -> Self;
+    fn add(&mut self, i: Idx) -> Result;
+    fn get(&self) -> &[Idx];
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Unique([Idx; 1]);
+
+impl Index for Unique {
+    #[inline]
+    fn new(i: Idx) -> Self {
+        Unique([i])
+    }
+
+    #[inline]
+    fn add(&mut self, _i: Idx) -> Result {
+        Err(IndexError::NotUniqueKey)
+    }
+
+    #[inline]
+    fn get(&self) -> &[Idx] {
+        &self.0
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Multi(Vec<Idx>);
+
+impl Index for Multi {
+    #[inline]
+    fn new(i: Idx) -> Self {
+        Multi(vec![i])
+    }
+
+    #[inline]
+    fn add(&mut self, i: Idx) -> Result {
+        self.0.push(i);
+        Ok(())
+    }
+
+    #[inline]
+    fn get(&self) -> &[Idx] {
+        &self.0
+    }
+}
 
 /// A Store for a mapping from a given Key to one or many Indices.
 pub trait KeyIdxStore<K>: IdxFilter<K> {
@@ -119,10 +167,7 @@ impl<T, F> Indices<T, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        index::uint::{UIntVecIndex, Unique},
-        ops::eq,
-    };
+    use crate::{index::uint::UIntVecIndex, ops::eq};
 
     struct Person(usize, &'static str);
 
