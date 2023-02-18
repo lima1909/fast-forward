@@ -31,7 +31,7 @@ pub mod map;
 pub mod uint;
 
 pub use error::IndexError;
-use std::{fmt::Debug, marker::PhantomData, ops::Deref};
+use std::fmt::Debug;
 
 use crate::{Idx, IdxFilter};
 
@@ -90,74 +90,66 @@ pub trait KeyIdxStore<K>: IdxFilter<K> {
     fn insert(&mut self, k: K, i: Idx) -> Result;
 }
 
-// fn filter(k: Key, op: crate::Op) {
-//     let _vu: Vec<&dyn KeyIdxStore<usize>> = vec![];
-//     let _vs: Vec<&dyn KeyIdxStore<String>> = vec![];
+type FieldValueFn<T, K> = fn(&T) -> K;
 
-//     let _r = match k {
-//         Key::Usize(u) => _vu.get(0).unwrap().filter(&u, op),
-//         Key::String(s) => _vs.get(0).unwrap().filter(&s, op),
-//         Key::I32(_) => todo!(),
-//     };
-// }
-
-pub struct NamedStore<T, K, F> {
+pub struct NamedStore<T, K> {
     name: &'static str,
     store: Box<dyn KeyIdxStore<K>>,
-    get_field_value: F,
-    _type: PhantomData<T>,
+    get_field_value: FieldValueFn<T, K>,
 }
 
-impl<T, K, F> NamedStore<T, K, F> {
-    pub fn new(name: &'static str, store: Box<dyn KeyIdxStore<K>>, get_field_value: F) -> Self {
+impl<T, K> IdxFilter<K> for NamedStore<T, K> {
+    fn idx(&self, f: crate::Filter<K>) -> &[Idx] {
+        self.store.idx(f)
+    }
+}
+
+impl<T, K> IdxFilter<K> for &NamedStore<T, K> {
+    fn idx(&self, f: crate::Filter<K>) -> &[Idx] {
+        self.store.idx(f)
+    }
+}
+
+impl<T, K> NamedStore<T, K> {
+    pub fn new(
+        name: &'static str,
+        store: Box<dyn KeyIdxStore<K>>,
+        get_field_value: FieldValueFn<T, K>,
+    ) -> Self {
         Self {
             name,
             store,
             get_field_value,
-            _type: PhantomData,
         }
-    }
-}
-
-impl<T, K, F> Deref for NamedStore<T, K, F> {
-    type Target = dyn KeyIdxStore<K>;
-
-    fn deref(&self) -> &Self::Target {
-        self.store.as_ref()
     }
 }
 
 /// Collection of indices ([`KeyIdxStore`]s).
 #[derive(Default)]
-pub struct Indices<T, F>(Vec<NamedStore<T, usize, F>>);
+pub struct Indices<T>(Vec<NamedStore<T, usize>>);
 
-impl<T, F> Indices<T, F> {
+impl<T> Indices<T> {
     pub fn new() -> Self {
         Self(Vec::new())
     }
 
-    pub fn add(
+    pub fn add_idx(
         &mut self,
         name: &'static str,
         store: Box<dyn KeyIdxStore<usize>>,
-        get_field_value: F,
+        get_field_value: FieldValueFn<T, usize>,
     ) {
         self.0.push(NamedStore::new(name, store, get_field_value));
     }
 
-    pub fn store(&self, idx_name: &str) -> &NamedStore<T, usize, F> {
+    pub fn get_idx(&self, idx_name: &str) -> &NamedStore<T, usize> {
         self.0.iter().find(|i| i.name == idx_name).unwrap()
     }
 
-    pub fn insert_index(&mut self, idx_name: &str, t: &T, idx: Idx) -> Result
-    where
-        F: Fn(&T) -> usize,
-    {
+    pub fn insert(&mut self, t: &T, idx: Idx) -> Result {
         for s in &mut self.0 {
-            if s.name == idx_name {
-                let key = (s.get_field_value)(t);
-                s.store.insert(key, idx)?;
-            }
+            let key = (s.get_field_value)(t);
+            s.store.insert(key, idx)?;
         }
 
         Ok(())
@@ -167,26 +159,38 @@ impl<T, F> Indices<T, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{index::uint::UIntVecIndex, ops::eq};
+    use crate::{index::uint::UIntVecIndex, ops::eq, Query};
 
-    struct Person(usize, &'static str);
+    struct Person(usize, usize, &'static str);
 
     #[test]
     fn person_indices() {
         let mut indices = Indices::new();
-        indices.add(
+        indices.add_idx(
             "pk",
             Box::<UIntVecIndex<Unique>>::default(),
             |p: &Person| p.0,
         );
+        indices.add_idx(
+            "second",
+            Box::<UIntVecIndex<Multi>>::default(),
+            |p: &Person| p.1,
+        );
 
-        indices.insert_index("pk", &Person(3, "Jasmin"), 0).unwrap();
-        indices.insert_index("pk", &Person(41, "Mario"), 1).unwrap();
+        indices.insert(&Person(3, 7, "Jasmin"), 0).unwrap();
+        indices.insert(&Person(41, 7, "Mario"), 1).unwrap();
 
-        let idx = indices.store("pk");
-        assert_eq!(1, idx.idx(eq(41))[0]);
-        assert_eq!(0, idx.idx(eq(3))[0]);
+        let pk = indices.get_idx("pk");
+        assert_eq!(1, pk.idx(eq(41))[0]);
+        assert_eq!(0, pk.idx(eq(3))[0]);
 
-        assert!(idx.idx(eq(101)).eq(&[]));
+        assert!(pk.idx(eq(101)).eq(&[]));
+
+        let second = indices.get_idx("second");
+        assert_eq!(&[0usize, 1], second.idx(eq(7)));
+
+        let r = second.or_rhs(eq(7), &pk, eq(3));
+        assert!(r.contains(&&0));
+        assert!(r.contains(&&1));
     }
 }
