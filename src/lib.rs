@@ -1,5 +1,6 @@
 pub mod index;
 pub mod ops;
+pub mod query;
 
 /// `Idx` is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;

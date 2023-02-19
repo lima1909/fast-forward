@@ -79,6 +79,7 @@ mod tests {
 
     mod unique {
         use crate::index::{IndexError, Unique};
+        use crate::query::{NQuery, OneIdxFilterQuery, QFilter};
 
         use super::*;
 
@@ -114,6 +115,16 @@ mod tests {
 
             let r = i.or(eq(99), eq(4));
             assert!(r.contains(&&8));
+
+            // TODO: new Query-impl-test
+            let q = OneIdxFilterQuery::new(i);
+            let r = q
+                .filter(QFilter::new(ops::EQ, crate::query::Key::Usize(3)))
+                .or(QFilter::new(ops::EQ, crate::query::Key::Usize(4)))
+                .exec();
+
+            assert!(r.contains(&8));
+            assert!(r.contains(&6));
         }
 
         #[test]

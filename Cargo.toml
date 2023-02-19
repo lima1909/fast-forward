@@ -11,7 +11,12 @@ repository = "https://github.com/lima1909/fast-forward"
 
 
 [dependencies]
+roaring = { version = "0.10.1", optional = true }
 
+
+[features]
+default = [ "roaring" ]
+roaring = [ "dep:roaring" ]
 
 [dev-dependencies]
 criterion = "0.4"
