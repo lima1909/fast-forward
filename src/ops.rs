@@ -1,7 +1,8 @@
 //! Operations are primarily compare functions, like equal, greater than and so on.
-use std::collections::HashSet;
-
-use crate::{Filter, Idx, IdxFilter, Op};
+use crate::{
+    query::{Key, QueryFilter},
+    Op,
+};
 
 /// equal `=`
 pub const EQ: Op = 1;
@@ -17,32 +18,11 @@ pub const GT: Op = 5;
 pub const GE: Op = 6;
 
 /// Equals `Key`
-pub fn eq<K>(key: K) -> Filter<K> {
-    Filter::new(EQ, key)
+pub fn eq<'a, K: Into<Key<'a>>>(field: &'a str, key: K) -> QueryFilter<'a> {
+    QueryFilter::new(field, EQ, key.into())
 }
 
 /// Not Equals `Key`
-pub fn ne<K>(key: K) -> Filter<K> {
-    Filter::new(NE, key)
-}
-
-/// Combine two [`Filter`] with an logical `OR`.
-pub fn or<'a, K, L: IdxFilter<K>, R: IdxFilter<K>>(
-    lidx: &'a L,
-    l: Filter<K>,
-    ridx: &'a R,
-    r: Filter<K>,
-) -> Vec<&'a Idx> {
-    let lr = lidx.idx(l);
-    let rr = ridx.idx(r);
-
-    let mut lhs: HashSet<&Idx> = HashSet::with_capacity(lr.len());
-    lhs.extend(lr);
-    let mut rhs = HashSet::with_capacity(rr.len());
-    rhs.extend(rr);
-
-    let r = &lhs | &rhs;
-    r.iter().copied().collect()
-
-    // Vec::<&Idx>::from_iter(lhs.symmetric_difference(&rhs).copied())
+pub fn ne<'a, K: Into<Key<'a>>>(field: &'a str, key: K) -> QueryFilter<'a> {
+    QueryFilter::new(field, NE, key.into())
 }

@@ -3,9 +3,9 @@ use std::{
     fmt::Debug,
 };
 
-use crate::{ops, Filter, Idx, IdxFilter};
+use crate::{ops, Idx};
 
-use super::{Index, KeyIdxStore};
+use super::{Filter, IdxFilter, Index, KeyIdxStore};
 
 #[derive(Debug, Default)]
 pub struct StrMapIndex<'a, I: Index>(BTreeMap<&'a str, I>);
@@ -38,17 +38,22 @@ impl<'a, I: Index> KeyIdxStore<&'a str> for StrMapIndex<'a, I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ops::eq, Query};
+    use crate::ops::*;
 
     mod unique {
-        use crate::index::{IndexError, Unique};
+        use std::collections::HashSet;
+
+        use crate::{
+            index::{IndexError, Unique},
+            query::{IdxFilterQuery, Query},
+        };
 
         use super::*;
 
         #[test]
         fn empty() {
             let i = StrMapIndex::<Unique>::default();
-            assert_eq!(0, i.idx(eq("Jasmin")).len());
+            assert_eq!(0, i.idx(Filter::new(EQ, "Jasmin")).len());
             assert!(i.0.is_empty());
         }
 
@@ -57,7 +62,7 @@ mod tests {
             let mut i = StrMapIndex::<Unique>::default();
             i.insert("Jasmin", 4).unwrap();
 
-            assert_eq!(i.idx(eq("Jasmin")), &[4]);
+            assert_eq!(i.idx(Filter::new(EQ, "Jasmin")), &[4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -68,15 +73,19 @@ mod tests {
             i.insert("Mario", 8).unwrap();
             i.insert("Paul", 6).unwrap();
 
-            let r = i.or(eq("Mario"), eq("Paul"));
-            assert!(r.contains(&&8));
-            assert!(r.contains(&&6));
+            let mut q = IdxFilterQuery::new(i, HashSet::<Idx>::default());
+            q = q.filter(eq("", "Mario")).or(eq("", "Paul"));
+            let r = q.exec();
+            assert!(r.contains(&8));
+            assert!(r.contains(&6));
 
-            let r = i.or(eq("Paul"), eq("Blub"));
-            assert!(r.contains(&&6));
+            q = q.reset().filter(eq("", "Paul")).or(eq("", "Blub"));
+            let r = q.exec();
+            assert!(r.contains(&6));
 
-            let r = i.or(eq("Blub"), eq("Mario"));
-            assert!(r.contains(&&8));
+            q = q.reset().filter(eq("", "Blub")).or(eq("", "Mario"));
+            let r = q.exec();
+            assert!(r.contains(&8));
         }
 
         #[test]
@@ -90,7 +99,7 @@ mod tests {
         #[test]
         fn out_of_bound() {
             let i = StrMapIndex::<Unique>::default();
-            assert_eq!(0, i.filter(eq("Jasmin")).len());
+            assert_eq!(0, i.idx(Filter::new(EQ, "Jasmin")).len());
         }
     }
 
@@ -102,7 +111,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = StrMapIndex::<Multi>::default();
-            assert_eq!(0, i.idx(eq("Jasmin")).len());
+            assert_eq!(0, i.idx(Filter::new(EQ, "Jasmin")).len());
             assert!(i.0.is_empty());
         }
 
@@ -111,7 +120,7 @@ mod tests {
             let mut i = StrMapIndex::<Multi>::default();
             i.insert("Jasmin", 2).unwrap();
 
-            assert!(i.idx(eq("Jasmin")).eq(&[2]));
+            assert!(i.idx(Filter::new(EQ, "Jasmin")).eq(&[2]));
             assert_eq!(1, i.0.len());
         }
 
@@ -121,7 +130,7 @@ mod tests {
             i.insert("Jasmin", 2).unwrap();
             i.insert("Jasmin", 1).unwrap();
 
-            assert!(i.filter(eq("Jasmin")).eq(&[2, 1]));
+            assert!(i.idx(Filter::new(EQ, "Jasmin")).eq(&[2, 1]));
         }
     }
 }

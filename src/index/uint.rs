@@ -2,9 +2,9 @@
 
 use std::ops::Deref;
 
-use crate::{ops, Filter};
+use crate::ops;
 
-use super::{Idx, IdxFilter, Index, KeyIdxStore, Result};
+use super::{Filter, Idx, IdxFilter, Index, KeyIdxStore, Result};
 
 /// Index for 32-bit unsigned integer type [`usize`].
 ///
@@ -75,18 +75,19 @@ impl<I: Index> Deref for UIntVecIndex<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ops::eq, Query};
+    use crate::ops::{eq, EQ};
 
     mod unique {
+
         use crate::index::{IndexError, Unique};
-        use crate::query::{NQuery, OneIdxFilterQuery, QFilter};
+        use crate::query::{IdxFilterQuery, Query};
 
         use super::*;
 
         #[test]
         fn empty() {
             let i = UIntVecIndex::<Unique>::default();
-            assert_eq!(0, i.idx(eq(2)).len());
+            assert_eq!(0, i.idx(Filter::new(EQ, 2)).len());
             assert!(i.0.is_empty());
         }
 
@@ -95,7 +96,7 @@ mod tests {
             let mut i = UIntVecIndex::<Unique>::default();
             i.insert(2, 4).unwrap();
 
-            assert_eq!(i.idx(eq(2)), &[4]);
+            assert_eq!(i.idx(Filter::new(EQ, 2)), &[4]);
             assert_eq!(3, i.0.len());
         }
 
@@ -106,23 +107,23 @@ mod tests {
             i.insert(4, 8).unwrap();
             i.insert(3, 6).unwrap();
 
-            let r = i.or(eq(3), eq(4));
-            assert!(r.contains(&&8));
-            assert!(r.contains(&&6));
+            let rbm = roaring::RoaringBitmap::default();
+            let mut q = IdxFilterQuery::new(i, rbm);
+            q = q.filter(eq("", 3)).or(eq("", 4));
+            let r = q.exec();
+            assert!(r.contains(&8));
+            assert!(r.contains(&6));
 
-            let r = i.or(eq(3), eq(99));
-            assert!(r.contains(&&6));
+            q = q.reset().filter(eq("", 3)).or(eq("", 99));
+            let r = q.exec();
+            assert!(r.contains(&6));
 
-            let r = i.or(eq(99), eq(4));
-            assert!(r.contains(&&8));
+            q = q.reset().filter(eq("", 99)).or(eq("", 4));
+            let r = q.exec();
+            assert!(r.contains(&8));
 
-            // TODO: new Query-impl-test
-            let q = OneIdxFilterQuery::new(i);
-            let r = q
-                .filter(QFilter::new(ops::EQ, crate::query::Key::Usize(3)))
-                .or(QFilter::new(ops::EQ, crate::query::Key::Usize(4)))
-                .exec();
-
+            q = q.reset().filter(eq("", 3)).or(eq("", 4));
+            let r = q.exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
         }
@@ -138,7 +139,7 @@ mod tests {
         #[test]
         fn out_of_bound() {
             let i = UIntVecIndex::<Unique>::default();
-            assert_eq!(0, i.filter(eq(2)).len());
+            assert_eq!(0, i.idx(Filter::new(EQ, 2)).len());
         }
     }
 
@@ -150,7 +151,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = UIntVecIndex::<Multi>::default();
-            assert_eq!(0, i.idx(eq(2)).len());
+            assert_eq!(0, i.idx(Filter::new(EQ, 2)).len());
             assert!(i.0.is_empty());
         }
 
@@ -159,7 +160,7 @@ mod tests {
             let mut i = UIntVecIndex::<Multi>::default();
             i.insert(2, 2).unwrap();
 
-            assert!(i.idx(eq(2)).eq(&[2]));
+            assert!(i.idx(Filter::new(EQ, 2)).eq(&[2]));
             assert_eq!(3, i.0.len());
         }
 
@@ -169,7 +170,7 @@ mod tests {
             i.insert(2, 2).unwrap();
             i.insert(2, 1).unwrap();
 
-            assert!(i.filter(eq(2)).eq(&[2, 1]));
+            assert!(i.idx(Filter::new(EQ, 2)).eq(&[2, 1]));
         }
     }
 }

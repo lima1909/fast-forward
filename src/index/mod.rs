@@ -33,7 +33,7 @@ pub mod uint;
 pub use error::IndexError;
 use std::fmt::Debug;
 
-use crate::{Idx, IdxFilter};
+use crate::{Idx, Op};
 
 /// Default Result for index with the Ok(T) value or en [`IndexError`].
 type Result<T = ()> = std::result::Result<T, IndexError>;
@@ -85,6 +85,28 @@ impl Index for Multi {
     }
 }
 
+/// Filter are the input data for describung a filter. A filter consist of a key and a operation [`Op`].
+/// Key `K` is a unique value under which all occurring indices are stored.
+///
+/// For example:
+/// Filter `= 5`
+/// means: Op: `=` and Key: `5`
+pub struct Filter<K> {
+    pub op: Op,
+    pub key: K,
+}
+
+impl<K> Filter<K> {
+    pub fn new(op: Op, key: K) -> Self {
+        Self { op, key }
+    }
+}
+
+/// Find all [`Idx`] for an given [`crate::Op`] and `Key`.
+pub trait IdxFilter<K> {
+    fn idx(&self, f: Filter<K>) -> &[Idx];
+}
+
 /// A Store for a mapping from a given Key to one or many Indices.
 pub trait KeyIdxStore<K>: IdxFilter<K> {
     fn insert(&mut self, k: K, i: Idx) -> Result;
@@ -99,13 +121,13 @@ pub struct NamedStore<T, K> {
 }
 
 impl<T, K> IdxFilter<K> for NamedStore<T, K> {
-    fn idx(&self, f: crate::Filter<K>) -> &[Idx] {
+    fn idx(&self, f: Filter<K>) -> &[Idx] {
         self.store.idx(f)
     }
 }
 
 impl<T, K> IdxFilter<K> for &NamedStore<T, K> {
-    fn idx(&self, f: crate::Filter<K>) -> &[Idx] {
+    fn idx(&self, f: Filter<K>) -> &[Idx] {
         self.store.idx(f)
     }
 }
@@ -158,8 +180,14 @@ impl<T> Indices<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
-    use crate::{index::uint::UIntVecIndex, ops::eq, Query};
+    use crate::{
+        index::uint::UIntVecIndex,
+        ops::eq,
+        query::{IdxFilterQuery, Query},
+    };
 
     struct Person(usize, usize, &'static str);
 
@@ -181,16 +209,25 @@ mod tests {
         indices.insert(&Person(41, 7, "Mario"), 1).unwrap();
 
         let pk = indices.get_idx("pk");
-        assert_eq!(1, pk.idx(eq(41))[0]);
-        assert_eq!(0, pk.idx(eq(3))[0]);
+        let mut q = IdxFilterQuery::new(pk, HashSet::<Idx>::default());
+        q = q.filter(eq("", 41));
+        assert_eq!(1, q.exec()[0]);
 
-        assert!(pk.idx(eq(101)).eq(&[]));
+        q = q.reset().filter(eq("", 3));
+        assert_eq!(0, q.exec()[0]);
+
+        q = q.reset().filter(eq("", 101));
+        assert_eq!(Vec::<usize>::new(), q.exec());
 
         let second = indices.get_idx("second");
-        assert_eq!(&[0usize, 1], second.idx(eq(7)));
+        let mut q = IdxFilterQuery::new(second, HashSet::<Idx>::default());
+        q = q.filter(eq("", 7));
+        let r = q.exec();
+        assert!(r.contains(&0));
+        assert!(r.contains(&1));
 
-        let r = second.or_rhs(eq(7), &pk, eq(3));
-        assert!(r.contains(&&0));
-        assert!(r.contains(&&1));
+        let r = q.reset().filter(eq("", 3)).or(eq("", 7)).exec();
+        assert!(r.contains(&0));
+        assert!(r.contains(&1));
     }
 }

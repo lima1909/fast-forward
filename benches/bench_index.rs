@@ -1,9 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use fast_forward::index::uint::UIntVecIndex;
-use fast_forward::index::{Indices, Unique};
-use fast_forward::ops::eq;
-use fast_forward::Query;
+use fast_forward::index::{Filter, IdxFilter, Indices, Unique};
+use fast_forward::ops;
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
@@ -30,7 +29,7 @@ fn list_index(c: &mut Criterion) {
     let mut group = c.benchmark_group("index");
     group.bench_function("list_index", |b| {
         b.iter(|| {
-            let i = idx.filter(eq(FIND_ID))[0];
+            let i = idx.idx(Filter::new(ops::EQ, FIND_ID))[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
