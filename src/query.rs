@@ -2,7 +2,7 @@
 
 use crate::{
     index::{uint::UIntVecIndex, Unique},
-    Idx, IdxFilter, Op,
+    Filter, Idx, IdxFilter, Op,
 };
 use std::{
     collections::HashSet,
@@ -10,6 +10,7 @@ use std::{
     ops::{BitAnd, BitOr},
 };
 
+#[derive(Debug, Clone)]
 pub enum Key<'a> {
     Usize(usize),
     Str(&'a str),
@@ -29,6 +30,15 @@ pub struct QFilter<'a> {
     name: &'a str,
     op: Op,
     key: Key<'a>,
+}
+
+impl<'a, K: From<Key<'a>>> From<QFilter<'a>> for Filter<K> {
+    fn from(f: QFilter<'a>) -> Self {
+        Filter {
+            op: f.op,
+            key: f.key.into(),
+        }
+    }
 }
 
 impl<'a> QFilter<'a> {
@@ -68,21 +78,13 @@ impl OneIdxFilterQuery<HashSet<Idx>, usize, UIntVecIndex<Unique>> {
 
 impl<'a> NQuery<'a> for OneIdxFilterQuery<HashSet<Idx>, usize, UIntVecIndex<Unique>> {
     fn filter(mut self, f: QFilter<'a>) -> Self {
-        let idxs = self.idx_filter.idx(crate::Filter {
-            op: f.op,
-            key: f.key.into(),
-        });
-
+        let idxs = self.idx_filter.idx(f.into());
         self.indices = HashSet::<Idx>::from_idx(idxs);
         self
     }
 
     fn or(mut self, f: QFilter<'a>) -> Self {
-        let idxs = self.idx_filter.idx(crate::Filter {
-            op: f.op,
-            key: f.key.into(),
-        });
-
+        let idxs = self.idx_filter.idx(f.into());
         self.indices = HashSet::<Idx>::from_idx(idxs).bitor(&self.indices);
         self
     }
