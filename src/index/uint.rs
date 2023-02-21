@@ -79,6 +79,8 @@ mod tests {
 
     mod unique {
 
+        use std::collections::HashSet;
+
         use crate::index::{IndexError, Unique};
         use crate::query::{IdxFilterQuery, Query};
 
@@ -107,23 +109,18 @@ mod tests {
             i.insert(4, 8).unwrap();
             i.insert(3, 6).unwrap();
 
-            let rbm = roaring::RoaringBitmap::default();
-            let mut q = IdxFilterQuery::new(i, rbm);
-            q = q.filter(eq("", 3)).or(eq("", 4));
-            let r = q.exec();
+            let mut q = IdxFilterQuery::new(i, HashSet::default());
+            let r = q.filter(eq("", 3)).or(eq("", 4)).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
 
-            q = q.reset().filter(eq("", 3)).or(eq("", 99));
-            let r = q.exec();
+            let r = q.reset().filter(eq("", 3)).or(eq("", 99)).exec();
             assert!(r.contains(&6));
 
-            q = q.reset().filter(eq("", 99)).or(eq("", 4));
-            let r = q.exec();
+            let r = q.reset().filter(eq("", 99)).or(eq("", 4)).exec();
             assert!(r.contains(&8));
 
-            q = q.reset().filter(eq("", 3)).or(eq("", 4));
-            let r = q.exec();
+            let r = q.reset().filter(eq("", 3)).or(eq("", 4)).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
         }

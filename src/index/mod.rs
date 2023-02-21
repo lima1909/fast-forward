@@ -209,20 +209,16 @@ mod tests {
         indices.insert(&Person(41, 7, "Mario"), 1).unwrap();
 
         let pk = indices.get_idx("pk");
-        let mut q = IdxFilterQuery::new(pk, HashSet::<Idx>::default());
-        q = q.filter(eq("", 41));
-        assert_eq!(1, q.exec()[0]);
 
-        q = q.reset().filter(eq("", 3));
-        assert_eq!(0, q.exec()[0]);
-
-        q = q.reset().filter(eq("", 101));
-        assert_eq!(Vec::<usize>::new(), q.exec());
+        let mut q = IdxFilterQuery::new(pk, HashSet::default());
+        assert_eq!(1, q.filter(eq("", 41)).exec()[0]);
+        assert_eq!(0, q.reset().filter(eq("", 3)).exec()[0]);
+        assert_eq!(Vec::<usize>::new(), q.reset().filter(eq("", 101)).exec());
 
         let second = indices.get_idx("second");
-        let mut q = IdxFilterQuery::new(second, HashSet::<Idx>::default());
-        q = q.filter(eq("", 7));
-        let r = q.exec();
+
+        let mut q = IdxFilterQuery::new(second, HashSet::default());
+        let r = q.filter(eq("", 7)).exec();
         assert!(r.contains(&0));
         assert!(r.contains(&1));
 

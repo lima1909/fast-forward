@@ -73,18 +73,15 @@ mod tests {
             i.insert("Mario", 8).unwrap();
             i.insert("Paul", 6).unwrap();
 
-            let mut q = IdxFilterQuery::new(i, HashSet::<Idx>::default());
-            q = q.filter(eq("", "Mario")).or(eq("", "Paul"));
-            let r = q.exec();
+            let mut q = IdxFilterQuery::new(i, HashSet::default());
+            let r = q.filter(eq("", "Mario")).or(eq("", "Paul")).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
 
-            q = q.reset().filter(eq("", "Paul")).or(eq("", "Blub"));
-            let r = q.exec();
+            let r = q.reset().filter(eq("", "Paul")).or(eq("", "Blub")).exec();
             assert!(r.contains(&6));
 
-            q = q.reset().filter(eq("", "Blub")).or(eq("", "Mario"));
-            let r = q.exec();
+            let r = q.reset().filter(eq("", "Blub")).or(eq("", "Mario")).exec();
             assert!(r.contains(&8));
         }
 

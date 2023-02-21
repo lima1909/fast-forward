@@ -69,9 +69,9 @@ impl<'a, K: From<Key<'a>>> From<QueryFilter<'a>> for Filter<K> {
 
 /// Query combines different filter. Filters can be linked using `and` and `or`.
 pub trait Query<'a> {
-    fn filter(self, f: QueryFilter<'a>) -> Self;
-    fn or(self, f: QueryFilter<'a>) -> Self;
-    fn reset(self) -> Self;
+    fn filter(&mut self, f: QueryFilter<'a>) -> &mut Self;
+    fn or(&mut self, f: QueryFilter<'a>) -> &mut Self;
+    fn reset(&mut self) -> &mut Self;
     fn exec(&self) -> Vec<Idx>;
 }
 
@@ -97,15 +97,16 @@ where
     K: From<Key<'a>>,
     I: IdxFilter<K>,
 {
-    fn filter(mut self, f: QueryFilter<'a>) -> Self {
+    fn filter(&mut self, f: QueryFilter<'a>) -> &mut Self {
         let idxs = self.idx_filter.idx(f.into());
         self.indices = B::from_idx(idxs);
         self
     }
 
-    fn or(mut self, f: QueryFilter<'a>) -> Self {
+    fn or(&mut self, f: QueryFilter<'a>) -> &mut Self {
         let idxs = self.idx_filter.idx(f.into());
-        self.indices = self.indices.or(idxs);
+        let or = self.indices.or(idxs);
+        let _old = std::mem::replace(&mut self.indices, or);
         self
     }
 
@@ -113,7 +114,7 @@ where
         self.indices.to_idx()
     }
 
-    fn reset(mut self) -> Self {
+    fn reset(&mut self) -> &mut Self {
         self.indices.reset();
         self
     }
@@ -123,7 +124,7 @@ pub trait BinOp {
     fn from_idx(idx: &[Idx]) -> Self;
     fn to_idx(&self) -> Vec<Idx>;
 
-    fn or(self, idx: &[Idx]) -> Self;
+    fn or(&self, idx: &[Idx]) -> Self;
 
     fn reset(&mut self);
 }
@@ -139,7 +140,7 @@ impl BinOp for HashSet<Idx> {
         self.iter().copied().collect()
     }
 
-    fn or(self, idx: &[Idx]) -> Self {
+    fn or(&self, idx: &[Idx]) -> Self {
         let rhs = Self::from_idx(idx);
         self.bitor(&rhs)
     }
@@ -159,10 +160,9 @@ impl BinOp for roaring::RoaringBitmap {
         self.iter().map(|i| i as usize).collect()
     }
 
-    fn or(self, idx: &[Idx]) -> Self {
-        let mut rbm = roaring::RoaringBitmap::new();
-        roaring::RoaringBitmap::extend(&mut rbm, idx.iter().map(|i| *i as u32));
-        self.bitor(rbm)
+    fn or(&self, idx: &[Idx]) -> Self {
+        let rhs = Self::from_idx(idx);
+        self.bitor(rhs)
     }
 
     fn reset(&mut self) {
