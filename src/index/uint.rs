@@ -78,13 +78,13 @@ mod tests {
     use crate::ops::{eq, EQ};
 
     mod unique {
-
+        use super::*;
         use std::collections::HashSet;
 
-        use crate::index::{IndexError, Unique};
-        use crate::query::{IdxFilterQuery, Query};
-
-        use super::*;
+        use crate::{
+            index::{IndexError, Unique},
+            query::{Query, ToQuery},
+        };
 
         #[test]
         fn empty() {
@@ -104,12 +104,12 @@ mod tests {
 
         #[test]
         fn or_find_idx_3_4() {
-            let mut i = UIntVecIndex::<Unique>::default();
-            i.insert(2, 4).unwrap();
-            i.insert(4, 8).unwrap();
-            i.insert(3, 6).unwrap();
+            let mut idx = UIntVecIndex::<Unique>::default();
+            idx.insert(2, 4).unwrap();
+            idx.insert(4, 8).unwrap();
+            idx.insert(3, 6).unwrap();
 
-            let mut q = IdxFilterQuery::new(i, HashSet::default());
+            let mut q = idx.to_query(HashSet::new());
             let r = q.filter(eq("", 3)).or(eq("", 4)).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
@@ -141,9 +141,8 @@ mod tests {
     }
 
     mod multi {
-        use crate::index::Multi;
-
         use super::*;
+        use crate::index::Multi;
 
         #[test]
         fn empty() {

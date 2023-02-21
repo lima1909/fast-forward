@@ -75,6 +75,14 @@ pub trait Query<'a> {
     fn exec(&self) -> Vec<Idx>;
 }
 
+pub trait ToQuery<B: BinOp, K>: IdxFilter<K> + Sized {
+    fn to_query(self, bin_op: B) -> IdxFilterQuery<B, K, Self> {
+        IdxFilterQuery::new(self, bin_op)
+    }
+}
+
+impl<B: BinOp, K, I: IdxFilter<K>> ToQuery<B, K> for I {}
+
 pub struct IdxFilterQuery<B, K, I> {
     idx_filter: I,
     indices: B,
