@@ -73,7 +73,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = UniqueStrIdx::default();
-            assert_eq!(0, i.idx(Filter::new(EQ, "Jasmin")).len());
+            assert_eq!(0, i.eq("Jasmin").len());
             assert!(i.0.is_empty());
         }
 
@@ -82,7 +82,7 @@ mod tests {
             let mut i = UniqueStrIdx::default();
             i.insert("Jasmin", 4).unwrap();
 
-            assert_eq!(i.idx(Filter::new(EQ, "Jasmin")), &[4]);
+            assert_eq!(i.eq("Jasmin"), &[4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -116,7 +116,7 @@ mod tests {
         #[test]
         fn out_of_bound() {
             let i = UniqueStrIdx::default();
-            assert_eq!(0, i.idx(Filter::new(EQ, "Jasmin")).len());
+            assert_eq!(0, i.eq("Jasmin").len());
         }
     }
 
@@ -126,7 +126,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = MultiStrIdx::default();
-            assert_eq!(0, i.idx(Filter::new(EQ, "Jasmin")).len());
+            assert_eq!(0, i.eq("Jasmin").len());
             assert!(i.0.is_empty());
         }
 
@@ -135,7 +135,7 @@ mod tests {
             let mut i = MultiStrIdx::default();
             i.insert("Jasmin", 2).unwrap();
 
-            assert!(i.idx(Filter::new(EQ, "Jasmin")).eq(&[2]));
+            assert_eq!(i.eq("Jasmin"), &[2]);
             assert_eq!(1, i.0.len());
         }
 
@@ -145,7 +145,7 @@ mod tests {
             i.insert("Jasmin", 2).unwrap();
             i.insert("Jasmin", 1).unwrap();
 
-            assert!(i.idx(Filter::new(EQ, "Jasmin")).eq(&[2, 1]));
+            assert_eq!(i.eq("Jasmin"), &[2, 1]);
         }
     }
 }

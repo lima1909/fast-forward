@@ -33,7 +33,10 @@ pub mod uint;
 pub use error::IndexError;
 use std::fmt::Debug;
 
-use crate::{Idx, Op};
+use crate::{
+    ops::{EQ, NE},
+    Idx, Op,
+};
 
 /// Default Result for index with the Ok(T) value or en [`IndexError`].
 type Result<T = ()> = std::result::Result<T, IndexError>;
@@ -105,6 +108,14 @@ impl<K> Filter<K> {
 /// Find all [`Idx`] for an given [`crate::Op`] and `Key`.
 pub trait IdxFilter<K> {
     fn idx(&self, f: Filter<K>) -> &[Idx];
+
+    fn eq(&self, key: K) -> &[Idx] {
+        self.idx(Filter::new(EQ, key))
+    }
+
+    fn ne(&self, key: K) -> &[Idx] {
+        self.idx(Filter::new(NE, key))
+    }
 }
 
 /// A Store for a mapping from a given Key to one or many Indices.

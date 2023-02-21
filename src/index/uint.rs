@@ -76,7 +76,6 @@ impl<I: Index> Deref for UIntVecIndex<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ops::{eq, EQ};
 
     mod unique {
         use super::*;
@@ -84,13 +83,14 @@ mod tests {
 
         use crate::{
             index::IndexError,
+            ops::eq,
             query::{Query, ToQuery},
         };
 
         #[test]
         fn empty() {
             let i = PkUintIdx::default();
-            assert_eq!(0, i.idx(Filter::new(EQ, 2)).len());
+            assert_eq!(0, i.eq(2).len());
             assert!(i.0.is_empty());
         }
 
@@ -99,7 +99,8 @@ mod tests {
             let mut i = PkUintIdx::default();
             i.insert(2, 4).unwrap();
 
-            assert_eq!(i.idx(Filter::new(EQ, 2)), &[4]);
+            assert_eq!(i.eq(2), &[4]);
+            assert_eq!(i.ne(3), &[]); // TODO: `ne` do not work now
             assert_eq!(3, i.0.len());
         }
 
@@ -137,7 +138,7 @@ mod tests {
         #[test]
         fn out_of_bound() {
             let i = PkUintIdx::default();
-            assert_eq!(0, i.idx(Filter::new(EQ, 2)).len());
+            assert_eq!(0, i.eq(2).len());
         }
 
         #[test]
@@ -156,7 +157,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = MultiUintIdx::default();
-            assert_eq!(0, i.idx(Filter::new(EQ, 2)).len());
+            assert_eq!(0, i.eq(2).len());
             assert!(i.0.is_empty());
         }
 
@@ -165,7 +166,7 @@ mod tests {
             let mut i = MultiUintIdx::default();
             i.insert(2, 2).unwrap();
 
-            assert!(i.idx(Filter::new(EQ, 2)).eq(&[2]));
+            assert_eq!(i.eq(2), &[2]);
             assert_eq!(3, i.0.len());
         }
 
@@ -175,7 +176,7 @@ mod tests {
             i.insert(2, 2).unwrap();
             i.insert(2, 1).unwrap();
 
-            assert!(i.idx(Filter::new(EQ, 2)).eq(&[2, 1]));
+            assert_eq!(i.eq(2), [2, 1]);
         }
     }
 }
