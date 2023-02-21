@@ -1,30 +1,31 @@
-//! Index for 32-bit unsigned integer type.
-
+//! Indices for 32-bit unsigned integer type ([`usize`]).
+//!
+//! Well suitable for for example `Primary Keys`
+//!
+//!```java
+//! let _unique_values = vec![3, 2, 4, 1, ...];
+//!
+//! Unique Index:
+//!
+//!  Key | Idx (_values)
+//! --------------------
+//!  0   |  -
+//!  1   |  3
+//!  2   |  1
+//!  3   |  0
+//!  4   |  2
+//! ...  | ...
+//!
+//! ```
+use super::{Filter, Idx, IdxFilter, Index, KeyIdxStore, Multi, Result, Unique};
+use crate::ops;
 use std::ops::Deref;
 
-use crate::ops;
+/// Unique `Primary Key` from type [`usize`].
+pub type PkUintIdx = UIntVecIndex<Unique>;
 
-use super::{Filter, Idx, IdxFilter, Index, KeyIdxStore, Result};
-
-/// Index for 32-bit unsigned integer type [`usize`].
-///
-/// Well suitable for for example Primary Keys
-///
-///```java
-/// let _unique_values = vec![3, 2, 4, 1, ...];
-///
-/// Unique Index:
-///
-///  Key | Idx (_values)
-/// --------------------
-///  0   |  -
-///  1   |  3
-///  2   |  1
-///  3   |  0
-///  4   |  2
-/// ...  | ...
-///
-/// ```
+/// An not unique Key, which can occur multiple times.
+pub type MultiUintIdx = UIntVecIndex<Multi>;
 
 /// `Key` is from type [`crate::Idx`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
@@ -82,20 +83,20 @@ mod tests {
         use std::collections::HashSet;
 
         use crate::{
-            index::{IndexError, Unique},
+            index::IndexError,
             query::{Query, ToQuery},
         };
 
         #[test]
         fn empty() {
-            let i = UIntVecIndex::<Unique>::default();
+            let i = PkUintIdx::default();
             assert_eq!(0, i.idx(Filter::new(EQ, 2)).len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut i = UIntVecIndex::<Unique>::default();
+            let mut i = PkUintIdx::default();
             i.insert(2, 4).unwrap();
 
             assert_eq!(i.idx(Filter::new(EQ, 2)), &[4]);
@@ -104,7 +105,7 @@ mod tests {
 
         #[test]
         fn or_find_idx_3_4() {
-            let mut idx = UIntVecIndex::<Unique>::default();
+            let mut idx = PkUintIdx::default();
             idx.insert(2, 4).unwrap();
             idx.insert(4, 8).unwrap();
             idx.insert(3, 6).unwrap();
@@ -127,7 +128,7 @@ mod tests {
 
         #[test]
         fn double_index() {
-            let mut i = UIntVecIndex::<Unique>::default();
+            let mut i = PkUintIdx::default();
             i.insert(2, 2).unwrap();
 
             assert_eq!(Err(IndexError::NotUniqueKey), i.insert(2, 2));
@@ -135,13 +136,13 @@ mod tests {
 
         #[test]
         fn out_of_bound() {
-            let i = UIntVecIndex::<Unique>::default();
+            let i = PkUintIdx::default();
             assert_eq!(0, i.idx(Filter::new(EQ, 2)).len());
         }
 
         #[test]
         fn query_or_without_filter() {
-            let mut idx = UIntVecIndex::<Unique>::default();
+            let mut idx = PkUintIdx::default();
             idx.insert(2, 2).unwrap();
 
             let mut q = idx.to_query(HashSet::new());
@@ -151,18 +152,17 @@ mod tests {
 
     mod multi {
         use super::*;
-        use crate::index::Multi;
 
         #[test]
         fn empty() {
-            let i = UIntVecIndex::<Multi>::default();
+            let i = MultiUintIdx::default();
             assert_eq!(0, i.idx(Filter::new(EQ, 2)).len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut i = UIntVecIndex::<Multi>::default();
+            let mut i = MultiUintIdx::default();
             i.insert(2, 2).unwrap();
 
             assert!(i.idx(Filter::new(EQ, 2)).eq(&[2]));
@@ -171,7 +171,7 @@ mod tests {
 
         #[test]
         fn double_index() {
-            let mut i = UIntVecIndex::<Multi>::default();
+            let mut i = MultiUintIdx::default();
             i.insert(2, 2).unwrap();
             i.insert(2, 1).unwrap();
 

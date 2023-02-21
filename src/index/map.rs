@@ -1,12 +1,33 @@
+//! Indices for string types: ([`str`]).
+//!
+//!
+//!```java
+//! let _unique_values = vec!["Paul", "Mario", "Jasmin", ...];
+//!
+//! Unique Index impl with a BTreeMap:
+//!
+//!  Key      | Idx
+//! --------------------
+//!  "Jasmin" |  2
+//!  "Mario"  |  1
+//!  "Paul"   |  0
+//!   ...     | ...
+//!
+//! ```
+use super::{Filter, IdxFilter, Index, KeyIdxStore, Multi, Unique};
+use crate::{ops, Idx};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     fmt::Debug,
 };
 
-use crate::{ops, Idx};
+/// Unique Key from type [`str`].
+pub type UniqueStrIdx<'a> = StrMapIndex<'a, Unique>;
 
-use super::{Filter, IdxFilter, Index, KeyIdxStore};
+/// An not unique [`str`] Key, which can occur multiple times.
+pub type MultiStrIdx<'a> = StrMapIndex<'a, Multi>;
 
+/// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
 pub struct StrMapIndex<'a, I: Index>(BTreeMap<&'a str, I>);
 
@@ -45,20 +66,20 @@ mod tests {
         use std::collections::HashSet;
 
         use crate::{
-            index::{IndexError, Unique},
+            index::IndexError,
             query::{Query, ToQuery},
         };
 
         #[test]
         fn empty() {
-            let i = StrMapIndex::<Unique>::default();
+            let i = UniqueStrIdx::default();
             assert_eq!(0, i.idx(Filter::new(EQ, "Jasmin")).len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut i = StrMapIndex::<Unique>::default();
+            let mut i = UniqueStrIdx::default();
             i.insert("Jasmin", 4).unwrap();
 
             assert_eq!(i.idx(Filter::new(EQ, "Jasmin")), &[4]);
@@ -67,7 +88,7 @@ mod tests {
 
         #[test]
         fn or_find_idx_3_4() {
-            let mut idx = StrMapIndex::<Unique>::default();
+            let mut idx = UniqueStrIdx::default();
             idx.insert("Jasmin", 4).unwrap();
             idx.insert("Mario", 8).unwrap();
             idx.insert("Paul", 6).unwrap();
@@ -86,7 +107,7 @@ mod tests {
 
         #[test]
         fn double_index() {
-            let mut i = StrMapIndex::<Unique>::default();
+            let mut i = UniqueStrIdx::default();
             i.insert("Jasmin", 2).unwrap();
 
             assert_eq!(Err(IndexError::NotUniqueKey), i.insert("Jasmin", 2));
@@ -94,25 +115,24 @@ mod tests {
 
         #[test]
         fn out_of_bound() {
-            let i = StrMapIndex::<Unique>::default();
+            let i = UniqueStrIdx::default();
             assert_eq!(0, i.idx(Filter::new(EQ, "Jasmin")).len());
         }
     }
 
     mod multi {
         use super::*;
-        use crate::index::Multi;
 
         #[test]
         fn empty() {
-            let i = StrMapIndex::<Multi>::default();
+            let i = MultiStrIdx::default();
             assert_eq!(0, i.idx(Filter::new(EQ, "Jasmin")).len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut i = StrMapIndex::<Multi>::default();
+            let mut i = MultiStrIdx::default();
             i.insert("Jasmin", 2).unwrap();
 
             assert!(i.idx(Filter::new(EQ, "Jasmin")).eq(&[2]));
@@ -121,7 +141,7 @@ mod tests {
 
         #[test]
         fn double_index() {
-            let mut i = StrMapIndex::<Multi>::default();
+            let mut i = MultiStrIdx::default();
             i.insert("Jasmin", 2).unwrap();
             i.insert("Jasmin", 1).unwrap();
 
