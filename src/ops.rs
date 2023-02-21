@@ -1,6 +1,6 @@
 //! Operations are primarily compare functions, like equal, greater than and so on.
 use crate::{
-    query::{Key, QueryFilter},
+    query::{Filter, Key},
     Op,
 };
 
@@ -18,11 +18,11 @@ pub const GT: Op = 5;
 pub const GE: Op = 6;
 
 /// Equals `Key`
-pub fn eq<'a, K: Into<Key<'a>>>(field: &'a str, key: K) -> QueryFilter<'a> {
-    QueryFilter::new(field, EQ, key.into())
+pub fn eq<'a, K: Into<Key<'a>>>(field: &'a str, key: K) -> Filter<'a> {
+    Filter::new(field, EQ, key.into())
 }
 
 /// Not Equals `Key`
-pub fn ne<'a, K: Into<Key<'a>>>(field: &'a str, key: K) -> QueryFilter<'a> {
-    QueryFilter::new(field, NE, key.into())
+pub fn ne<'a, K: Into<Key<'a>>>(field: &'a str, key: K) -> Filter<'a> {
+    Filter::new(field, NE, key.into())
 }

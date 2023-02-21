@@ -138,6 +138,15 @@ mod tests {
             let i = UIntVecIndex::<Unique>::default();
             assert_eq!(0, i.idx(Filter::new(EQ, 2)).len());
         }
+
+        #[test]
+        fn query_or_without_filter() {
+            let mut idx = UIntVecIndex::<Unique>::default();
+            idx.insert(2, 2).unwrap();
+
+            let mut q = idx.to_query(HashSet::new());
+            assert_eq!(vec![2], q.or(eq("", 2)).exec());
+        }
     }
 
     mod multi {

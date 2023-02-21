@@ -1,11 +1,11 @@
-#![allow(dead_code)]
-
+//! Query combines different filter. Filters can be linked using `and` and `or`.
 use crate::{
-    index::{Filter, IdxFilter},
+    index::{self, IdxFilter},
     Idx, Op,
 };
 use std::{collections::HashSet, marker::PhantomData, ops::BitOr};
 
+/// Supported types for quering [`IdxFilter`].
 #[derive(Debug, Clone)]
 pub enum Key<'a> {
     Usize(usize),
@@ -42,21 +42,22 @@ impl<'a> From<&'a str> for Key<'a> {
     }
 }
 /// `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
-pub struct QueryFilter<'a> {
+pub struct Filter<'a> {
+    #[allow(dead_code)]
     field: &'a str,
     op: Op,
     key: Key<'a>,
 }
 
-impl<'a> QueryFilter<'a> {
+impl<'a> Filter<'a> {
     pub fn new(field: &'a str, op: Op, key: Key<'a>) -> Self {
         Self { field, op, key }
     }
 }
 
-impl<'a, K: From<Key<'a>>> From<QueryFilter<'a>> for Filter<K> {
-    fn from(f: QueryFilter<'a>) -> Self {
-        Filter {
+impl<'a, K: From<Key<'a>>> From<Filter<'a>> for index::Filter<K> {
+    fn from(f: Filter<'a>) -> Self {
+        index::Filter {
             op: f.op,
             key: f.key.into(),
         }
@@ -69,12 +70,13 @@ impl<'a, K: From<Key<'a>>> From<QueryFilter<'a>> for Filter<K> {
 
 /// Query combines different filter. Filters can be linked using `and` and `or`.
 pub trait Query<'a> {
-    fn filter(&mut self, f: QueryFilter<'a>) -> &mut Self;
-    fn or(&mut self, f: QueryFilter<'a>) -> &mut Self;
+    fn filter(&mut self, f: Filter<'a>) -> &mut Self;
+    fn or(&mut self, f: Filter<'a>) -> &mut Self;
     fn reset(&mut self) -> &mut Self;
     fn exec(&self) -> Vec<Idx>;
 }
 
+/// If this trait is in scope, than it convert [`IdxFilter`] into a [`Query`].
 pub trait ToQuery<B: BinOp, K>: IdxFilter<K> + Sized {
     fn to_query(self, bin_op: B) -> IdxFilterQuery<B, K, Self> {
         IdxFilterQuery::new(self, bin_op)
@@ -83,6 +85,8 @@ pub trait ToQuery<B: BinOp, K>: IdxFilter<K> + Sized {
 
 impl<B: BinOp, K, I: IdxFilter<K>> ToQuery<B, K> for I {}
 
+/// Wrapper, for creating an impl for the trait [`Query`] combined with the [`IdxFilter`] trait.
+/// The simpelst way to use the [`ToQuery`] trait.
 pub struct IdxFilterQuery<B, K, I> {
     idx_filter: I,
     indices: B,
@@ -105,13 +109,13 @@ where
     K: From<Key<'a>>,
     I: IdxFilter<K>,
 {
-    fn filter(&mut self, f: QueryFilter<'a>) -> &mut Self {
+    fn filter(&mut self, f: Filter<'a>) -> &mut Self {
         let idxs = self.idx_filter.idx(f.into());
         self.indices = B::from_idx(idxs);
         self
     }
 
-    fn or(&mut self, f: QueryFilter<'a>) -> &mut Self {
+    fn or(&mut self, f: Filter<'a>) -> &mut Self {
         let idxs = self.idx_filter.idx(f.into());
         let or = self.indices.or(idxs);
         let _old = std::mem::replace(&mut self.indices, or);
@@ -128,6 +132,7 @@ where
     }
 }
 
+/// Support for binary logical operations, like `or` and `and`.
 pub trait BinOp {
     fn from_idx(idx: &[Idx]) -> Self;
     fn to_idx(&self) -> Vec<Idx>;
