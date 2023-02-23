@@ -164,6 +164,10 @@ mod tests {
             // )
             // => 3 -> 6
             assert_eq!(&[6], &r[..]);
+
+            q.new(eq("", 3)).or(eq("", 4)).exec();
+            let r = q.and(eq("", 2)).exec();
+            assert!(r.is_empty());
         }
 
         #[test]

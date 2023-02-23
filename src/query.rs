@@ -45,7 +45,7 @@ pub trait Query<'a> {
     fn new(&mut self, f: Filter<'a>) -> &mut Self;
     fn or(&mut self, f: Filter<'a>) -> &mut Self;
     fn and(&mut self, f: Filter<'a>) -> &mut Self;
-    fn exec(&self) -> Vec<Idx>;
+    fn exec(&mut self) -> Vec<Idx>;
 }
 
 /// If this trait is in scope, than it convert [`IdxFilter`] into a [`Query`].
@@ -99,52 +99,45 @@ where
         self
     }
 
-    fn exec(&self) -> Vec<Idx> {
+    fn exec(&mut self) -> Vec<Idx> {
         self.ors.exec()
     }
 }
 
 struct Ors<B> {
-    current_pos: usize,
-    first: B, // equals ands
-    list: Vec<B>,
+    ops: Vec<B>,
 }
 
 impl<B: BinOp> Ors<B> {
     fn new(b: B) -> Self {
-        Self {
-            current_pos: 0,
-            first: b,
-            list: Vec::new(),
-        }
-    }
-
-    // or is equals add and exec on the end with call `exec`
-    fn or(&mut self, b: B) {
-        self.list.push(b);
-        self.current_pos += 1;
-    }
-
-    fn and(&mut self, b: B) {
-        if self.current_pos == 0 {
-            self.first = self.first.and(&b)
-        } else {
-            let i = self.current_pos - 1;
-            self.list[i] = self.list[i].and(&b);
-        }
+        let mut s = Self { ops: Vec::new() };
+        s.or(b);
+        s
     }
 
     #[inline]
-    fn exec(&self) -> Vec<Idx> {
-        if self.list.is_empty() {
-            return self.first.to_idx();
+    fn or(&mut self, b: B) {
+        self.ops.push(b);
+    }
+
+    #[inline]
+    fn and(&mut self, b: B) {
+        let i = self.ops.len() - 1;
+        self.ops[i] = self.ops[i].and(&b);
+    }
+
+    #[inline]
+    fn exec(&mut self) -> Vec<Idx> {
+        let v = std::mem::take(&mut self.ops);
+        let mut it = v.into_iter();
+        let mut first = it.next().unwrap();
+        for b in it {
+            first = first.or(&b);
         }
 
-        let mut first = self.first.or(&self.list[0]);
-        for b in self.list.iter().skip(1) {
-            first = first.or(b)
-        }
-        first.to_idx()
+        let idx = first.to_idx();
+        self.or(first);
+        idx
     }
 }
 
