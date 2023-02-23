@@ -126,19 +126,44 @@ mod tests {
             idx.insert(3, 6).unwrap();
 
             let mut q = idx.to_query(HashSet::new());
-            let r = q.filter(eq("", 3)).or(eq("", 4)).exec();
+            let r = q.new(eq("", 3)).or(eq("", 4)).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
 
-            let r = q.reset().filter(eq("", 3)).or(eq("", 99)).exec();
+            // reuse the query without `new`
+            let r = q.and(eq("", 3)).exec();
+            assert_eq!(&[6], &r[..]);
+
+            let r = q.new(eq("", 3)).or(eq("", 99)).exec();
             assert!(r.contains(&6));
 
-            let r = q.reset().filter(eq("", 99)).or(eq("", 4)).exec();
+            let r = q.new(eq("", 99)).or(eq("", 4)).exec();
             assert!(r.contains(&8));
 
-            let r = q.reset().filter(eq("", 3)).or(eq("", 4)).exec();
+            let r = q.new(eq("", 3)).or(eq("", 4)).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
+        }
+
+        #[test]
+        fn query_and_or() {
+            let mut idx = PkUintIdx::default();
+            idx.insert(2, 4).unwrap();
+            idx.insert(4, 8).unwrap();
+            idx.insert(3, 6).unwrap();
+
+            let mut q = idx.to_query(HashSet::new());
+            let r = q.new(eq("", 3)).and(eq("", 2)).exec();
+            assert!(r.is_empty());
+
+            let r = q.new(eq("", 3)).or(eq("", 4)).and(eq("", 2)).exec();
+            // =3 or =4 and =2 =>
+            // (
+            // (4 and 2 = false) // `and` has higher prio than `or`
+            //  or 3 = true
+            // )
+            // => 3 -> 6
+            assert_eq!(&[6], &r[..]);
         }
 
         #[test]

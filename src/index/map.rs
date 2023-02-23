@@ -106,14 +106,14 @@ mod tests {
             idx.insert("Paul", 6).unwrap();
 
             let mut q = idx.to_query(HashSet::new());
-            let r = q.filter(eq("", "Mario")).or(eq("", "Paul")).exec();
+            let r = q.new(eq("", "Mario")).or(eq("", "Paul")).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
 
-            let r = q.reset().filter(eq("", "Paul")).or(eq("", "Blub")).exec();
+            let r = q.new(eq("", "Paul")).or(eq("", "Blub")).exec();
             assert!(r.contains(&6));
 
-            let r = q.reset().filter(eq("", "Blub")).or(eq("", "Mario")).exec();
+            let r = q.new(eq("", "Blub")).or(eq("", "Mario")).exec();
             assert!(r.contains(&8));
         }
 

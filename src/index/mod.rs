@@ -222,18 +222,18 @@ mod tests {
         let pk = indices.get_idx("pk");
 
         let mut q = IdxFilterQuery::new(pk, HashSet::default());
-        assert_eq!(1, q.filter(eq("", 41)).exec()[0]);
-        assert_eq!(0, q.reset().filter(eq("", 3)).exec()[0]);
-        assert_eq!(Vec::<usize>::new(), q.reset().filter(eq("", 101)).exec());
+        assert_eq!(1, q.new(eq("", 41)).exec()[0]);
+        assert_eq!(0, q.new(eq("", 3)).exec()[0]);
+        assert_eq!(Vec::<usize>::new(), q.new(eq("", 101)).exec());
 
         let second = indices.get_idx("second");
 
         let mut q = IdxFilterQuery::new(second, HashSet::default());
-        let r = q.filter(eq("", 7)).exec();
+        let r = q.new(eq("", 7)).exec();
         assert!(r.contains(&0));
         assert!(r.contains(&1));
 
-        let r = q.reset().filter(eq("", 3)).or(eq("", 7)).exec();
+        let r = q.new(eq("", 3)).or(eq("", 7)).exec();
         assert!(r.contains(&0));
         assert!(r.contains(&1));
     }
