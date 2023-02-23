@@ -3,7 +3,7 @@
 //! The `Key` is the Hash-Key in the Index-Map ([`StrMapIndex`]).
 //!
 //!
-//!```java
+//!```text
 //! let _unique_values = vec!["Paul", "Mario", "Jasmin", ...];
 //!
 //! Unique Index:

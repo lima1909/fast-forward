@@ -14,7 +14,7 @@
 //! - `Key` = name (String)
 //! - [`Idx`] = index is the position in a List (Vec)
 //!
-//! ```java
+//! ```text
 //! let _names = vec!["Paul", "Jasmin", "Inge", "Paul", ...];
 //!
 //!  Key       | Idx

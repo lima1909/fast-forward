@@ -4,7 +4,7 @@
 //!
 //! The `Key` is the position (index) in the Index-Vec ([`UIntVecIndex`]).
 //!
-//!```java
+//!```text
 //! let _unique_values = vec![3, 2, 4, 1, ...];
 //!
 //! Unique Index:
