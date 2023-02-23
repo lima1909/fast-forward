@@ -31,7 +31,7 @@ pub mod map;
 pub mod uint;
 
 pub use error::IndexError;
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     ops::{EQ, NE},
@@ -84,6 +84,28 @@ impl Index for Multi {
 
     #[inline]
     fn get(&self) -> &[Idx] {
+        &self.0
+    }
+}
+
+/// Positions is an container for gathering [`Index`] values (&[Idx]).
+/// It is usefull for operations like greater then ([`crate::ops::GT`]),
+/// where the result consists one or many [`Index`]s.
+pub struct Positions<I>(Vec<Idx>, PhantomData<I>);
+
+impl<I: Index> Positions<I> {
+    #[inline]
+    pub fn new(i: I) -> Self {
+        Positions(Vec::from_iter(i.get().iter().copied()), PhantomData)
+    }
+
+    #[inline]
+    pub fn add(&mut self, i: I) {
+        self.0.extend(i.get());
+    }
+
+    #[inline]
+    pub fn get(&self) -> &[Idx] {
         &self.0
     }
 }
