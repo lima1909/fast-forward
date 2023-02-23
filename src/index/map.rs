@@ -1,16 +1,28 @@
 //! Indices for string types: ([`str`]).
 //!
+//! The `Key` is the Hash-Key in the Index-Map ([`StrMapIndex`]).
+//!
 //!
 //!```java
 //! let _unique_values = vec!["Paul", "Mario", "Jasmin", ...];
 //!
-//! Unique Index impl with a BTreeMap:
+//! Unique Index:
 //!
 //!  Key      | Idx
 //! --------------------
 //!  "Jasmin" |  2
 //!  "Mario"  |  1
 //!  "Paul"   |  0
+//!   ...     | ...
+//!
+//! let _multi_values = vec!["Jasmin", "Mario", "Jasmin", ...];
+//!
+//! Multi Index:
+//!
+//!  Key      | Idx
+//! --------------------
+//!  "Jasmin" |  0, 2
+//!  "Mario"  |  1
 //!   ...     | ...
 //!
 //! ```
