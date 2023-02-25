@@ -31,7 +31,7 @@
 //!  3   |  0, 2
 //! ...  | ...
 //! ```
-use super::{Filter, Idx, IdxFilter, Index, KeyIdxStore, Multi, Result, Unique};
+use super::{Filter, Idx, Index, KeyIdxStore, Multi, Result, Unique};
 use crate::ops;
 use std::ops::Deref;
 
@@ -45,19 +45,6 @@ pub type MultiUintIdx = UIntVecIndex<Multi>;
 #[derive(Debug, Default)]
 pub struct UIntVecIndex<I: Index>(Vec<Option<I>>);
 
-impl<I: Index> IdxFilter<Idx> for UIntVecIndex<I> {
-    fn idx(&self, f: Filter<Idx>) -> &[Idx] {
-        if f.op != ops::EQ {
-            return &[];
-        }
-
-        match &self.0.get(f.key) {
-            Some(Some(idx)) => idx.get(),
-            _ => &[],
-        }
-    }
-}
-
 impl<I: Index + Clone> KeyIdxStore<Idx> for UIntVecIndex<I> {
     fn insert(&mut self, key: Idx, i: Idx) -> Result {
         if self.0.len() <= key {
@@ -70,6 +57,17 @@ impl<I: Index + Clone> KeyIdxStore<Idx> for UIntVecIndex<I> {
         }
 
         Ok(())
+    }
+
+    fn idx(&self, f: Filter<Idx>) -> &[Idx] {
+        if f.op != ops::EQ {
+            return &[];
+        }
+
+        match &self.0.get(f.key) {
+            Some(Some(idx)) => idx.get(),
+            _ => &[],
+        }
     }
 }
 
@@ -89,7 +87,7 @@ impl<I: Index> Deref for UIntVecIndex<I> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{super::OpsFilter, *};
 
     mod unique {
         use super::*;

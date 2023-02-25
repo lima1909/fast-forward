@@ -31,7 +31,7 @@ pub mod map;
 pub mod uint;
 
 pub use error::IndexError;
-use std::{fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 
 use crate::{
     ops::{EQ, NE},
@@ -127,10 +127,15 @@ impl<K> Filter<K> {
     }
 }
 
-/// Find all [`Idx`] for an given [`crate::Op`] and `Key`.
-pub trait IdxFilter<K> {
-    fn idx(&self, f: Filter<K>) -> &[Idx];
+/// A Store for a mapping from a given Key to one or many Indices.
+pub trait KeyIdxStore<K> {
+    fn insert(&mut self, k: K, i: Idx) -> Result;
 
+    fn idx(&self, f: Filter<K>) -> &[Idx];
+}
+
+/// Find all [`Idx`] for an given [`Filter`] ([`crate::Op`]) and [`crate::query::Key`].
+pub trait OpsFilter<K>: KeyIdxStore<K> {
     fn eq(&self, key: K) -> &[Idx] {
         self.idx(Filter::new(EQ, key))
     }
@@ -140,10 +145,7 @@ pub trait IdxFilter<K> {
     }
 }
 
-/// A Store for a mapping from a given Key to one or many Indices.
-pub trait KeyIdxStore<K>: IdxFilter<K> {
-    fn insert(&mut self, k: K, i: Idx) -> Result;
-}
+impl<K, S: KeyIdxStore<K>> OpsFilter<K> for S {}
 
 type FieldValueFn<T, K> = fn(&T) -> K;
 
@@ -151,18 +153,6 @@ pub struct NamedStore<T, K> {
     name: &'static str,
     store: Box<dyn KeyIdxStore<K>>,
     get_field_value: FieldValueFn<T, K>,
-}
-
-impl<T, K> IdxFilter<K> for NamedStore<T, K> {
-    fn idx(&self, f: Filter<K>) -> &[Idx] {
-        self.store.idx(f)
-    }
-}
-
-impl<T, K> IdxFilter<K> for &NamedStore<T, K> {
-    fn idx(&self, f: Filter<K>) -> &[Idx] {
-        self.store.idx(f)
-    }
 }
 
 impl<T, K> NamedStore<T, K> {
@@ -176,6 +166,14 @@ impl<T, K> NamedStore<T, K> {
             store,
             get_field_value,
         }
+    }
+}
+
+impl<T, K> Deref for NamedStore<T, K> {
+    type Target = Box<dyn KeyIdxStore<K>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.store
     }
 }
 

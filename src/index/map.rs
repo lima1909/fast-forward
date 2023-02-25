@@ -26,7 +26,7 @@
 //!   ...     | ...
 //!
 //! ```
-use super::{Filter, IdxFilter, Index, KeyIdxStore, Multi, Unique};
+use super::{Filter, Index, KeyIdxStore, Multi, Unique};
 use crate::{ops, Idx};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
@@ -43,7 +43,17 @@ pub type MultiStrIdx<'a> = StrMapIndex<'a, Multi>;
 #[derive(Debug, Default)]
 pub struct StrMapIndex<'a, I: Index>(BTreeMap<&'a str, I>);
 
-impl<'a, I: Index> IdxFilter<&str> for StrMapIndex<'a, I> {
+impl<'a, I: Index> KeyIdxStore<&'a str> for StrMapIndex<'a, I> {
+    fn insert(&mut self, k: &'a str, i: Idx) -> super::Result {
+        match self.0.entry(k) {
+            Entry::Vacant(e) => {
+                e.insert(I::new(i));
+                Ok(())
+            }
+            Entry::Occupied(mut e) => e.get_mut().add(i),
+        }
+    }
+
     fn idx(&self, f: Filter<&str>) -> &[Idx] {
         if f.op != ops::EQ {
             return &[];
@@ -56,21 +66,9 @@ impl<'a, I: Index> IdxFilter<&str> for StrMapIndex<'a, I> {
     }
 }
 
-impl<'a, I: Index> KeyIdxStore<&'a str> for StrMapIndex<'a, I> {
-    fn insert(&mut self, k: &'a str, i: Idx) -> super::Result {
-        match self.0.entry(k) {
-            Entry::Vacant(e) => {
-                e.insert(I::new(i));
-                Ok(())
-            }
-            Entry::Occupied(mut e) => e.get_mut().add(i),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{super::OpsFilter, *};
 
     mod unique {
         use super::*;
