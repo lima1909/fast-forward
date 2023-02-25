@@ -27,11 +27,13 @@
 
 #![allow(dead_code)]
 pub mod error;
+pub mod index;
 pub mod map;
 pub mod uint;
 
 pub use error::IndexError;
-use std::{fmt::Debug, marker::PhantomData, ops::Deref};
+pub use index::{Index, Multi, Positions, Unique};
+use std::ops::Deref;
 
 use crate::{
     ops::{EQ, NE},
@@ -40,75 +42,6 @@ use crate::{
 
 /// Default Result for index with the Ok(T) value or en [`IndexError`].
 type Result<T = ()> = std::result::Result<T, IndexError>;
-
-pub trait Index: Debug {
-    fn new(i: Idx) -> Self;
-    fn add(&mut self, i: Idx) -> Result;
-    fn get(&self) -> &[Idx];
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Unique([Idx; 1]);
-
-impl Index for Unique {
-    #[inline]
-    fn new(i: Idx) -> Self {
-        Unique([i])
-    }
-
-    #[inline]
-    fn add(&mut self, _i: Idx) -> Result {
-        Err(IndexError::NotUniqueKey)
-    }
-
-    #[inline]
-    fn get(&self) -> &[Idx] {
-        &self.0
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Multi(Vec<Idx>);
-
-impl Index for Multi {
-    #[inline]
-    fn new(i: Idx) -> Self {
-        Multi(vec![i])
-    }
-
-    #[inline]
-    fn add(&mut self, i: Idx) -> Result {
-        self.0.push(i);
-        Ok(())
-    }
-
-    #[inline]
-    fn get(&self) -> &[Idx] {
-        &self.0
-    }
-}
-
-/// Positions is an container for gathering [`Index`] values (&[Idx]).
-/// It is usefull for operations like greater then ([`crate::ops::GT`]),
-/// where the result consists one or many [`Index`]s.
-pub struct Positions<I>(Vec<Idx>, PhantomData<I>);
-
-impl<I: Index> Positions<I> {
-    #[inline]
-    pub fn new(i: I) -> Self {
-        Positions(Vec::from_iter(i.get().iter().copied()), PhantomData)
-    }
-
-    #[inline]
-    pub fn add(&mut self, i: I) {
-        self.0.extend(i.get());
-    }
-
-    #[inline]
-    pub fn get(&self) -> &[Idx] {
-        &self.0
-    }
-}
 
 /// Filter are the input data for describung a filter. A filter consist of a key and a operation [`Op`].
 /// Key `K` is a unique value under which all occurring indices are stored.
