@@ -4,7 +4,7 @@ use crate::{
     Idx, Op,
 };
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::HashSet,
     marker::PhantomData,
     ops::{BitAnd, BitOr},
 };
@@ -104,16 +104,16 @@ where
     }
 }
 
-struct Ors<B>(VecDeque<B>);
+struct Ors<B>(Vec<B>);
 
 impl<B: BinOp> Ors<B> {
     fn new(b: B) -> Self {
-        Self(VecDeque::from(vec![b]))
+        Self(vec![b])
     }
 
     #[inline]
     fn or(&mut self, b: B) {
-        self.0.push_back(b);
+        self.0.push(b);
     }
 
     #[inline]
@@ -124,11 +124,12 @@ impl<B: BinOp> Ors<B> {
 
     #[inline]
     fn exec(mut self) -> Vec<Idx> {
-        let mut first = self.0.pop_front().unwrap();
+        // TODO: maybe better sorted by B.len() before executed???
+        let mut last = self.0.remove(self.0.len() - 1);
         for b in self.0 {
-            first = first.or(&b);
+            last = last.or(&b);
         }
-        first.to_idx()
+        last.to_idx()
     }
 }
 

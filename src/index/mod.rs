@@ -27,12 +27,12 @@
 
 #![allow(dead_code)]
 pub mod error;
-pub mod index;
+pub mod idx;
 pub mod map;
 pub mod uint;
 
 pub use error::IndexError;
-pub use index::{Index, Multi, Positions, Unique};
+pub use idx::{Index, Multi, Positions, Unique};
 use std::ops::Deref;
 
 use crate::{
