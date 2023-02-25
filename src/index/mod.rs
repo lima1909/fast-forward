@@ -218,9 +218,12 @@ mod tests {
     use super::*;
     use crate::{
         index::uint::UIntVecIndex,
-        ops::eq,
-        query::{IdxFilterQuery, Query},
+        query::{Filter, Key, QueryBuilder},
     };
+
+    fn eq<'a>(v: usize) -> Filter<'a> {
+        Filter::new("", crate::ops::EQ, Key::Usize(v))
+    }
 
     struct Person(usize, usize, &'static str);
 
@@ -242,20 +245,18 @@ mod tests {
         indices.insert(&Person(41, 7, "Mario"), 1).unwrap();
 
         let pk = indices.get_idx("pk");
-
-        let mut q = IdxFilterQuery::new(pk, HashSet::default());
-        assert_eq!(1, q.new(eq("", 41)).exec()[0]);
-        assert_eq!(0, q.new(eq("", 3)).exec()[0]);
-        assert_eq!(Vec::<usize>::new(), q.new(eq("", 101)).exec());
+        let b = QueryBuilder::<HashSet<Idx>, _>::new(|f: Filter| pk.idx(f.into()));
+        assert_eq!(1, b.query(eq(41)).exec()[0]);
+        assert_eq!(0, b.query(eq(3)).exec()[0]);
+        assert_eq!(Vec::<usize>::new(), b.query(eq(101)).exec());
 
         let second = indices.get_idx("second");
-
-        let mut q = IdxFilterQuery::new(second, HashSet::default());
-        let r = q.new(eq("", 7)).exec();
+        let b = QueryBuilder::<HashSet<Idx>, _>::new(|f: Filter| second.idx(f.into()));
+        let r = b.query(eq(7)).exec();
         assert!(r.contains(&0));
         assert!(r.contains(&1));
 
-        let r = q.new(eq("", 3)).or(eq("", 7)).exec();
+        let r = b.query(eq(3)).or(eq(7)).exec();
         assert!(r.contains(&0));
         assert!(r.contains(&1));
     }

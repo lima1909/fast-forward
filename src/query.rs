@@ -1,6 +1,6 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
 use crate::{
-    index::{self, IdxFilter},
+    index::{self},
     Idx, Op,
 };
 use std::{
@@ -39,67 +39,59 @@ impl<'a, K: From<Key<'a>>> From<Filter<'a>> for index::Filter<K> {
     }
 }
 
-/// Query combines different filter. Filters can be linked using `and` and `or`.
-pub trait Query<'a> {
-    #[allow(clippy::wrong_self_convention)]
-    fn new(&mut self, f: Filter<'a>) -> &mut Self;
-    fn or(&mut self, f: Filter<'a>) -> &mut Self;
-    fn and(&mut self, f: Filter<'a>) -> &mut Self;
-    fn exec(&mut self) -> Vec<Idx>;
+pub trait ToIdx<'a> {
+    fn to_idx(&'a self, f: Filter<'a>) -> &[Idx];
 }
 
-/// If this trait is in scope, than it convert [`IdxFilter`] into a [`Query`].
-pub trait ToQuery<B: BinOp, K>: IdxFilter<K> + Sized {
-    fn to_query(self, bin_op: B) -> IdxFilterQuery<B, K, Self> {
-        IdxFilterQuery::new(self, bin_op)
+impl<'a, F: Fn(Filter<'a>) -> &[Idx]> ToIdx<'a> for F {
+    fn to_idx(&'a self, f: Filter<'a>) -> &[Idx] {
+        self(f)
     }
 }
 
-impl<B: BinOp, K, I: IdxFilter<K>> ToQuery<B, K> for I {}
-
-/// Wrapper, for creating an impl for the trait [`Query`] combined with the [`IdxFilter`] trait.
-/// The simpelst way to use the [`ToQuery`] trait.
-pub struct IdxFilterQuery<B, K, I> {
-    idx_filter: I,
-    ors: Ors<B>,
-    _key: PhantomData<K>,
+pub struct QueryBuilder<B, I> {
+    idx: I,
+    _b: PhantomData<B>,
 }
 
-impl<B: BinOp, K, I> IdxFilterQuery<B, K, I> {
-    pub fn new(idx_filter: I, bin_op: B) -> Self {
+impl<'a, B: BinOp, I: ToIdx<'a>> QueryBuilder<B, I> {
+    pub fn new(idx: I) -> Self {
         Self {
-            idx_filter,
-            ors: Ors::new(bin_op),
-            _key: PhantomData,
+            idx,
+            _b: PhantomData,
+        }
+    }
+
+    pub fn query(&'a self, f: Filter<'a>) -> Query<B, I> {
+        let idxs = self.idx.to_idx(f);
+        let ors = Ors::new(B::from_idx(idxs));
+        Query {
+            idx: &self.idx,
+            ors,
         }
     }
 }
 
-impl<'a, B, K, I> Query<'a> for IdxFilterQuery<B, K, I>
-where
-    B: BinOp,
-    K: From<Key<'a>>,
-    I: IdxFilter<K>,
-{
-    fn new(&mut self, f: Filter<'a>) -> &mut Self {
-        let idxs = self.idx_filter.idx(f.into());
-        self.ors = Ors::new(B::from_idx(idxs));
-        self
-    }
+/// Query combines different filter. Filters can be linked using `and` and `or`.
+pub struct Query<'a, B, I> {
+    idx: &'a I,
+    ors: Ors<B>,
+}
 
-    fn or(&mut self, f: Filter<'a>) -> &mut Self {
-        let idxs = self.idx_filter.idx(f.into());
+impl<'a, B: BinOp, I: ToIdx<'a>> Query<'a, B, I> {
+    pub fn or(mut self, f: Filter<'a>) -> Self {
+        let idxs = self.idx.to_idx(f);
         self.ors.or(B::from_idx(idxs));
         self
     }
 
-    fn and(&mut self, f: Filter<'a>) -> &mut Self {
-        let idxs = self.idx_filter.idx(f.into());
+    pub fn and(mut self, f: Filter<'a>) -> Self {
+        let idxs = self.idx.to_idx(f);
         self.ors.and(B::from_idx(idxs));
         self
     }
 
-    fn exec(&mut self) -> Vec<Idx> {
+    pub fn exec(mut self) -> Vec<Idx> {
         self.ors.exec()
     }
 }
@@ -110,9 +102,7 @@ struct Ors<B> {
 
 impl<B: BinOp> Ors<B> {
     fn new(b: B) -> Self {
-        let mut s = Self { ops: Vec::new() };
-        s.or(b);
-        s
+        Self { ops: vec![b] }
     }
 
     #[inline]

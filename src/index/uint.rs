@@ -97,9 +97,18 @@ mod tests {
 
         use crate::{
             index::IndexError,
-            ops::eq,
-            query::{Query, ToQuery},
+            query::{self, QueryBuilder, ToIdx},
         };
+
+        impl<'a> ToIdx<'a> for PkUintIdx {
+            fn to_idx(&self, f: crate::query::Filter<'a>) -> &[Idx] {
+                self.idx(f.into())
+            }
+        }
+
+        fn eq<'a>(v: usize) -> query::Filter<'a> {
+            query::Filter::new("", crate::ops::EQ, query::Key::Usize(v))
+        }
 
         #[test]
         fn empty() {
@@ -125,24 +134,24 @@ mod tests {
             idx.insert(4, 8).unwrap();
             idx.insert(3, 6).unwrap();
 
-            let mut q = idx.to_query(HashSet::new());
-            let r = q.new(eq("", 3)).or(eq("", 4)).exec();
+            let b = QueryBuilder::<HashSet<Idx>, _>::new(idx);
+            let r = b.query(eq(3)).or(eq(4)).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
 
             // reuse the query without `new`
-            let r = q.and(eq("", 3)).exec();
+            let q = b.query(eq(3));
+            let r = q.and(eq(3)).exec();
             assert_eq!(&[6], &r[..]);
 
-            let r = q.new(eq("", 3)).or(eq("", 99)).exec();
+            let r = b.query(eq(3)).or(eq(99)).exec();
             assert!(r.contains(&6));
 
-            let r = q.new(eq("", 99)).or(eq("", 4)).exec();
+            let r = b.query(eq(99)).or(eq(4)).exec();
             assert!(r.contains(&8));
 
-            let r = q.new(eq("", 3)).or(eq("", 4)).exec();
-            assert!(r.contains(&8));
-            assert!(r.contains(&6));
+            let r = b.query(eq(3)).and(eq(4)).exec();
+            assert!(r.is_empty());
         }
 
         #[test]
@@ -152,11 +161,11 @@ mod tests {
             idx.insert(4, 8).unwrap();
             idx.insert(3, 6).unwrap();
 
-            let mut q = idx.to_query(HashSet::new());
-            let r = q.new(eq("", 3)).and(eq("", 2)).exec();
+            let b = QueryBuilder::<HashSet<Idx>, _>::new(idx);
+            let r = b.query(eq(3)).and(eq(2)).exec();
             assert!(r.is_empty());
 
-            let r = q.new(eq("", 3)).or(eq("", 4)).and(eq("", 2)).exec();
+            let r = b.query(eq(3)).or(eq(4)).and(eq(2)).exec();
             // =3 or =4 and =2 =>
             // (
             // (4 and 2 = false) // `and` has higher prio than `or`
@@ -164,10 +173,6 @@ mod tests {
             // )
             // => 3 -> 6
             assert_eq!(&[6], &r[..]);
-
-            q.new(eq("", 3)).or(eq("", 4)).exec();
-            let r = q.and(eq("", 2)).exec();
-            assert!(r.is_empty());
         }
 
         #[test]
@@ -182,15 +187,6 @@ mod tests {
         fn out_of_bound() {
             let i = PkUintIdx::default();
             assert_eq!(0, i.eq(2).len());
-        }
-
-        #[test]
-        fn query_or_without_filter() {
-            let mut idx = PkUintIdx::default();
-            idx.insert(2, 2).unwrap();
-
-            let mut q = idx.to_query(HashSet::new());
-            assert_eq!(vec![2], q.or(eq("", 2)).exec());
         }
     }
 

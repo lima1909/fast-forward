@@ -71,7 +71,6 @@ impl<'a, I: Index> KeyIdxStore<&'a str> for StrMapIndex<'a, I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ops::*;
 
     mod unique {
         use super::*;
@@ -79,8 +78,18 @@ mod tests {
 
         use crate::{
             index::IndexError,
-            query::{Query, ToQuery},
+            query::{self, QueryBuilder, ToIdx},
         };
+
+        impl<'a> ToIdx<'a> for UniqueStrIdx<'a> {
+            fn to_idx(&self, f: crate::query::Filter<'a>) -> &[Idx] {
+                self.idx(f.into())
+            }
+        }
+
+        fn eq(v: &str) -> query::Filter<'_> {
+            query::Filter::new("", crate::ops::EQ, query::Key::Str(v))
+        }
 
         #[test]
         fn empty() {
@@ -105,15 +114,15 @@ mod tests {
             idx.insert("Mario", 8).unwrap();
             idx.insert("Paul", 6).unwrap();
 
-            let mut q = idx.to_query(HashSet::new());
-            let r = q.new(eq("", "Mario")).or(eq("", "Paul")).exec();
+            let b = QueryBuilder::<HashSet<Idx>, _>::new(idx);
+            let r = b.query(eq("Mario")).or(eq("Paul")).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
 
-            let r = q.new(eq("", "Paul")).or(eq("", "Blub")).exec();
+            let r = b.query(eq("Paul")).or(eq("Blub")).exec();
             assert!(r.contains(&6));
 
-            let r = q.new(eq("", "Blub")).or(eq("", "Mario")).exec();
+            let r = b.query(eq("Blub")).or(eq("Mario")).exec();
             assert!(r.contains(&8));
         }
 
