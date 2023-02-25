@@ -4,7 +4,7 @@ use crate::{
     Idx, Op,
 };
 use std::{
-    collections::HashSet,
+    collections::{HashSet, VecDeque},
     marker::PhantomData,
     ops::{BitAnd, BitOr},
 };
@@ -54,7 +54,11 @@ pub struct QueryBuilder<B, I> {
     _b: PhantomData<B>,
 }
 
-impl<'a, B: BinOp, I: IdxFilter<'a>> QueryBuilder<B, I> {
+impl<'a, B, I> QueryBuilder<B, I>
+where
+    B: BinOp,
+    I: IdxFilter<'a>,
+{
     pub fn new(idx: I) -> Self {
         Self {
             idx,
@@ -78,7 +82,11 @@ pub struct Query<'a, B, I> {
     ors: Ors<B>,
 }
 
-impl<'a, B: BinOp, I: IdxFilter<'a>> Query<'a, B, I> {
+impl<'a, B, I> Query<'a, B, I>
+where
+    B: BinOp,
+    I: IdxFilter<'a>,
+{
     pub fn or(mut self, f: Filter<'a>) -> Self {
         let idxs = self.idx.filter(f);
         self.ors.or(B::from_idx(idxs));
@@ -91,43 +99,36 @@ impl<'a, B: BinOp, I: IdxFilter<'a>> Query<'a, B, I> {
         self
     }
 
-    pub fn exec(mut self) -> Vec<Idx> {
+    pub fn exec(self) -> Vec<Idx> {
         self.ors.exec()
     }
 }
 
-struct Ors<B> {
-    ops: Vec<B>,
-}
+struct Ors<B>(VecDeque<B>);
 
 impl<B: BinOp> Ors<B> {
     fn new(b: B) -> Self {
-        Self { ops: vec![b] }
+        Self(VecDeque::from(vec![b]))
     }
 
     #[inline]
     fn or(&mut self, b: B) {
-        self.ops.push(b);
+        self.0.push_back(b);
     }
 
     #[inline]
     fn and(&mut self, b: B) {
-        let i = self.ops.len() - 1;
-        self.ops[i] = self.ops[i].and(&b);
+        let i = self.0.len() - 1;
+        self.0[i] = self.0[i].and(&b);
     }
 
     #[inline]
-    fn exec(&mut self) -> Vec<Idx> {
-        let v = std::mem::take(&mut self.ops);
-        let mut it = v.into_iter();
-        let mut first = it.next().unwrap();
-        for b in it {
+    fn exec(mut self) -> Vec<Idx> {
+        let mut first = self.0.pop_front().unwrap();
+        for b in self.0 {
             first = first.or(&b);
         }
-
-        let idx = first.to_idx();
-        self.or(first);
-        idx
+        first.to_idx()
     }
 }
 
