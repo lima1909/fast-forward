@@ -39,12 +39,12 @@ impl<'a, K: From<Key<'a>>> From<Filter<'a>> for index::Filter<K> {
     }
 }
 
-pub trait ToIdx<'a> {
-    fn to_idx(&'a self, f: Filter<'a>) -> &[Idx];
+pub trait IdxFilter<'a> {
+    fn filter(&'a self, f: Filter<'a>) -> &[Idx];
 }
 
-impl<'a, F: Fn(Filter<'a>) -> &[Idx]> ToIdx<'a> for F {
-    fn to_idx(&'a self, f: Filter<'a>) -> &[Idx] {
+impl<'a, F: Fn(Filter<'a>) -> &[Idx]> IdxFilter<'a> for F {
+    fn filter(&'a self, f: Filter<'a>) -> &[Idx] {
         self(f)
     }
 }
@@ -54,7 +54,7 @@ pub struct QueryBuilder<B, I> {
     _b: PhantomData<B>,
 }
 
-impl<'a, B: BinOp, I: ToIdx<'a>> QueryBuilder<B, I> {
+impl<'a, B: BinOp, I: IdxFilter<'a>> QueryBuilder<B, I> {
     pub fn new(idx: I) -> Self {
         Self {
             idx,
@@ -63,7 +63,7 @@ impl<'a, B: BinOp, I: ToIdx<'a>> QueryBuilder<B, I> {
     }
 
     pub fn query(&'a self, f: Filter<'a>) -> Query<B, I> {
-        let idxs = self.idx.to_idx(f);
+        let idxs = self.idx.filter(f);
         let ors = Ors::new(B::from_idx(idxs));
         Query {
             idx: &self.idx,
@@ -78,15 +78,15 @@ pub struct Query<'a, B, I> {
     ors: Ors<B>,
 }
 
-impl<'a, B: BinOp, I: ToIdx<'a>> Query<'a, B, I> {
+impl<'a, B: BinOp, I: IdxFilter<'a>> Query<'a, B, I> {
     pub fn or(mut self, f: Filter<'a>) -> Self {
-        let idxs = self.idx.to_idx(f);
+        let idxs = self.idx.filter(f);
         self.ors.or(B::from_idx(idxs));
         self
     }
 
     pub fn and(mut self, f: Filter<'a>) -> Self {
-        let idxs = self.idx.to_idx(f);
+        let idxs = self.idx.filter(f);
         self.ors.and(B::from_idx(idxs));
         self
     }

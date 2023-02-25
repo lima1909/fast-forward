@@ -129,19 +129,21 @@ impl<K> Filter<K> {
 
 /// A Store for a mapping from a given Key to one or many Indices.
 pub trait KeyIdxStore<K> {
+    /// Insert all indices for a given `Key`.
     fn insert(&mut self, k: K, i: Idx) -> Result;
 
-    fn idx(&self, f: Filter<K>) -> &[Idx];
+    /// find for the given `Key` all indices.
+    fn find(&self, f: Filter<K>) -> &[Idx];
 }
 
 /// Find all [`Idx`] for an given [`Filter`] ([`crate::Op`]) and [`crate::query::Key`].
 pub trait OpsFilter<K>: KeyIdxStore<K> {
     fn eq(&self, key: K) -> &[Idx] {
-        self.idx(Filter::new(EQ, key))
+        self.find(Filter::new(EQ, key))
     }
 
     fn ne(&self, key: K) -> &[Idx] {
-        self.idx(Filter::new(NE, key))
+        self.find(Filter::new(NE, key))
     }
 }
 
@@ -243,13 +245,13 @@ mod tests {
         indices.insert(&Person(41, 7, "Mario"), 1).unwrap();
 
         let pk = indices.get_idx("pk");
-        let b = QueryBuilder::<HashSet<Idx>, _>::new(|f: Filter| pk.idx(f.into()));
+        let b = QueryBuilder::<HashSet<Idx>, _>::new(|f: Filter| pk.find(f.into()));
         assert_eq!(1, b.query(eq(41)).exec()[0]);
         assert_eq!(0, b.query(eq(3)).exec()[0]);
         assert_eq!(Vec::<usize>::new(), b.query(eq(101)).exec());
 
         let second = indices.get_idx("second");
-        let b = QueryBuilder::<HashSet<Idx>, _>::new(|f: Filter| second.idx(f.into()));
+        let b = QueryBuilder::<HashSet<Idx>, _>::new(|f: Filter| second.find(f.into()));
         let r = b.query(eq(7)).exec();
         assert!(r.contains(&0));
         assert!(r.contains(&1));

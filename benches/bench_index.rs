@@ -29,7 +29,7 @@ fn list_index(c: &mut Criterion) {
     let mut group = c.benchmark_group("index");
     group.bench_function("list_index", |b| {
         b.iter(|| {
-            let i = idx.idx(Filter::new(ops::EQ, FIND_ID))[0];
+            let i = idx.find(Filter::new(ops::EQ, FIND_ID))[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
