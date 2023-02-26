@@ -104,32 +104,41 @@ where
     }
 }
 
-struct Ors<B>(Vec<B>);
+struct Ors<B> {
+    first: B,
+    ors: Vec<B>,
+}
 
 impl<B: BinOp> Ors<B> {
     fn new(b: B) -> Self {
-        Self(vec![b])
+        Self {
+            first: b,
+            ors: vec![],
+        }
     }
 
     #[inline]
     fn or(&mut self, b: B) {
-        self.0.push(b);
+        self.ors.push(b);
     }
 
     #[inline]
     fn and(&mut self, b: B) {
-        let i = self.0.len() - 1;
-        self.0[i] = self.0[i].and(&b);
+        if self.ors.is_empty() {
+            self.first = self.first.and(&b);
+        } else {
+            let i = self.ors.len() - 1;
+            self.ors[i] = self.ors[i].and(&b);
+        }
     }
 
     #[inline]
     fn exec(mut self) -> Vec<Idx> {
-        // TODO: maybe better sorted by B.len() before executed???
-        let mut last = self.0.remove(self.0.len() - 1);
-        for b in self.0 {
-            last = last.or(&b);
+        // TODO: maybe it is better a sorted Vec by B.len() before executed???
+        for b in self.ors {
+            self.first = self.first.or(&b);
         }
-        last.to_idx()
+        self.first.to_idx()
     }
 }
 
