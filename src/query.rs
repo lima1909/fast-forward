@@ -18,10 +18,9 @@ pub enum Key<'a> {
 
 /// `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
 pub struct Filter<'a> {
-    #[allow(dead_code)]
-    field: &'a str,
-    op: Op,
-    key: Key<'a>,
+    pub field: &'a str,
+    pub op: Op,
+    pub key: Key<'a>,
 }
 
 impl<'a> Filter<'a> {

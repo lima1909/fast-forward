@@ -150,8 +150,13 @@ mod tests {
 
     use super::*;
     use crate::{
-        index::uint::UIntVecIndex,
-        query::{Filter, Key, QueryBuilder},
+        index::{
+            map::UniqueStrIdx,
+            uint::{PkUintIdx, UIntVecIndex},
+            KeyIdxStore,
+        },
+        ops,
+        query::{Filter, IdxFilter, Key, QueryBuilder},
     };
 
     fn eq<'a>(v: usize) -> Filter<'a> {
@@ -192,5 +197,46 @@ mod tests {
         let r = b.query(eq(3)).or(eq(7)).exec();
         assert!(r.contains(&0));
         assert!(r.contains(&1));
+    }
+
+    struct Idxs<'a>(PkUintIdx, UniqueStrIdx<'a>);
+
+    impl<'a> IdxFilter<'a> for Idxs<'a> {
+        fn filter(&'a self, f: Filter<'a>) -> &[Idx] {
+            match f.key {
+                Key::Usize(_u) => self.0.find(f.into()),
+                Key::Str(_s) => self.1.find(f.into()),
+            }
+        }
+    }
+
+    #[test]
+    fn different_idxs() -> Result<()> {
+        let mut idx_u = PkUintIdx::default();
+        idx_u.insert(1, 1)?;
+        idx_u.insert(2, 2)?;
+        idx_u.insert(99, 0)?;
+
+        let mut idx_s = UniqueStrIdx::default();
+        idx_s.insert("a", 1)?;
+        idx_s.insert("b", 2)?;
+        idx_s.insert("z", 0)?;
+
+        let idxs = Idxs(idx_u, idx_s);
+
+        let b = QueryBuilder::<HashSet<Idx>, _>::new(idxs);
+        let r = b.query(eq(1)).and(ops::eq("", "a")).exec();
+        assert_eq!(&[1], &r[..]);
+
+        let r = b
+            .query(ops::eq("", "z"))
+            .or(eq(1))
+            .and(ops::eq("", "a"))
+            .exec();
+        // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
+        assert!(r.contains(&1));
+        assert!(r.contains(&0));
+
+        Ok(())
     }
 }
