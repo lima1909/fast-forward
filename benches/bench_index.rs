@@ -1,8 +1,11 @@
+use std::collections::HashSet;
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use fast_forward::index::uint::UIntVecIndex;
 use fast_forward::index::{Filter, Indices, Unique};
-use fast_forward::ops;
+use fast_forward::query::BinOp;
+use fast_forward::{ops, Idx};
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
@@ -56,13 +59,49 @@ fn list_index(c: &mut Criterion) {
     group.finish();
 }
 
+fn bit_operation(c: &mut Criterion) {
+    let mut v = Vec::new();
+    for i in 0..50 {
+        v.push(i);
+    }
+
+    let lbop = HashSet::<Idx>::from_idx(&v);
+    let rbop = HashSet::<Idx>::from_idx(&v);
+
+    // group benchmark
+    let mut group = c.benchmark_group("bitop");
+    group.bench_function("hashset", |b| {
+        b.iter(|| {
+            let r = lbop.and(&rbop);
+            assert_eq!(50, r.len());
+        })
+    });
+
+    group.bench_function("from_idx", |b| {
+        b.iter(|| {
+            let lbop = HashSet::<Idx>::from_idx(&v);
+            let rbop = HashSet::<Idx>::from_idx(&v);
+            let r = lbop.and(&rbop);
+            assert_eq!(50, r.len());
+        })
+    });
+
+    group.finish();
+}
+
 criterion_group! {
     name = list;
     config = Criterion::default().significance_level(0.1).sample_size(100);
     targets = list_index
 }
 
-criterion_main!(list);
+criterion_group! {
+    name = bitop;
+    config = Criterion::default().significance_level(0.1).sample_size(100);
+    targets = bit_operation
+}
+
+criterion_main!(list, bitop);
 
 fn create_person_vec() -> Vec<Person> {
     let mut v = Vec::new();
