@@ -37,6 +37,7 @@ use std::ops::Deref;
 
 use crate::{
     ops::{EQ, NE},
+    query::{self, IdxFilter, Key},
     Idx, Op,
 };
 
@@ -84,28 +85,28 @@ impl<K, S: KeyIdxStore<K>> OpsFilter<K> for S {}
 
 type FieldValueFn<T, K> = fn(&T) -> K;
 
-pub struct NamedStore<T, K> {
-    name: &'static str,
-    store: Box<dyn KeyIdxStore<K>>,
-    get_field_value: FieldValueFn<T, K>,
+pub struct FieldIdxStore<'a, T, K> {
+    field_name: &'a str,
+    get_field_value_fn: FieldValueFn<T, K>,
+    store: Box<dyn KeyIdxStore<K> + 'a>,
 }
 
-impl<T, K> NamedStore<T, K> {
+impl<'a, T, K> FieldIdxStore<'a, T, K> {
     pub fn new(
-        name: &'static str,
-        store: Box<dyn KeyIdxStore<K>>,
-        get_field_value: FieldValueFn<T, K>,
+        field_name: &'a str,
+        get_field_value_fn: FieldValueFn<T, K>,
+        store: Box<dyn KeyIdxStore<K> + 'a>,
     ) -> Self {
         Self {
-            name,
+            field_name,
+            get_field_value_fn,
             store,
-            get_field_value,
         }
     }
 }
 
-impl<T, K> Deref for NamedStore<T, K> {
-    type Target = Box<dyn KeyIdxStore<K>>;
+impl<'a, T, K> Deref for FieldIdxStore<'a, T, K> {
+    type Target = Box<dyn KeyIdxStore<K> + 'a>;
 
     fn deref(&self) -> &Self::Target {
         &self.store
@@ -114,34 +115,76 @@ impl<T, K> Deref for NamedStore<T, K> {
 
 /// Collection of indices ([`KeyIdxStore`]s).
 #[derive(Default)]
-pub struct Indices<T>(Vec<NamedStore<T, usize>>);
+pub struct Indices<'a, T> {
+    k_usize: Vec<FieldIdxStore<'a, T, usize>>,
+    k_str: Vec<FieldIdxStore<'a, T, &'a str>>,
+}
 
-impl<T> Indices<T> {
+impl<'a, T> IdxFilter<'a> for Indices<'a, T> {
+    fn filter(&self, f: query::Filter<'a>) -> &[Idx] {
+        match f.key {
+            Key::Usize(_u) => {
+                let s = self
+                    .k_usize
+                    .iter()
+                    .find(|i| i.field_name == f.field)
+                    .unwrap();
+                s.find(f.into())
+            }
+            Key::Str(_s) => {
+                let s = self.k_str.iter().find(|i| i.field_name == f.field).unwrap();
+                s.find(f.into())
+            }
+        }
+    }
+}
+
+impl<'a, T> Indices<'a, T> {
     pub fn new() -> Self {
-        Self(Vec::new())
+        Self {
+            k_usize: Vec::new(),
+            k_str: Vec::new(),
+        }
     }
-
-    pub fn add_idx(
+    pub fn add_usize_idx(
         &mut self,
-        name: &'static str,
-        store: Box<dyn KeyIdxStore<usize>>,
-        get_field_value: FieldValueFn<T, usize>,
+        field_name: &'a str,
+        get_field_value_fn: FieldValueFn<T, usize>,
+        store: Box<dyn KeyIdxStore<usize> + 'a>,
     ) {
-        self.0.push(NamedStore::new(name, store, get_field_value));
+        self.k_usize
+            .push(FieldIdxStore::new(field_name, get_field_value_fn, store))
     }
 
-    pub fn get_idx(&self, idx_name: &str) -> &NamedStore<T, usize> {
-        self.0.iter().find(|i| i.name == idx_name).unwrap()
+    pub fn add_str_idx(
+        &mut self,
+        field_name: &'a str,
+        get_field_value_fn: FieldValueFn<T, &'a str>,
+        store: Box<dyn KeyIdxStore<&'a str> + 'a>,
+    ) {
+        self.k_str
+            .push(FieldIdxStore::new(field_name, get_field_value_fn, store))
+    }
+
+    pub fn get_idx(&self, idx_name: &str) -> &FieldIdxStore<T, usize> {
+        self.k_usize
+            .iter()
+            .find(|i| i.field_name == idx_name)
+            .unwrap()
     }
 
     pub fn insert(&mut self, t: &T, idx: Idx) -> Result {
-        for s in &mut self.0 {
-            let key = (s.get_field_value)(t);
+        for s in &mut self.k_usize {
+            let key = (s.get_field_value_fn)(t);
             s.store.insert(key, idx)?;
         }
 
         Ok(())
     }
+
+    // pub fn query_builder<B: BinOp>(self) -> QueryBuilder<B, Self> {
+    // QueryBuilder::<B, _>::new(self)
+    // }
 }
 
 #[cfg(test)]
@@ -155,51 +198,57 @@ mod tests {
             uint::{PkUintIdx, UIntVecIndex},
             KeyIdxStore,
         },
-        ops,
+        ops::eq,
         query::{Filter, IdxFilter, Key, QueryBuilder},
     };
-
-    fn eq<'a>(v: usize) -> Filter<'a> {
-        Filter::new("", crate::ops::EQ, Key::Usize(v))
-    }
 
     struct Person(usize, usize, &'static str);
 
     #[test]
     fn person_indices() {
         let mut indices = Indices::new();
-        indices.add_idx(
+        indices.add_usize_idx(
             "pk",
-            Box::<UIntVecIndex<Unique>>::default(),
             |p: &Person| p.0,
+            Box::<UIntVecIndex<Unique>>::default(),
         );
-        indices.add_idx(
+        indices.add_usize_idx(
             "second",
-            Box::<UIntVecIndex<Multi>>::default(),
             |p: &Person| p.1,
+            Box::<UIntVecIndex<Multi>>::default(),
         );
+        // indices.add_str_idx("name", |p: &Person| p.2, Box::<UniqueStrIdx>::default());
 
         indices.insert(&Person(3, 7, "Jasmin"), 0).unwrap();
         indices.insert(&Person(41, 7, "Mario"), 1).unwrap();
 
+        // let b = QueryBuilder::<HashSet<Idxs>, _>::new(indices); //indices.query_builder::<HashSet<Idx>>();
         let pk = indices.get_idx("pk");
         let b = QueryBuilder::<HashSet<Idx>, _>::new(|f: Filter| pk.find(f.into()));
-        assert_eq!(1, b.query(eq(41)).exec()[0]);
-        assert_eq!(0, b.query(eq(3)).exec()[0]);
-        assert_eq!(Vec::<usize>::new(), b.query(eq(101)).exec());
+        assert_eq!(1, b.query(eq("pk", 41)).exec()[0]);
+        assert_eq!(0, b.query(eq("pk", 3)).exec()[0]);
+        assert_eq!(Vec::<usize>::new(), b.query(eq("pk", 101)).exec());
 
         let second = indices.get_idx("second");
         let b = QueryBuilder::<HashSet<Idx>, _>::new(|f: Filter| second.find(f.into()));
-        let r = b.query(eq(7)).exec();
+
+        let r = b.query(eq("second", 7)).exec();
         assert!(r.contains(&0));
         assert!(r.contains(&1));
 
-        let r = b.query(eq(3)).or(eq(7)).exec();
+        let r = b.query(eq("second", 3)).or(eq("second", 7)).exec();
         assert!(r.contains(&0));
         assert!(r.contains(&1));
+
+        // let b = QueryBuilder::<HashSet<Idx>, _>::new(indices);
+        // b.query(eq("pk", 41)).exec();
     }
 
     struct Idxs<'a>(PkUintIdx, UniqueStrIdx<'a>);
+    // struct Idxs<'a>(
+    //     Box<dyn KeyIdxStore<usize> + 'a>,
+    //     Box<dyn KeyIdxStore<&'a str> + 'a>,
+    // );
 
     impl<'a> IdxFilter<'a> for Idxs<'a> {
         fn filter(&'a self, f: Filter<'a>) -> &[Idx] {
@@ -217,22 +266,20 @@ mod tests {
         idx_u.insert(2, 2)?;
         idx_u.insert(99, 0)?;
 
+        let p = Person(3, 7, "a");
         let mut idx_s = UniqueStrIdx::default();
-        idx_s.insert("a", 1)?;
+        idx_s.insert(p.2, 1)?;
         idx_s.insert("b", 2)?;
         idx_s.insert("z", 0)?;
 
         let idxs = Idxs(idx_u, idx_s);
+        // let idxs = Idxs(Box::new(idx_u), Box::new(idx_s));
 
         let b = QueryBuilder::<HashSet<Idx>, _>::new(idxs);
-        let r = b.query(eq(1)).and(ops::eq("", "a")).exec();
+        let r = b.query(eq("", 1)).and(eq("", "a")).exec();
         assert_eq!(&[1], &r[..]);
 
-        let r = b
-            .query(ops::eq("", "z"))
-            .or(eq(1))
-            .and(ops::eq("", "a"))
-            .exec();
+        let r = b.query(eq("", "z")).or(eq("", 1)).and(eq("", "a")).exec();
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
         assert!(r.contains(&1));
         assert!(r.contains(&0));

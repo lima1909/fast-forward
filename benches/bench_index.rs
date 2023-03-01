@@ -21,7 +21,7 @@ fn list_index(c: &mut Criterion) {
     // create search index
     let uint_idx = UIntVecIndex::<Unique>::with_capacity(HOW_MUCH_PERSON);
     let mut idx = Indices::new();
-    idx.add_idx("pk", Box::new(uint_idx), |p: &Person| p.0);
+    idx.add_usize_idx("pk", |p: &Person| p.0, Box::new(uint_idx));
 
     for i in 0..=HOW_MUCH_PERSON {
         idx.insert(&Person(i, "Jasmin"), i).unwrap();
