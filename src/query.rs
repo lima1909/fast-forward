@@ -38,14 +38,8 @@ impl<'a, K: From<Key<'a>>> From<Filter<'a>> for index::Filter<K> {
     }
 }
 
-pub trait IdxFilter<'a> {
-    fn filter(&'a self, f: Filter<'a>) -> &[Idx];
-}
-
-impl<'a, F: Fn(Filter<'a>) -> &[Idx]> IdxFilter<'a> for F {
-    fn filter(&'a self, f: Filter<'a>) -> &[Idx] {
-        self(f)
-    }
+pub trait IdxFilter<'f> {
+    fn filter(&self, f: Filter<'f>) -> &[Idx];
 }
 
 pub struct QueryBuilder<B, I> {
@@ -65,7 +59,7 @@ where
         }
     }
 
-    pub fn query(&'a self, f: Filter<'a>) -> Query<B, I> {
+    pub fn query(&self, f: Filter<'a>) -> Query<B, I> {
         let idxs = self.idx.filter(f);
         let ors = Ors::new(B::from_idx(idxs));
         Query {
@@ -76,23 +70,23 @@ where
 }
 
 /// Query combines different filter. Filters can be linked using `and` and `or`.
-pub struct Query<'a, B, I> {
-    idx: &'a I,
+pub struct Query<'i, B, I> {
+    idx: &'i I,
     ors: Ors<B>,
 }
 
-impl<'a, B, I> Query<'a, B, I>
+impl<'i, 'f, B, I> Query<'i, B, I>
 where
     B: BinOp,
-    I: IdxFilter<'a>,
+    I: IdxFilter<'f> + 'i,
 {
-    pub fn or(mut self, f: Filter<'a>) -> Self {
+    pub fn or(mut self, f: Filter<'f>) -> Self {
         let idxs = self.idx.filter(f);
         self.ors.or(B::from_idx(idxs));
         self
     }
 
-    pub fn and(mut self, f: Filter<'a>) -> Self {
+    pub fn and(mut self, f: Filter<'f>) -> Self {
         let idxs = self.idx.filter(f);
         self.ors.and(B::from_idx(idxs));
         self
