@@ -72,7 +72,7 @@ mod tests {
 
         use crate::{
             index::IndexError,
-            query::{self, IdxFilter, QueryBuilder},
+            query::{self, IdxFilter},
         };
 
         impl<'a> IdxFilter<'a> for UniqueStrIdx<'a> {
@@ -108,7 +108,7 @@ mod tests {
             idx.insert("Mario", 8).unwrap();
             idx.insert("Paul", 6).unwrap();
 
-            let b = QueryBuilder::<HashSet<Idx>, _>::new(idx);
+            let b = idx.query_builder::<HashSet<Idx>>();
             let r = b.query(eq("Mario")).or(eq("Paul")).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));

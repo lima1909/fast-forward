@@ -90,11 +90,11 @@ mod tests {
 
         use crate::{
             index::IndexError,
-            query::{self, IdxFilter, QueryBuilder},
+            query::{self, IdxFilter},
         };
 
-        impl<'a> IdxFilter<'a> for PkUintIdx {
-            fn filter(&self, f: crate::query::Filter<'a>) -> &[Idx] {
+        impl<'f> IdxFilter<'f> for PkUintIdx {
+            fn filter(&self, f: crate::query::Filter<'f>) -> &[Idx] {
                 self.find(f.into())
             }
         }
@@ -127,7 +127,7 @@ mod tests {
             idx.insert(4, 8).unwrap();
             idx.insert(3, 6).unwrap();
 
-            let b = QueryBuilder::<HashSet<Idx>, _>::new(idx);
+            let b = idx.query_builder::<HashSet<Idx>>();
             let r = b.query(eq(3)).or(eq(4)).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
@@ -154,7 +154,7 @@ mod tests {
             idx.insert(4, 8).unwrap();
             idx.insert(3, 6).unwrap();
 
-            let b = QueryBuilder::<HashSet<Idx>, _>::new(idx);
+            let b = idx.query_builder::<HashSet<Idx>>();
             let r = b.query(eq(3)).and(eq(2)).exec();
             assert!(r.is_empty());
 

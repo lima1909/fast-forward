@@ -38,8 +38,12 @@ impl<'a, K: From<Key<'a>>> From<Filter<'a>> for index::Filter<K> {
     }
 }
 
-pub trait IdxFilter<'f> {
+pub trait IdxFilter<'f>: Sized {
     fn filter(&self, f: Filter<'f>) -> &[Idx];
+
+    fn query_builder<B: BinOp>(self) -> QueryBuilder<B, Self> {
+        QueryBuilder::<B, _>::new(self)
+    }
 }
 
 pub struct QueryBuilder<B, I> {
@@ -52,7 +56,7 @@ where
     B: BinOp,
     I: IdxFilter<'a>,
 {
-    pub fn new(idx: I) -> Self {
+    fn new(idx: I) -> Self {
         Self {
             idx,
             _b: PhantomData,

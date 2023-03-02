@@ -37,7 +37,7 @@ use std::ops::Deref;
 
 use crate::{
     ops::{EQ, NE},
-    query::{self, BinOp, IdxFilter, Key, QueryBuilder},
+    query::{self, IdxFilter, Key},
     Idx, Op,
 };
 
@@ -186,10 +186,6 @@ impl<'i, T> Indices<'i, T> {
 
         Ok(())
     }
-
-    pub fn query_builder<B: BinOp>(self) -> QueryBuilder<B, Self> {
-        QueryBuilder::<B, _>::new(self)
-    }
 }
 
 #[cfg(test)]
@@ -278,7 +274,7 @@ mod tests {
 
         let idxs = Idxs(Box::new(idx_u), Box::new(idx_s));
 
-        let b = QueryBuilder::<HashSet<Idx>, _>::new(idxs);
+        let b = idxs.query_builder::<HashSet<Idx>>();
         let r = b.query(eq("", 1)).and(eq("", "a")).exec();
         assert_eq!(&[1], &r[..]);
 
