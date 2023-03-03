@@ -28,7 +28,7 @@
 //! ```
 use crate::{
     index::{Filter, Index, KeyIdxStore, Multi, Unique},
-    query::IdxFilter,
+    query::{IdxFilter, IdxFilterQuery},
     Idx,
 };
 use std::{
@@ -71,6 +71,8 @@ impl<'a, I: Index> IdxFilter<'a> for StrMapIndex<'a, I> {
     }
 }
 
+impl<'a, I: Index> IdxFilterQuery<'a> for StrMapIndex<'a, I> {}
+
 #[cfg(test)]
 mod tests {
     use super::{super::OpsFilter, *};
@@ -79,7 +81,7 @@ mod tests {
         use super::*;
         use std::collections::HashSet;
 
-        use crate::{index::IndexError, query::IdxFilter};
+        use crate::index::IndexError;
 
         #[test]
         fn empty() {

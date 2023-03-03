@@ -37,7 +37,7 @@ use std::ops::Deref;
 
 use crate::{
     ops::{EQ, NE},
-    query::{self, IdxFilter, Key},
+    query::{self, IdxFilter, IdxFilterQuery, Key},
     Idx, Op,
 };
 
@@ -138,6 +138,8 @@ impl<'i, T> IdxFilter<'i> for Indices<'i, T> {
         }
     }
 }
+
+impl<'i, T> IdxFilterQuery<'i> for Indices<'i, T> {}
 
 impl<'i, T> Indices<'i, T> {
     pub fn new() -> Self {
@@ -259,6 +261,8 @@ mod tests {
         }
     }
 
+    impl<'i> IdxFilterQuery<'i> for Idxs<'i> {}
+
     #[test]
     fn different_idxs() -> Result<()> {
         let mut idx_u = PkUintIdx::default();
@@ -284,5 +288,21 @@ mod tests {
         assert!(r.contains(&0));
 
         Ok(())
+    }
+
+    #[test]
+    fn collect_idxfilters() {
+        let p = Person(3, 7, "a");
+        let mut idx_s = UniqueStrIdx::default();
+        idx_s.insert(p.2, 1).unwrap();
+
+        let idxs = Idxs(Box::<PkUintIdx>::default(), Box::new(idx_s));
+
+        let v: Vec<Box<dyn IdxFilter>> = vec![
+            Box::<UniqueStrIdx>::default(),
+            Box::<PkUintIdx>::default(),
+            Box::new(idxs),
+        ];
+        assert_eq!(3, v.len());
     }
 }

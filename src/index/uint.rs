@@ -33,7 +33,7 @@
 //! ```
 use crate::{
     index::{Filter, Idx, Index, KeyIdxStore, Multi, Result, Unique},
-    query::IdxFilter,
+    query::{IdxFilter, IdxFilterQuery},
 };
 use std::ops::Deref;
 
@@ -75,6 +75,8 @@ impl<'f, I: Index + Clone> IdxFilter<'f> for UIntVecIndex<I> {
     }
 }
 
+impl<'f, I: Index + Clone> IdxFilterQuery<'f> for UIntVecIndex<I> {}
+
 impl<I: Index> UIntVecIndex<I> {
     pub fn with_capacity(capacity: usize) -> Self {
         UIntVecIndex(Vec::with_capacity(capacity))
@@ -97,7 +99,7 @@ mod tests {
         use super::*;
         use std::collections::HashSet;
 
-        use crate::{index::IndexError, query::IdxFilter};
+        use crate::index::IndexError;
 
         #[test]
         fn empty() {

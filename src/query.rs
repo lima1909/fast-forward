@@ -30,7 +30,10 @@ impl<'a> Filter<'a> {
     }
 }
 
-impl<'a, K: From<Key<'a>>> From<Filter<'a>> for index::Filter<K> {
+impl<'a, K> From<Filter<'a>> for index::Filter<K>
+where
+    K: From<Key<'a>>,
+{
     fn from(f: Filter<'a>) -> Self {
         index::Filter {
             op: f.op,
@@ -57,9 +60,11 @@ where
     }
 }
 
-pub trait IdxFilter<'f>: Sized {
+pub trait IdxFilter<'f> {
     fn filter(&self, f: Filter<'f>) -> &[Idx];
+}
 
+pub trait IdxFilterQuery<'f>: IdxFilter<'f> + Sized {
     fn query_builder<B: BinOp>(&self) -> QueryBuilder<Self, B> {
         QueryBuilder::<_, B>::new(self)
     }
