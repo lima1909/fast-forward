@@ -26,8 +26,11 @@
 //!   ...     | ...
 //!
 //! ```
-use super::{Filter, Index, KeyIdxStore, Multi, Unique};
-use crate::Idx;
+use crate::{
+    index::{Filter, Index, KeyIdxStore, Multi, Unique},
+    query::IdxFilter,
+    Idx,
+};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     fmt::Debug,
@@ -62,6 +65,12 @@ impl<'a, I: Index> KeyIdxStore<&'a str> for StrMapIndex<'a, I> {
     }
 }
 
+impl<'a, I: Index> IdxFilter<'a> for StrMapIndex<'a, I> {
+    fn filter(&self, f: crate::query::Filter<'a>) -> &[Idx] {
+        self.find(f.into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{super::OpsFilter, *};
@@ -74,12 +83,6 @@ mod tests {
             index::IndexError,
             query::{self, IdxFilter},
         };
-
-        impl<'a> IdxFilter<'a> for UniqueStrIdx<'a> {
-            fn filter(&self, f: crate::query::Filter<'a>) -> &[Idx] {
-                self.find(f.into())
-            }
-        }
 
         fn eq(v: &str) -> query::Filter<'_> {
             query::Filter::new("", crate::ops::EQ, query::Key::Str(v))

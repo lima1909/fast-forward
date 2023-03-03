@@ -31,7 +31,10 @@
 //!  3   |  0, 2
 //! ...  | ...
 //! ```
-use super::{Filter, Idx, Index, KeyIdxStore, Multi, Result, Unique};
+use crate::{
+    index::{Filter, Idx, Index, KeyIdxStore, Multi, Result, Unique},
+    query::IdxFilter,
+};
 use std::ops::Deref;
 
 /// Unique `Primary Key` from type [`usize`].
@@ -66,6 +69,12 @@ impl<I: Index + Clone> KeyIdxStore<Idx> for UIntVecIndex<I> {
     }
 }
 
+impl<'f, I: Index + Clone> IdxFilter<'f> for UIntVecIndex<I> {
+    fn filter(&self, f: crate::query::Filter<'f>) -> &[Idx] {
+        self.find(f.into())
+    }
+}
+
 impl<I: Index> UIntVecIndex<I> {
     pub fn with_capacity(capacity: usize) -> Self {
         UIntVecIndex(Vec::with_capacity(capacity))
@@ -92,12 +101,6 @@ mod tests {
             index::IndexError,
             query::{self, IdxFilter},
         };
-
-        impl<'f> IdxFilter<'f> for PkUintIdx {
-            fn filter(&self, f: crate::query::Filter<'f>) -> &[Idx] {
-                self.find(f.into())
-            }
-        }
 
         fn eq<'a>(v: usize) -> query::Filter<'a> {
             query::Filter::new("", crate::ops::EQ, query::Key::Usize(v))

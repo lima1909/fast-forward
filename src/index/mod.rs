@@ -33,7 +33,7 @@ pub mod uint;
 
 pub use error::IndexError;
 pub use idx::{Index, Multi, Positions, Unique};
-use std::{marker::PhantomData, ops::Deref};
+use std::ops::Deref;
 
 use crate::{
     ops::{EQ, NE},
@@ -69,34 +69,6 @@ pub trait KeyIdxStore<K> {
     /// find for the given `Key` all indices.
     fn find(&self, f: Filter<K>) -> &[Idx];
 }
-
-// -------------------------------------
-pub struct Store<'a, K, S: KeyIdxStore<K>> {
-    field_name: &'a str,
-    store: S,
-    _key: PhantomData<K>,
-}
-
-impl<'a, K: From<Key<'a>>, S: KeyIdxStore<K>> Store<'a, K, S> {
-    pub fn new(store: S) -> Self {
-        Self::with_name("", store)
-    }
-
-    pub fn with_name(field_name: &'a str, store: S) -> Self {
-        Self {
-            field_name,
-            store,
-            _key: PhantomData,
-        }
-    }
-}
-
-impl<'a, K: From<Key<'a>>, S: KeyIdxStore<K>> IdxFilter<'a> for Store<'a, K, S> {
-    fn filter(&self, f: query::Filter<'a>) -> &[Idx] {
-        self.store.find(f.into())
-    }
-}
-// -------------------------------------
 
 /// Find all [`Idx`] for an given [`Filter`] ([`crate::Op`]) and [`crate::query::Key`].
 pub trait OpsFilter<K>: KeyIdxStore<K> {
