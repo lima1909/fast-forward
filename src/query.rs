@@ -60,29 +60,29 @@ where
 pub trait IdxFilter<'f>: Sized {
     fn filter(&self, f: Filter<'f>) -> &[Idx];
 
-    fn query_builder<B: BinOp>(self) -> QueryBuilder<B, Self> {
-        QueryBuilder::<B, _>::new(self)
+    fn query_builder<B: BinOp>(self) -> QueryBuilder<Self, B> {
+        QueryBuilder::<_, B>::new(self)
     }
 }
 
-pub struct QueryBuilder<B, I> {
+pub struct QueryBuilder<I, B: BinOp = HashSet<Idx>> {
     idx: I,
     _b: PhantomData<B>,
 }
 
-impl<'a, B, I> QueryBuilder<B, I>
+impl<'a, I, B> QueryBuilder<I, B>
 where
-    B: BinOp,
     I: IdxFilter<'a>,
+    B: BinOp,
 {
-    fn new(idx: I) -> Self {
+    pub fn new(idx: I) -> Self {
         Self {
             idx,
             _b: PhantomData,
         }
     }
 
-    pub fn query<F>(&self, f: F) -> Query<B, I>
+    pub fn query<F>(&self, f: F) -> Query<I, B>
     where
         F: Into<Filter<'a>>,
     {
@@ -96,15 +96,15 @@ where
 }
 
 /// Query combines different filter. Filters can be linked using `and` and `or`.
-pub struct Query<'i, B, I> {
+pub struct Query<'i, I, B: BinOp = HashSet<Idx>> {
     idx: &'i I,
     ors: Ors<B>,
 }
 
-impl<'i, 'f, B, I> Query<'i, B, I>
+impl<'i, 'f, I, B> Query<'i, I, B>
 where
-    B: BinOp,
     I: IdxFilter<'f> + 'i,
+    B: BinOp,
 {
     pub fn or<F>(mut self, f: F) -> Self
     where
@@ -129,7 +129,7 @@ where
     }
 }
 
-struct Ors<B> {
+struct Ors<B: BinOp = HashSet<Idx>> {
     first: B,
     ors: Vec<B>,
 }
