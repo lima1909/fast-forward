@@ -60,22 +60,22 @@ where
 pub trait IdxFilter<'f>: Sized {
     fn filter(&self, f: Filter<'f>) -> &[Idx];
 
-    fn query_builder<B: BinOp>(self) -> QueryBuilder<Self, B> {
+    fn query_builder<B: BinOp>(&self) -> QueryBuilder<Self, B> {
         QueryBuilder::<_, B>::new(self)
     }
 }
 
-pub struct QueryBuilder<I, B: BinOp = HashSet<Idx>> {
-    idx: I,
+pub struct QueryBuilder<'i, I, B: BinOp = HashSet<Idx>> {
+    idx: &'i I,
     _b: PhantomData<B>,
 }
 
-impl<'a, I, B> QueryBuilder<I, B>
+impl<'i, 'a, I, B> QueryBuilder<'i, I, B>
 where
     I: IdxFilter<'a>,
     B: BinOp,
 {
-    pub fn new(idx: I) -> Self {
+    pub fn new(idx: &'i I) -> Self {
         Self {
             idx,
             _b: PhantomData,
@@ -88,10 +88,7 @@ where
     {
         let idxs = self.idx.filter(f.into());
         let ors = Ors::new(B::from_idx(idxs));
-        Query {
-            idx: &self.idx,
-            ors,
-        }
+        Query { idx: self.idx, ors }
     }
 }
 

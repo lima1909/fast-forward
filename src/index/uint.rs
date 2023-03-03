@@ -123,24 +123,32 @@ mod tests {
             idx.insert(4, 8).unwrap();
             idx.insert(3, 6).unwrap();
 
+            {
+                let b = idx.query_builder::<HashSet<Idx>>();
+                let r = b.query(3).or(4).exec();
+                assert!(r.contains(&8));
+                assert!(r.contains(&6));
+
+                // reuse the query without `new`
+                let q = b.query(3);
+                let r = q.and(3).exec();
+                assert_eq!(&[6], &r[..]);
+
+                let r = b.query(3).or(99).exec();
+                assert!(r.contains(&6));
+
+                let r = b.query(99).or(4).exec();
+                assert!(r.contains(&8));
+
+                let r = b.query(3).and(4).exec();
+                assert!(r.is_empty());
+            }
+
+            // add a new index after creating a QueryBuilder
+            idx.insert(99, 0).unwrap();
             let b = idx.query_builder::<HashSet<Idx>>();
-            let r = b.query(3).or(4).exec();
-            assert!(r.contains(&8));
-            assert!(r.contains(&6));
-
-            // reuse the query without `new`
-            let q = b.query(3);
-            let r = q.and(3).exec();
-            assert_eq!(&[6], &r[..]);
-
-            let r = b.query(3).or(99).exec();
-            assert!(r.contains(&6));
-
-            let r = b.query(99).or(4).exec();
-            assert!(r.contains(&8));
-
-            let r = b.query(3).and(4).exec();
-            assert!(r.is_empty());
+            let r = b.query(99).exec();
+            assert_eq!(&[0], &r[..]);
         }
 
         #[test]
