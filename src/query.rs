@@ -1,6 +1,7 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
 use crate::{
     index::{self},
+    ops::EQ,
     Idx, Op,
 };
 use std::{
@@ -38,6 +39,24 @@ impl<'a, K: From<Key<'a>>> From<Filter<'a>> for index::Filter<K> {
     }
 }
 
+impl<'a, K> From<(Op, K)> for Filter<'a>
+where
+    K: Into<Key<'a>>,
+{
+    fn from(ok: (Op, K)) -> Self {
+        Filter::new("", ok.0, ok.1.into())
+    }
+}
+
+impl<'a, K> From<K> for Filter<'a>
+where
+    K: Into<Key<'a>>,
+{
+    fn from(k: K) -> Self {
+        Filter::new("", EQ, k.into())
+    }
+}
+
 pub trait IdxFilter<'f>: Sized {
     fn filter(&self, f: Filter<'f>) -> &[Idx];
 
@@ -63,8 +82,11 @@ where
         }
     }
 
-    pub fn query(&self, f: Filter<'a>) -> Query<B, I> {
-        let idxs = self.idx.filter(f);
+    pub fn query<F>(&self, f: F) -> Query<B, I>
+    where
+        F: Into<Filter<'a>>,
+    {
+        let idxs = self.idx.filter(f.into());
         let ors = Ors::new(B::from_idx(idxs));
         Query {
             idx: &self.idx,
@@ -84,14 +106,20 @@ where
     B: BinOp,
     I: IdxFilter<'f> + 'i,
 {
-    pub fn or(mut self, f: Filter<'f>) -> Self {
-        let idxs = self.idx.filter(f);
+    pub fn or<F>(mut self, f: F) -> Self
+    where
+        F: Into<Filter<'f>>,
+    {
+        let idxs = self.idx.filter(f.into());
         self.ors.or(B::from_idx(idxs));
         self
     }
 
-    pub fn and(mut self, f: Filter<'f>) -> Self {
-        let idxs = self.idx.filter(f);
+    pub fn and<F>(mut self, f: F) -> Self
+    where
+        F: Into<Filter<'f>>,
+    {
+        let idxs = self.idx.filter(f.into());
         self.ors.and(B::from_idx(idxs));
         self
     }

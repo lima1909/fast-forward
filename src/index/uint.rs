@@ -97,14 +97,7 @@ mod tests {
         use super::*;
         use std::collections::HashSet;
 
-        use crate::{
-            index::IndexError,
-            query::{self, IdxFilter},
-        };
-
-        fn eq<'a>(v: usize) -> query::Filter<'a> {
-            query::Filter::new("", crate::ops::EQ, query::Key::Usize(v))
-        }
+        use crate::{index::IndexError, query::IdxFilter};
 
         #[test]
         fn empty() {
@@ -131,22 +124,22 @@ mod tests {
             idx.insert(3, 6).unwrap();
 
             let b = idx.query_builder::<HashSet<Idx>>();
-            let r = b.query(eq(3)).or(eq(4)).exec();
+            let r = b.query(3).or(4).exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
 
             // reuse the query without `new`
-            let q = b.query(eq(3));
-            let r = q.and(eq(3)).exec();
+            let q = b.query(3);
+            let r = q.and(3).exec();
             assert_eq!(&[6], &r[..]);
 
-            let r = b.query(eq(3)).or(eq(99)).exec();
+            let r = b.query(3).or(99).exec();
             assert!(r.contains(&6));
 
-            let r = b.query(eq(99)).or(eq(4)).exec();
+            let r = b.query(99).or(4).exec();
             assert!(r.contains(&8));
 
-            let r = b.query(eq(3)).and(eq(4)).exec();
+            let r = b.query(3).and(4).exec();
             assert!(r.is_empty());
         }
 
@@ -158,10 +151,10 @@ mod tests {
             idx.insert(3, 6).unwrap();
 
             let b = idx.query_builder::<HashSet<Idx>>();
-            let r = b.query(eq(3)).and(eq(2)).exec();
+            let r = b.query(3).and(2).exec();
             assert!(r.is_empty());
 
-            let r = b.query(eq(3)).or(eq(4)).and(eq(2)).exec();
+            let r = b.query(3).or(4).and(2).exec();
             // =3 or =4 and =2 =>
             // (
             // (4 and 2 = false) // `and` has higher prio than `or`

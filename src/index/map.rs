@@ -79,14 +79,7 @@ mod tests {
         use super::*;
         use std::collections::HashSet;
 
-        use crate::{
-            index::IndexError,
-            query::{self, IdxFilter},
-        };
-
-        fn eq(v: &str) -> query::Filter<'_> {
-            query::Filter::new("", crate::ops::EQ, query::Key::Str(v))
-        }
+        use crate::{index::IndexError, query::IdxFilter};
 
         #[test]
         fn empty() {
@@ -112,14 +105,14 @@ mod tests {
             idx.insert("Paul", 6).unwrap();
 
             let b = idx.query_builder::<HashSet<Idx>>();
-            let r = b.query(eq("Mario")).or(eq("Paul")).exec();
+            let r = b.query("Mario").or("Paul").exec();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
 
-            let r = b.query(eq("Paul")).or(eq("Blub")).exec();
+            let r = b.query("Paul").or("Blub").exec();
             assert!(r.contains(&6));
 
-            let r = b.query(eq("Blub")).or(eq("Mario")).exec();
+            let r = b.query("Blub").or("Mario").exec();
             assert!(r.contains(&8));
         }
 
