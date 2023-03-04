@@ -35,8 +35,8 @@ pub use error::IndexError;
 pub use idx::{Index, Multi, Positions, Unique};
 
 use crate::{
-    query::{Key, NamedPredicate, Queryable},
-    Idx,
+    query::Queryable,
+    Idx, Key, NamedPredicate,
     Op::{self, *},
 };
 
@@ -77,7 +77,7 @@ pub trait Filterable<'k> {
     fn filter(&self, p: Predicate<'k>) -> &[Idx];
 }
 
-/// Find all [`Idx`] for an given [`Predicate`] ([`crate::Op`]) and [`crate::query::Key`].
+/// Find all [`Idx`] for an given [`Predicate`] ([`crate::Op`]) and [`crate::Key`].
 pub trait OpsFilter<'k>: Filterable<'k> {
     fn eq<K: Into<Key<'k>>>(&self, k: K) -> &[Idx] {
         self.filter(Predicate::new_eq(k.into()))
@@ -175,7 +175,7 @@ mod tests {
             map::UniqueStrIdx,
             uint::{PkUintIdx, UIntVecIndex},
         },
-        query::Key,
+        Key,
     };
     use std::collections::HashSet;
 
@@ -255,10 +255,10 @@ mod tests {
         let idxs = Idxs(Box::new(idx_u), Box::new(idx_s));
 
         let b = idxs.query_builder::<HashSet<Idx>>();
-        let r = b.query(eq("", 1)).and(eq("", "a")).exec();
+        let r = b.query(1).and("a").exec();
         assert_eq!(&[1], &r[..]);
 
-        let r = b.query(eq("", "z")).or(eq("", 1)).and(eq("", "a")).exec();
+        let r = b.query("z").or(1).and("a").exec();
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
         assert!(r.contains(&1));
         assert!(r.contains(&0));

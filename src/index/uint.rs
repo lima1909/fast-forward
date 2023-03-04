@@ -33,7 +33,7 @@
 //! ```
 use crate::{
     index::{Filterable, Idx, Index, Multi, Predicate, Result, Store, Unique},
-    query::Key,
+    Key,
 };
 use std::ops::Deref;
 

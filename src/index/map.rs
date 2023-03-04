@@ -28,8 +28,7 @@
 //! ```
 use crate::{
     index::{Filterable, Index, Multi, Predicate, Store, Unique},
-    query::Key,
-    Idx,
+    Idx, Key,
 };
 use std::{
     collections::{btree_map::Entry, BTreeMap},

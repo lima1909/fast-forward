@@ -1,7 +1,7 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
 use crate::{
     index::{Filterable, Predicate},
-    Idx,
+    Idx, Key,
     Op::{self, *},
 };
 use std::{
@@ -9,13 +9,6 @@ use std::{
     marker::PhantomData,
     ops::{BitAnd, BitOr},
 };
-
-/// Supported types for quering/filtering [`NamedPredicate`] or [`Predicate`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Key<'a> {
-    Usize(usize),
-    Str(&'a str),
-}
 
 /// `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -218,35 +211,5 @@ impl BinOp for roaring::RoaringBitmap {
     #[inline]
     fn and(&self, idx: &Self) -> Self {
         self.bitand(idx)
-    }
-}
-
-impl<'a> From<Key<'a>> for usize {
-    fn from(key: Key<'a>) -> Self {
-        match key {
-            Key::Usize(u) => u,
-            _ => todo!(),
-        }
-    }
-}
-
-impl<'a> From<Key<'a>> for &'a str {
-    fn from(key: Key<'a>) -> Self {
-        match key {
-            Key::Str(s) => s,
-            _ => todo!(),
-        }
-    }
-}
-
-impl From<usize> for Key<'_> {
-    fn from(u: usize) -> Self {
-        Key::Usize(u)
-    }
-}
-
-impl<'a> From<&'a str> for Key<'a> {
-    fn from(s: &'a str) -> Self {
-        Key::Str(s)
     }
 }

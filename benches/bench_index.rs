@@ -4,8 +4,8 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use fast_forward::index::uint::UIntVecIndex;
 use fast_forward::index::{Indices, Predicate, Unique};
-use fast_forward::query::{BinOp, Key};
-use fast_forward::Idx;
+use fast_forward::query::BinOp;
+use fast_forward::{Idx, Key};
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
