@@ -33,11 +33,10 @@ pub mod uint;
 
 pub use error::IndexError;
 pub use idx::{Index, Multi, Positions, Unique};
-use std::ops::Deref;
 
 use crate::{
     ops::{EQ, NE},
-    query::{self, IdxFilter, IdxFilterQuery, Key},
+    query::{Filter, Key, Queryable},
     Idx, Op,
 };
 
@@ -50,139 +49,116 @@ type Result<T = ()> = std::result::Result<T, IndexError>;
 /// For example:
 /// Filter `= 5`
 /// means: Op: `=` and Key: `5`
-pub struct Filter<K> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Predicate<'k> {
     pub op: Op,
-    pub key: K,
+    pub key: Key<'k>,
 }
 
-impl<K> Filter<K> {
-    pub fn new(op: Op, key: K) -> Self {
+impl<'k> Predicate<'k> {
+    pub fn new(op: Op, key: Key<'k>) -> Self {
         Self { op, key }
+    }
+
+    pub fn new_eq(key: Key<'k>) -> Self {
+        Self { op: EQ, key }
     }
 }
 
 /// A Store for a mapping from a given Key to one or many Indices.
-pub trait KeyIdxStore<K> {
+pub trait Store<'k> {
     /// Insert all indices for a given `Key`.
-    fn insert(&mut self, k: K, i: Idx) -> Result;
+    fn insert(&mut self, k: Key<'k>, i: Idx) -> Result;
+}
 
+/// Filtering the [`Store`] with a given [`Predicate`]
+pub trait Filterable<'k> {
     /// find for the given `Key` all indices.
-    fn find(&self, f: Filter<K>) -> &[Idx];
+    fn filter(&self, p: Predicate<'k>) -> &[Idx];
 }
 
-/// Find all [`Idx`] for an given [`Filter`] ([`crate::Op`]) and [`crate::query::Key`].
-pub trait OpsFilter<K>: KeyIdxStore<K> {
-    fn eq(&self, key: K) -> &[Idx] {
-        self.find(Filter::new(EQ, key))
+/// Find all [`Idx`] for an given [`Predicate`] ([`crate::Op`]) and [`crate::query::Key`].
+pub trait OpsFilter<'k>: Filterable<'k> {
+    fn eq<K: Into<Key<'k>>>(&self, k: K) -> &[Idx] {
+        self.filter(Predicate::new_eq(k.into()))
     }
 
-    fn ne(&self, key: K) -> &[Idx] {
-        self.find(Filter::new(NE, key))
+    fn ne<K: Into<Key<'k>>>(&self, k: K) -> &[Idx] {
+        self.filter(Predicate::new(NE, k.into()))
     }
 }
 
-impl<K, S: KeyIdxStore<K>> OpsFilter<K> for S {}
+impl<'k, F: Filterable<'k>> OpsFilter<'k> for F {}
 
-type FieldValueFn<T, K> = fn(&T) -> K;
+pub trait FilterableStore<'k>: Store<'k> + Filterable<'k> {}
 
-pub struct FieldIdxStore<'a, T, K> {
-    field_name: &'a str,
-    get_field_value_fn: FieldValueFn<T, K>,
-    store: Box<dyn KeyIdxStore<K> + 'a>,
+impl<'k, F: Store<'k> + Filterable<'k>> FilterableStore<'k> for F {}
+
+type FieldValueFn<'k, T> = fn(&T) -> Key<'k>;
+
+/// `FieldStore` extend a [`Store`] with an field-name and a function to get the value of an given object-type `<T>`
+pub struct FieldStore<'k, T> {
+    field: &'static str,
+    field_value_fn: FieldValueFn<'k, T>,
+    pub store: Box<dyn FilterableStore<'k> + 'k>,
 }
 
-impl<'a, T, K> FieldIdxStore<'a, T, K> {
+impl<'k, T> FieldStore<'k, T> {
     pub fn new(
-        field_name: &'a str,
-        get_field_value_fn: FieldValueFn<T, K>,
-        store: Box<dyn KeyIdxStore<K> + 'a>,
+        field: &'static str,
+        field_value_fn: FieldValueFn<'k, T>,
+        store: Box<dyn FilterableStore<'k> + 'k>,
     ) -> Self {
         Self {
-            field_name,
-            get_field_value_fn,
+            field,
+            field_value_fn,
             store,
         }
     }
 }
 
-impl<'a, T, K> Deref for FieldIdxStore<'a, T, K> {
-    type Target = Box<dyn KeyIdxStore<K> + 'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.store
-    }
-}
-
-/// Collection of indices ([`KeyIdxStore`]s).
+/// Collection of indices ([`FieldStore`]s).
 #[derive(Default)]
-pub struct Indices<'i, T> {
-    k_usize: Vec<FieldIdxStore<'i, T, usize>>,
-    k_str: Vec<FieldIdxStore<'i, T, &'i str>>,
-}
+pub struct Indices<'i, T>(Vec<FieldStore<'i, T>>);
 
-impl<'i, T> IdxFilter<'i> for Indices<'i, T> {
-    fn filter(&self, f: query::Filter<'i>) -> &[Idx] {
-        match f.key {
-            Key::Usize(_u) => {
-                let s = self
-                    .k_usize
-                    .iter()
-                    .find(|i| i.field_name == f.field)
-                    .unwrap();
-                s.find(f.into())
-            }
-            Key::Str(_s) => {
-                let s = self.k_str.iter().find(|i| i.field_name == f.field).unwrap();
-                s.find(f.into())
-            }
-        }
+impl<'k, T> Queryable<'k> for Indices<'k, T> {
+    fn filter<Fltr>(&self, f: Fltr) -> &[Idx]
+    where
+        Fltr: Into<Filter<'k>>,
+    {
+        let f: Filter = f.into();
+        let s = self.0.iter().find(|s| s.field == f.field).unwrap();
+        s.store.filter(f.into())
     }
 }
-
-impl<'i, T> IdxFilterQuery<'i> for Indices<'i, T> {}
 
 impl<'i, T> Indices<'i, T> {
-    pub fn new() -> Self {
-        Self {
-            k_usize: Vec::new(),
-            k_str: Vec::new(),
-        }
-    }
-    pub fn add_usize_idx(
-        &mut self,
-        field_name: &'i str,
-        get_field_value_fn: FieldValueFn<T, usize>,
-        store: Box<dyn KeyIdxStore<usize> + 'i>,
-    ) {
-        self.k_usize
-            .push(FieldIdxStore::new(field_name, get_field_value_fn, store))
+    pub fn new(
+        field: &'static str,
+        field_value_fn: FieldValueFn<'i, T>,
+        store: Box<dyn FilterableStore<'i> + 'i>,
+    ) -> Self {
+        let mut s = Self(Vec::new());
+        s.add_idx(field, field_value_fn, store);
+        s
     }
 
-    pub fn add_str_idx(
+    pub fn add_idx(
         &mut self,
-        field_name: &'i str,
-        get_field_value_fn: FieldValueFn<T, &'i str>,
-        store: Box<dyn KeyIdxStore<&'i str> + 'i>,
+        field: &'static str,
+        field_value_fn: FieldValueFn<'i, T>,
+        store: Box<dyn FilterableStore<'i> + 'i>,
     ) {
-        self.k_str
-            .push(FieldIdxStore::new(field_name, get_field_value_fn, store))
+        self.0.push(FieldStore::new(field, field_value_fn, store))
     }
 
-    pub fn get_idx(&self, idx_name: &str) -> &FieldIdxStore<T, usize> {
-        self.k_usize
-            .iter()
-            .find(|i| i.field_name == idx_name)
-            .unwrap()
+    pub fn get_idx(&self, idx_name: &str) -> &FieldStore<'i, T> {
+        self.0.iter().find(|i| i.field == idx_name).unwrap()
     }
 
     pub fn insert(&mut self, t: &T, idx: Idx) -> Result {
-        for s in &mut self.k_usize {
-            let key = (s.get_field_value_fn)(t);
-            s.store.insert(key, idx)?;
-        }
-
-        for s in &mut self.k_str {
-            let key = (s.get_field_value_fn)(t);
+        for s in &mut self.0 {
+            let key = (s.field_value_fn)(t);
             s.store.insert(key, idx)?;
         }
 
@@ -192,35 +168,37 @@ impl<'i, T> Indices<'i, T> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use super::*;
     use crate::{
         index::{
             map::UniqueStrIdx,
             uint::{PkUintIdx, UIntVecIndex},
-            KeyIdxStore,
         },
         ops::eq,
-        query::{Filter, IdxFilter, Key},
+        query::Key,
     };
+    use std::collections::HashSet;
 
+    #[derive(Default, Debug)]
     struct Person(usize, usize, &'static str);
 
     #[test]
     fn person_indices() {
-        let mut indices = Indices::new();
-        indices.add_usize_idx(
+        let mut indices = Indices::new(
             "pk",
-            |p: &Person| p.0,
+            |p: &Person| Key::Usize(p.0),
             Box::<UIntVecIndex<Unique>>::default(),
         );
-        indices.add_usize_idx(
+        indices.add_idx(
             "second",
-            |p: &Person| p.1,
+            |p: &Person| Key::Usize(p.1),
             Box::<UIntVecIndex<Multi>>::default(),
         );
-        indices.add_str_idx("name", |p: &Person| p.2, Box::<UniqueStrIdx>::default());
+        indices.add_idx(
+            "name",
+            |p: &Person| Key::Str(p.2),
+            Box::<UniqueStrIdx>::default(),
+        );
 
         indices.insert(&Person(3, 7, "Jasmin"), 0).unwrap();
         indices.insert(&Person(41, 7, "Mario"), 1).unwrap();
@@ -247,34 +225,32 @@ mod tests {
         assert!(r.contains(&1));
     }
 
-    struct Idxs<'a>(
-        Box<dyn KeyIdxStore<usize> + 'a>,
-        Box<dyn KeyIdxStore<&'a str> + 'a>,
+    struct Idxs<'k>(
+        Box<dyn FilterableStore<'k> + 'k>,
+        Box<dyn FilterableStore<'k> + 'k>,
     );
 
-    impl<'a> IdxFilter<'a> for Idxs<'a> {
-        fn filter(&self, f: Filter<'a>) -> &[Idx] {
-            match f.key {
-                Key::Usize(_u) => self.0.find(f.into()),
-                Key::Str(_s) => self.1.find(f.into()),
+    impl<'k> Filterable<'k> for Idxs<'k> {
+        fn filter(&self, p: Predicate<'k>) -> &[Idx] {
+            match p.key {
+                Key::Usize(_u) => self.0.filter(p),
+                Key::Str(_s) => self.1.filter(p),
             }
         }
     }
 
-    impl<'i> IdxFilterQuery<'i> for Idxs<'i> {}
-
     #[test]
     fn different_idxs() -> Result<()> {
         let mut idx_u = PkUintIdx::default();
-        idx_u.insert(1, 1)?;
-        idx_u.insert(2, 2)?;
-        idx_u.insert(99, 0)?;
+        idx_u.insert_idx(1, 1)?;
+        idx_u.insert_idx(2, 2)?;
+        idx_u.insert_idx(99, 0)?;
 
         let p = Person(3, 7, "a");
         let mut idx_s = UniqueStrIdx::default();
-        idx_s.insert(p.2, 1)?;
-        idx_s.insert("b", 2)?;
-        idx_s.insert("z", 0)?;
+        idx_s.insert_str(p.2, 1)?;
+        idx_s.insert_str("b", 2)?;
+        idx_s.insert_str("z", 0)?;
 
         let idxs = Idxs(Box::new(idx_u), Box::new(idx_s));
 
@@ -294,11 +270,11 @@ mod tests {
     fn collect_idxfilters() {
         let p = Person(3, 7, "a");
         let mut idx_s = UniqueStrIdx::default();
-        idx_s.insert(p.2, 1).unwrap();
+        idx_s.insert_str(p.2, 1).unwrap();
 
         let idxs = Idxs(Box::<PkUintIdx>::default(), Box::new(idx_s));
 
-        let v: Vec<Box<dyn IdxFilter>> = vec![
+        let v: Vec<Box<dyn Filterable>> = vec![
             Box::<UniqueStrIdx>::default(),
             Box::<PkUintIdx>::default(),
             Box::new(idxs),

@@ -27,8 +27,8 @@
 //!
 //! ```
 use crate::{
-    index::{Filter, Index, KeyIdxStore, Multi, Unique},
-    query::{IdxFilter, IdxFilterQuery},
+    index::{Filterable, Index, Multi, Predicate, Store, Unique},
+    query::Key,
     Idx,
 };
 use std::{
@@ -46,9 +46,9 @@ pub type MultiStrIdx<'a> = StrMapIndex<'a, Multi>;
 #[derive(Debug, Default)]
 pub struct StrMapIndex<'a, I: Index>(BTreeMap<&'a str, I>);
 
-impl<'a, I: Index> KeyIdxStore<&'a str> for StrMapIndex<'a, I> {
-    fn insert(&mut self, k: &'a str, i: Idx) -> super::Result {
-        match self.0.entry(k) {
+impl<'k, I: Index> Store<'k> for StrMapIndex<'k, I> {
+    fn insert(&mut self, k: Key<'k>, i: Idx) -> super::Result {
+        match self.0.entry(k.into()) {
             Entry::Vacant(e) => {
                 e.insert(I::new(i));
                 Ok(())
@@ -56,32 +56,32 @@ impl<'a, I: Index> KeyIdxStore<&'a str> for StrMapIndex<'a, I> {
             Entry::Occupied(mut e) => e.get_mut().add(i),
         }
     }
+}
 
-    fn find(&self, f: Filter<&str>) -> &[Idx] {
-        match self.0.get(f.key) {
+impl<'k, I: Index> Filterable<'k> for StrMapIndex<'k, I> {
+    fn filter(&self, p: Predicate<'k>) -> &[Idx] {
+        match self.0.get(p.key.into()) {
             Some(i) => i.get(),
             None => &[],
         }
     }
 }
 
-impl<'a, I: Index> IdxFilter<'a> for StrMapIndex<'a, I> {
-    fn filter(&self, f: crate::query::Filter<'a>) -> &[Idx] {
-        self.find(f.into())
+impl<'k, I: Index> StrMapIndex<'k, I> {
+    pub fn insert_str(&mut self, k: &'k str, i: Idx) -> super::Result {
+        self.insert(k.into(), i)
     }
 }
 
-impl<'a, I: Index> IdxFilterQuery<'a> for StrMapIndex<'a, I> {}
-
 #[cfg(test)]
 mod tests {
-    use super::{super::OpsFilter, *};
+    use super::*;
+    use crate::index::{IndexError, OpsFilter};
+    use crate::query::Queryable;
+    use std::collections::HashSet;
 
     mod unique {
         use super::*;
-        use std::collections::HashSet;
-
-        use crate::index::IndexError;
 
         #[test]
         fn empty() {
@@ -93,7 +93,7 @@ mod tests {
         #[test]
         fn find_idx_2() {
             let mut i = UniqueStrIdx::default();
-            i.insert("Jasmin", 4).unwrap();
+            i.insert_str("Jasmin", 4).unwrap();
 
             assert_eq!(i.eq("Jasmin"), &[4]);
             assert_eq!(1, i.0.len());
@@ -102,9 +102,9 @@ mod tests {
         #[test]
         fn or_find_idx_3_4() {
             let mut idx = UniqueStrIdx::default();
-            idx.insert("Jasmin", 4).unwrap();
-            idx.insert("Mario", 8).unwrap();
-            idx.insert("Paul", 6).unwrap();
+            idx.insert_str("Jasmin", 4).unwrap();
+            idx.insert_str("Mario", 8).unwrap();
+            idx.insert_str("Paul", 6).unwrap();
 
             let b = idx.query_builder::<HashSet<Idx>>();
             let r = b.query("Mario").or("Paul").exec();
@@ -121,9 +121,9 @@ mod tests {
         #[test]
         fn double_index() {
             let mut i = UniqueStrIdx::default();
-            i.insert("Jasmin", 2).unwrap();
+            i.insert_str("Jasmin", 2).unwrap();
 
-            assert_eq!(Err(IndexError::NotUniqueKey), i.insert("Jasmin", 2));
+            assert_eq!(Err(IndexError::NotUniqueKey), i.insert_str("Jasmin", 2));
         }
 
         #[test]
@@ -146,7 +146,7 @@ mod tests {
         #[test]
         fn find_idx_2() {
             let mut i = MultiStrIdx::default();
-            i.insert("Jasmin", 2).unwrap();
+            i.insert_str("Jasmin", 2).unwrap();
 
             assert_eq!(i.eq("Jasmin"), &[2]);
             assert_eq!(1, i.0.len());
@@ -155,8 +155,8 @@ mod tests {
         #[test]
         fn double_index() {
             let mut i = MultiStrIdx::default();
-            i.insert("Jasmin", 2).unwrap();
-            i.insert("Jasmin", 1).unwrap();
+            i.insert_str("Jasmin", 2).unwrap();
+            i.insert_str("Jasmin", 1).unwrap();
 
             assert_eq!(i.eq("Jasmin"), &[2, 1]);
         }

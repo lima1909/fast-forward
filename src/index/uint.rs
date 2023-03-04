@@ -32,8 +32,8 @@
 //! ...  | ...
 //! ```
 use crate::{
-    index::{Filter, Idx, Index, KeyIdxStore, Multi, Result, Unique},
-    query::{IdxFilter, IdxFilterQuery},
+    index::{Filterable, Idx, Index, Multi, Predicate, Result, Store, Unique},
+    query::Key,
 };
 use std::ops::Deref;
 
@@ -47,35 +47,36 @@ pub type MultiUintIdx = UIntVecIndex<Multi>;
 #[derive(Debug, Default)]
 pub struct UIntVecIndex<I: Index>(Vec<Option<I>>);
 
-impl<I: Index + Clone> KeyIdxStore<Idx> for UIntVecIndex<I> {
-    fn insert(&mut self, key: Idx, i: Idx) -> Result {
-        if self.0.len() <= key {
-            self.0.resize(key + 1, None);
+impl<'k, I: Index + Clone> Store<'k> for UIntVecIndex<I> {
+    fn insert(&mut self, key: Key<'k>, i: Idx) -> Result {
+        let k = key.into();
+        if self.0.len() <= k {
+            self.0.resize(k + 1, None);
         }
 
-        match self.0[key].as_mut() {
+        match self.0[k].as_mut() {
             Some(idx) => idx.add(i)?,
-            None => self.0[key] = Some(I::new(i)),
+            None => self.0[k] = Some(I::new(i)),
         }
 
         Ok(())
     }
+}
 
-    fn find(&self, f: Filter<Idx>) -> &[Idx] {
-        match &self.0.get(f.key) {
+impl<'k, I: Index> Filterable<'k> for UIntVecIndex<I> {
+    fn filter(&self, p: Predicate<'k>) -> &[Idx] {
+        let i: Idx = p.key.into();
+        match &self.0.get(i) {
             Some(Some(idx)) => idx.get(),
             _ => &[],
         }
     }
 }
-
-impl<'f, I: Index + Clone> IdxFilter<'f> for UIntVecIndex<I> {
-    fn filter(&self, f: crate::query::Filter<'f>) -> &[Idx] {
-        self.find(f.into())
+impl<I: Index + Clone> UIntVecIndex<I> {
+    pub fn insert_idx(&mut self, idx: Idx, i: Idx) -> Result {
+        self.insert(idx.into(), i)
     }
 }
-
-impl<'f, I: Index + Clone> IdxFilterQuery<'f> for UIntVecIndex<I> {}
 
 impl<I: Index> UIntVecIndex<I> {
     pub fn with_capacity(capacity: usize) -> Self {
@@ -93,13 +94,13 @@ impl<I: Index> Deref for UIntVecIndex<I> {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::OpsFilter, *};
+    use super::*;
+    use crate::index::{IndexError, OpsFilter};
+    use crate::query::Queryable;
+    use std::collections::HashSet;
 
     mod unique {
         use super::*;
-        use std::collections::HashSet;
-
-        use crate::index::IndexError;
 
         #[test]
         fn empty() {
@@ -111,7 +112,7 @@ mod tests {
         #[test]
         fn find_idx_2() {
             let mut i = PkUintIdx::default();
-            i.insert(2, 4).unwrap();
+            i.insert_idx(2, 4).unwrap();
 
             assert_eq!(i.eq(2), &[4]);
             // assert_eq!(i.ne(3), &[]);  TODO: `ne` do not work now
@@ -121,9 +122,9 @@ mod tests {
         #[test]
         fn or_find_idx_3_4() {
             let mut idx = PkUintIdx::default();
-            idx.insert(2, 4).unwrap();
-            idx.insert(4, 8).unwrap();
-            idx.insert(3, 6).unwrap();
+            idx.insert_idx(2, 4).unwrap();
+            idx.insert_idx(4, 8).unwrap();
+            idx.insert_idx(3, 6).unwrap();
 
             {
                 let b = idx.query_builder::<HashSet<Idx>>();
@@ -147,7 +148,7 @@ mod tests {
             }
 
             // add a new index after creating a QueryBuilder
-            idx.insert(99, 0).unwrap();
+            idx.insert_idx(99, 0).unwrap();
             let b = idx.query_builder::<HashSet<Idx>>();
             let r = b.query(99).exec();
             assert_eq!(&[0], &r[..]);
@@ -156,9 +157,9 @@ mod tests {
         #[test]
         fn query_and_or() {
             let mut idx = PkUintIdx::default();
-            idx.insert(2, 4).unwrap();
-            idx.insert(4, 8).unwrap();
-            idx.insert(3, 6).unwrap();
+            idx.insert_idx(2, 4).unwrap();
+            idx.insert_idx(4, 8).unwrap();
+            idx.insert_idx(3, 6).unwrap();
 
             let b = idx.query_builder::<HashSet<Idx>>();
             let r = b.query(3).and(2).exec();
@@ -177,9 +178,9 @@ mod tests {
         #[test]
         fn double_index() {
             let mut i = PkUintIdx::default();
-            i.insert(2, 2).unwrap();
+            i.insert_idx(2, 2).unwrap();
 
-            assert_eq!(Err(IndexError::NotUniqueKey), i.insert(2, 2));
+            assert_eq!(Err(IndexError::NotUniqueKey), i.insert_idx(2, 2));
         }
 
         #[test]
@@ -202,7 +203,7 @@ mod tests {
         #[test]
         fn find_idx_2() {
             let mut i = MultiUintIdx::default();
-            i.insert(2, 2).unwrap();
+            i.insert_idx(2, 2).unwrap();
 
             assert_eq!(i.eq(2), &[2]);
             assert_eq!(3, i.0.len());
@@ -211,8 +212,8 @@ mod tests {
         #[test]
         fn double_index() {
             let mut i = MultiUintIdx::default();
-            i.insert(2, 2).unwrap();
-            i.insert(2, 1).unwrap();
+            i.insert_idx(2, 2).unwrap();
+            i.insert_idx(2, 1).unwrap();
 
             assert_eq!(i.eq(2), [2, 1]);
         }

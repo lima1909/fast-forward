@@ -1,6 +1,6 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
 use crate::{
-    index::{self},
+    index::{self, Filterable},
     ops::EQ,
     Idx, Op,
 };
@@ -11,13 +11,14 @@ use std::{
 };
 
 /// Supported types for quering/filtering [`IdxFilter`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Key<'a> {
     Usize(usize),
     Str(&'a str),
 }
 
 /// `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
+#[derive(Clone, Debug)]
 pub struct Filter<'a> {
     pub field: &'a str,
     pub op: Op,
@@ -30,14 +31,11 @@ impl<'a> Filter<'a> {
     }
 }
 
-impl<'a, K> From<Filter<'a>> for index::Filter<K>
-where
-    K: From<Key<'a>>,
-{
+impl<'a> From<Filter<'a>> for index::Predicate<'a> {
     fn from(f: Filter<'a>) -> Self {
-        index::Filter {
+        index::Predicate {
             op: f.op,
-            key: f.key.into(),
+            key: f.key,
         }
     }
 }
@@ -60,68 +58,75 @@ where
     }
 }
 
-pub trait IdxFilter<'f> {
-    fn filter(&self, f: Filter<'f>) -> &[Idx];
-}
+pub trait Queryable<'k> {
+    fn filter<Fltr: Into<Filter<'k>>>(&self, f: Fltr) -> &[Idx];
 
-pub trait IdxFilterQuery<'f>: IdxFilter<'f> + Sized {
-    fn query_builder<B: BinOp>(&self) -> QueryBuilder<Self, B> {
+    fn query_builder<B: BinOp>(&self) -> QueryBuilder<Self, B>
+    where
+        Self: Sized,
+    {
         QueryBuilder::<_, B>::new(self)
     }
 }
 
-pub struct QueryBuilder<'i, I, B: BinOp = HashSet<Idx>> {
-    idx: &'i I,
+impl<'k, F: Filterable<'k>> Queryable<'k> for F {
+    fn filter<Fltr>(&self, f: Fltr) -> &[Idx]
+    where
+        Fltr: Into<Filter<'k>>,
+    {
+        Filterable::filter(self, f.into().into())
+    }
+}
+
+pub struct QueryBuilder<'q, Q, B: BinOp = HashSet<Idx>> {
+    q: &'q Q,
     _b: PhantomData<B>,
 }
 
-impl<'i, 'a, I, B> QueryBuilder<'i, I, B>
+impl<'q, 'k, Q, B> QueryBuilder<'q, Q, B>
 where
-    I: IdxFilter<'a>,
+    Q: Queryable<'k>,
     B: BinOp,
 {
-    pub fn new(idx: &'i I) -> Self {
-        Self {
-            idx,
-            _b: PhantomData,
-        }
+    pub fn new(q: &'q Q) -> Self {
+        Self { q, _b: PhantomData }
     }
 
-    pub fn query<F>(&self, f: F) -> Query<I, B>
+    pub fn query<Fltr>(&self, f: Fltr) -> Query<Q, B>
     where
-        F: Into<Filter<'a>>,
+        Fltr: Into<Filter<'k>>,
     {
-        let idxs = self.idx.filter(f.into());
+        let idxs = self.q.filter(f.into());
         let ors = Ors::new(B::from_idx(idxs));
-        Query { idx: self.idx, ors }
+        Query { q: self.q, ors }
     }
 }
 
 /// Query combines different filter. Filters can be linked using `and` and `or`.
-pub struct Query<'i, I, B: BinOp = HashSet<Idx>> {
-    idx: &'i I,
+pub struct Query<'q, Q, B: BinOp = HashSet<Idx>> {
+    q: &'q Q,
     ors: Ors<B>,
 }
 
-impl<'i, 'f, I, B> Query<'i, I, B>
+impl<'q, 'k, Q, B> Query<'q, Q, B>
 where
-    I: IdxFilter<'f> + 'i,
+    Q: Queryable<'k> + 'q,
     B: BinOp,
 {
-    pub fn or<F>(mut self, f: F) -> Self
+    pub fn or<Fltr>(mut self, f: Fltr) -> Self
     where
-        F: Into<Filter<'f>>,
+        Fltr: Into<Filter<'k>>,
     {
-        let idxs = self.idx.filter(f.into());
+        let idxs = self.q.filter(f.into());
         self.ors.or(B::from_idx(idxs));
         self
     }
 
-    pub fn and<F>(mut self, f: F) -> Self
+    pub fn and<Fltr>(mut self, f: Fltr) -> Self
     where
-        F: Into<Filter<'f>>,
+        Fltr: Into<Filter<'k>>,
     {
-        let idxs = self.idx.filter(f.into());
+        let idxs = self.q.filter(f.into());
         self.ors.and(B::from_idx(idxs));
         self
     }
