@@ -1,8 +1,8 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
 use crate::{
     index::{Filterable, Predicate},
-    ops::EQ,
-    Idx, Op,
+    Idx,
+    Op::{self, *},
 };
 use std::{
     collections::HashSet,

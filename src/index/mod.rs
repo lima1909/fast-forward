@@ -35,9 +35,9 @@ pub use error::IndexError;
 pub use idx::{Index, Multi, Positions, Unique};
 
 use crate::{
-    ops::{EQ, NE},
     query::{Key, NamedPredicate, Queryable},
-    Idx, Op,
+    Idx,
+    Op::{self, *},
 };
 
 /// Default Result for index with the Ok(T) value or en [`IndexError`].
@@ -170,11 +170,11 @@ impl<'i, T> Indices<'i, T> {
 mod tests {
     use super::*;
     use crate::{
+        eq,
         index::{
             map::UniqueStrIdx,
             uint::{PkUintIdx, UIntVecIndex},
         },
-        ops::eq,
         query::Key,
     };
     use std::collections::HashSet;

@@ -51,7 +51,7 @@ impl Index for Multi {
 }
 
 /// Positions is an container for gathering [`Index`] values (&[Idx]).
-/// It is usefull for operations like greater then ([`crate::ops::GT`]),
+/// It is usefull for operations like greater then ([`crate::Op::GT`]),
 /// where the result consists one or many [`Index`]s.
 pub struct Positions<I>(Vec<Idx>, PhantomData<I>);
 
