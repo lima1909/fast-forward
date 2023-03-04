@@ -1,6 +1,6 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
 use crate::{
-    index::{self, Filterable},
+    index::{Filterable, Predicate},
     ops::EQ,
     Idx, Op,
 };
@@ -10,7 +10,7 @@ use std::{
     ops::{BitAnd, BitOr},
 };
 
-/// Supported types for quering/filtering [`IdxFilter`].
+/// Supported types for quering/filtering [`NamedPredicate`] or [`Predicate`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Key<'a> {
     Usize(usize),
@@ -18,48 +18,41 @@ pub enum Key<'a> {
 }
 
 /// `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
-#[derive(Clone, Debug)]
-pub struct Filter<'a> {
-    pub field: &'a str,
-    pub op: Op,
-    pub key: Key<'a>,
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NamedPredicate<'k> {
+    pub field: &'k str,
+    pub p: Predicate<'k>,
 }
 
-impl<'a> Filter<'a> {
-    pub fn new(field: &'a str, op: Op, key: Key<'a>) -> Self {
-        Self { field, op, key }
-    }
-}
-
-impl<'a> From<Filter<'a>> for index::Predicate<'a> {
-    fn from(f: Filter<'a>) -> Self {
-        index::Predicate {
-            op: f.op,
-            key: f.key,
+impl<'k> NamedPredicate<'k> {
+    pub fn new(field: &'k str, op: Op, key: Key<'k>) -> Self {
+        Self {
+            field,
+            p: Predicate::new(op, key),
         }
     }
 }
 
-impl<'a, K> From<(Op, K)> for Filter<'a>
+impl<'k, K> From<(Op, K)> for NamedPredicate<'k>
 where
-    K: Into<Key<'a>>,
+    K: Into<Key<'k>>,
 {
     fn from(ok: (Op, K)) -> Self {
-        Filter::new("", ok.0, ok.1.into())
+        NamedPredicate::new("", ok.0, ok.1.into())
     }
 }
 
-impl<'a, K> From<K> for Filter<'a>
+impl<'k, K> From<K> for NamedPredicate<'k>
 where
-    K: Into<Key<'a>>,
+    K: Into<Key<'k>>,
 {
     fn from(k: K) -> Self {
-        Filter::new("", EQ, k.into())
+        NamedPredicate::new("", EQ, k.into())
     }
 }
 
 pub trait Queryable<'k> {
-    fn filter<Fltr: Into<Filter<'k>>>(&self, f: Fltr) -> &[Idx];
+    fn filter<P: Into<NamedPredicate<'k>>>(&self, p: P) -> &[Idx];
 
     fn query_builder<B: BinOp>(&self) -> QueryBuilder<Self, B>
     where
@@ -70,11 +63,11 @@ pub trait Queryable<'k> {
 }
 
 impl<'k, F: Filterable<'k>> Queryable<'k> for F {
-    fn filter<Fltr>(&self, f: Fltr) -> &[Idx]
+    fn filter<P>(&self, p: P) -> &[Idx]
     where
-        Fltr: Into<Filter<'k>>,
+        P: Into<NamedPredicate<'k>>,
     {
-        Filterable::filter(self, f.into().into())
+        Filterable::filter(self, p.into().p)
     }
 }
 
@@ -92,11 +85,11 @@ where
         Self { q, _b: PhantomData }
     }
 
-    pub fn query<Fltr>(&self, f: Fltr) -> Query<Q, B>
+    pub fn query<P>(&self, p: P) -> Query<Q, B>
     where
-        Fltr: Into<Filter<'k>>,
+        P: Into<NamedPredicate<'k>>,
     {
-        let idxs = self.q.filter(f.into());
+        let idxs = self.q.filter(p.into());
         let ors = Ors::new(B::from_idx(idxs));
         Query { q: self.q, ors }
     }
@@ -113,20 +106,20 @@ where
     Q: Queryable<'k> + 'q,
     B: BinOp,
 {
-    pub fn or<Fltr>(mut self, f: Fltr) -> Self
+    pub fn or<P>(mut self, p: P) -> Self
     where
-        Fltr: Into<Filter<'k>>,
+        P: Into<NamedPredicate<'k>>,
     {
-        let idxs = self.q.filter(f.into());
+        let idxs = self.q.filter(p.into());
         self.ors.or(B::from_idx(idxs));
         self
     }
 
-    pub fn and<Fltr>(mut self, f: Fltr) -> Self
+    pub fn and<P>(mut self, p: P) -> Self
     where
-        Fltr: Into<Filter<'k>>,
+        P: Into<NamedPredicate<'k>>,
     {
-        let idxs = self.q.filter(f.into());
+        let idxs = self.q.filter(p.into());
         self.ors.and(B::from_idx(idxs));
         self
     }

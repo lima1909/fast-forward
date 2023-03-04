@@ -36,7 +36,7 @@ pub use idx::{Index, Multi, Positions, Unique};
 
 use crate::{
     ops::{EQ, NE},
-    query::{Filter, Key, Queryable},
+    query::{Key, NamedPredicate, Queryable},
     Idx, Op,
 };
 
@@ -122,13 +122,13 @@ impl<'k, T> FieldStore<'k, T> {
 pub struct Indices<'i, T>(Vec<FieldStore<'i, T>>);
 
 impl<'k, T> Queryable<'k> for Indices<'k, T> {
-    fn filter<Fltr>(&self, f: Fltr) -> &[Idx]
+    fn filter<P>(&self, p: P) -> &[Idx]
     where
-        Fltr: Into<Filter<'k>>,
+        P: Into<NamedPredicate<'k>>,
     {
-        let f: Filter = f.into();
+        let f: NamedPredicate = p.into();
         let s = self.0.iter().find(|s| s.field == f.field).unwrap();
-        s.store.filter(f.into())
+        s.store.filter(f.p)
     }
 }
 
