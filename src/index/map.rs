@@ -75,8 +75,8 @@ impl<'k, I: Index> StrMapIndex<'k, I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::{IndexError, OpsFilter};
     use crate::query::Queryable;
+    use crate::{error::Error, index::OpsFilter};
     use std::collections::HashSet;
 
     mod unique {
@@ -122,7 +122,7 @@ mod tests {
             let mut i = UniqueStrIdx::default();
             i.insert_str("Jasmin", 2).unwrap();
 
-            assert_eq!(Err(IndexError::NotUniqueKey), i.insert_str("Jasmin", 2));
+            assert_eq!(Err(Error::NotUniqueIndexKey), i.insert_str("Jasmin", 2));
         }
 
         #[test]

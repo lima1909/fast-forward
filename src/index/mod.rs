@@ -26,18 +26,13 @@
 //! ```
 
 #![allow(dead_code)]
-pub mod error;
 pub mod idx;
 pub mod map;
 pub mod uint;
 
-pub use error::IndexError;
 pub use idx::{Index, Multi, Positions, Unique};
 
-use crate::{query::Queryable, Idx, Key, Op, Predicate};
-
-/// Default Result for index with the Ok(T) value or en [`IndexError`].
-type Result<T = ()> = std::result::Result<T, IndexError>;
+use crate::{query::Queryable, Idx, Key, Op, Predicate, Result};
 
 /// A Store for a mapping from a given Key to one or many Indices.
 pub trait Store<'k> {

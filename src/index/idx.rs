@@ -1,7 +1,6 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use super::{IndexError, Result};
-use crate::Idx;
+use crate::{error::Error, Idx, Result};
 
 pub trait Index: Debug {
     fn new(i: Idx) -> Self;
@@ -20,7 +19,7 @@ impl Index for Unique {
 
     #[inline]
     fn add(&mut self, _i: Idx) -> Result {
-        Err(IndexError::NotUniqueKey)
+        Err(Error::NotUniqueIndexKey)
     }
 
     #[inline]

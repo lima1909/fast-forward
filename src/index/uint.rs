@@ -95,8 +95,8 @@ impl<I: Index> Deref for UIntVecIndex<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::{IndexError, OpsFilter};
     use crate::query::Queryable;
+    use crate::{error::Error, index::OpsFilter};
     use std::collections::HashSet;
 
     mod unique {
@@ -180,7 +180,7 @@ mod tests {
             let mut i = PkUintIdx::default();
             i.insert_idx(2, 2).unwrap();
 
-            assert_eq!(Err(IndexError::NotUniqueKey), i.insert_idx(2, 2));
+            assert_eq!(Err(Error::NotUniqueIndexKey), i.insert_idx(2, 2));
         }
 
         #[test]

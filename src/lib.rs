@@ -22,11 +22,15 @@
 //!
 //! To Find the [`Key::Str("Jasmin")`] with the [`Op::EQ`] is only one step necessary.
 
+pub mod error;
 pub mod index;
 pub mod query;
 
 /// `Idx` is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
+
+/// Default Result for index with the Ok(T) value or en [`error::Error`].
+type Result<T = ()> = std::result::Result<T, error::Error>;
 
 /// Supported types for quering/filtering [`Predicate`].
 #[derive(Debug, Clone, PartialEq, Eq)]

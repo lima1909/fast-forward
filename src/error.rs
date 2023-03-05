@@ -1,21 +1,18 @@
 //! Possible `errors` by using index.
-use std::{
-    error::Error,
-    fmt::{Debug, Display},
-};
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum IndexError {
+pub enum Error {
     /// Occurs, if the Index is unique and the given key is already used.
-    NotUniqueKey,
+    NotUniqueIndexKey,
 }
 
-impl Display for IndexError {
+impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IndexError::NotUniqueKey => write!(f, "Index is not unique"),
+            Error::NotUniqueIndexKey => write!(f, "Index-key is not unique"),
         }
     }
 }
 
-impl Error for IndexError {}
+impl std::error::Error for Error {}
