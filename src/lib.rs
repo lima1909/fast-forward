@@ -21,6 +21,7 @@
 //! ```
 //!
 //! To Find the [`Key::Str("Jasmin")`] with the [`Op::EQ`] is only one step necessary.
+//!
 
 pub mod error;
 pub mod index;
