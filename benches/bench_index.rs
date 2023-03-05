@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use fast_forward::index::uint::UIntVecIndex;
-use fast_forward::index::{Indices, Predicate, Unique};
+use fast_forward::index::{Indices, Unique};
 use fast_forward::query::BinOp;
-use fast_forward::{Idx, Key};
+use fast_forward::{Idx, Key, Op, Predicate};
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
@@ -27,7 +27,7 @@ fn list_index(c: &mut Criterion) {
     }
 
     let idx = idx.get_idx("pk");
-    let p = Predicate::new_eq(Key::Usize(FIND_ID));
+    let p = Predicate::new(Op::EQ, Key::Usize(FIND_ID));
 
     // group benchmark
     let mut group = c.benchmark_group("index");

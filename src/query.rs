@@ -1,51 +1,16 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
-use crate::{
-    index::{Filterable, Predicate},
-    Idx, Key,
-    Op::{self, *},
-};
+use crate::{index::Filterable, Idx, Predicate};
 use std::{
     collections::HashSet,
     marker::PhantomData,
     ops::{BitAnd, BitOr},
 };
 
-/// `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NamedPredicate<'k> {
-    pub field: &'k str,
-    pub p: Predicate<'k>,
-}
-
-impl<'k> NamedPredicate<'k> {
-    pub fn new(field: &'k str, op: Op, key: Key<'k>) -> Self {
-        Self {
-            field,
-            p: Predicate::new(op, key),
-        }
-    }
-}
-
-impl<'k, K> From<(Op, K)> for NamedPredicate<'k>
-where
-    K: Into<Key<'k>>,
-{
-    fn from(ok: (Op, K)) -> Self {
-        NamedPredicate::new("", ok.0, ok.1.into())
-    }
-}
-
-impl<'k, K> From<K> for NamedPredicate<'k>
-where
-    K: Into<Key<'k>>,
-{
-    fn from(k: K) -> Self {
-        NamedPredicate::new("", EQ, k.into())
-    }
-}
-
 pub trait Queryable<'k> {
-    fn filter<P: Into<NamedPredicate<'k>>>(&self, p: P) -> &[Idx];
+    /// `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
+    fn filter<P>(&self, p: P) -> &[Idx]
+    where
+        P: Into<Predicate<'k>>;
 
     fn query_builder<B: BinOp>(&self) -> QueryBuilder<Self, B>
     where
@@ -58,9 +23,9 @@ pub trait Queryable<'k> {
 impl<'k, F: Filterable<'k>> Queryable<'k> for F {
     fn filter<P>(&self, p: P) -> &[Idx]
     where
-        P: Into<NamedPredicate<'k>>,
+        P: Into<Predicate<'k>>,
     {
-        Filterable::filter(self, p.into().p)
+        Filterable::filter(self, p.into())
     }
 }
 
@@ -80,7 +45,7 @@ where
 
     pub fn query<P>(&self, p: P) -> Query<Q, B>
     where
-        P: Into<NamedPredicate<'k>>,
+        P: Into<Predicate<'k>>,
     {
         let idxs = self.q.filter(p.into());
         let ors = Ors::new(B::from_idx(idxs));
@@ -101,7 +66,7 @@ where
 {
     pub fn or<P>(mut self, p: P) -> Self
     where
-        P: Into<NamedPredicate<'k>>,
+        P: Into<Predicate<'k>>,
     {
         let idxs = self.q.filter(p.into());
         self.ors.or(B::from_idx(idxs));
@@ -110,7 +75,7 @@ where
 
     pub fn and<P>(mut self, p: P) -> Self
     where
-        P: Into<NamedPredicate<'k>>,
+        P: Into<Predicate<'k>>,
     {
         let idxs = self.q.filter(p.into());
         self.ors.and(B::from_idx(idxs));

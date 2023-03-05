@@ -65,7 +65,7 @@ impl<'k, I: Index + Clone> Store<'k> for UIntVecIndex<I> {
 
 impl<'k, I: Index> Filterable<'k> for UIntVecIndex<I> {
     fn filter(&self, p: Predicate<'k>) -> &[Idx] {
-        let i: Idx = p.key.into();
+        let i: Idx = p.2.into();
         match &self.0.get(i) {
             Some(Some(idx)) => idx.get(),
             _ => &[],

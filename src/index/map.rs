@@ -59,7 +59,7 @@ impl<'k, I: Index> Store<'k> for StrMapIndex<'k, I> {
 
 impl<'k, I: Index> Filterable<'k> for StrMapIndex<'k, I> {
     fn filter(&self, p: Predicate<'k>) -> &[Idx] {
-        match self.0.get(p.key.into()) {
+        match self.0.get(p.2.into()) {
             Some(i) => i.get(),
             None => &[],
         }

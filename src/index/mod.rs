@@ -34,36 +34,10 @@ pub mod uint;
 pub use error::IndexError;
 pub use idx::{Index, Multi, Positions, Unique};
 
-use crate::{
-    query::Queryable,
-    Idx, Key, NamedPredicate,
-    Op::{self, *},
-};
+use crate::{query::Queryable, Idx, Key, Op, Predicate};
 
 /// Default Result for index with the Ok(T) value or en [`IndexError`].
 type Result<T = ()> = std::result::Result<T, IndexError>;
-
-/// Filter are the input data for describung a filter. A filter consist of a key and a operation [`Op`].
-/// Key `K` is a unique value under which all occurring indices are stored.
-///
-/// For example:
-/// Filter `= 5`
-/// means: Op: `=` and Key: `5`
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Predicate<'k> {
-    pub op: Op,
-    pub key: Key<'k>,
-}
-
-impl<'k> Predicate<'k> {
-    pub fn new(op: Op, key: Key<'k>) -> Self {
-        Self { op, key }
-    }
-
-    pub fn new_eq(key: Key<'k>) -> Self {
-        Self { op: EQ, key }
-    }
-}
 
 /// A Store for a mapping from a given Key to one or many Indices.
 pub trait Store<'k> {
@@ -77,6 +51,10 @@ pub trait Filterable<'k> {
     fn filter(&self, p: Predicate<'k>) -> &[Idx];
 }
 
+pub trait FilterableStore<'k>: Store<'k> + Filterable<'k> {}
+
+impl<'k, F: Store<'k> + Filterable<'k>> FilterableStore<'k> for F {}
+
 /// Find all [`Idx`] for an given [`Predicate`] ([`crate::Op`]) and [`crate::Key`].
 pub trait OpsFilter<'k>: Filterable<'k> {
     fn eq<K: Into<Key<'k>>>(&self, k: K) -> &[Idx] {
@@ -84,15 +62,11 @@ pub trait OpsFilter<'k>: Filterable<'k> {
     }
 
     fn ne<K: Into<Key<'k>>>(&self, k: K) -> &[Idx] {
-        self.filter(Predicate::new(NE, k.into()))
+        self.filter(Predicate::new(Op::NE, k.into()))
     }
 }
 
 impl<'k, F: Filterable<'k>> OpsFilter<'k> for F {}
-
-pub trait FilterableStore<'k>: Store<'k> + Filterable<'k> {}
-
-impl<'k, F: Store<'k> + Filterable<'k>> FilterableStore<'k> for F {}
 
 type FieldValueFn<'k, T> = fn(&T) -> Key<'k>;
 
@@ -124,11 +98,10 @@ pub struct Indices<'i, T>(Vec<FieldStore<'i, T>>);
 impl<'k, T> Queryable<'k> for Indices<'k, T> {
     fn filter<P>(&self, p: P) -> &[Idx]
     where
-        P: Into<NamedPredicate<'k>>,
+        P: Into<Predicate<'k>>,
     {
-        let f: NamedPredicate = p.into();
-        let s = self.0.iter().find(|s| s.field == f.field).unwrap();
-        s.store.filter(f.p)
+        let p: Predicate = p.into();
+        self.get_idx(p.0).store.filter(p)
     }
 }
 
@@ -232,7 +205,7 @@ mod tests {
 
     impl<'k> Filterable<'k> for Idxs<'k> {
         fn filter(&self, p: Predicate<'k>) -> &[Idx] {
-            match p.key {
+            match &p.2 {
                 Key::Usize(_u) => self.0.filter(p),
                 Key::Str(_s) => self.1.filter(p),
             }
