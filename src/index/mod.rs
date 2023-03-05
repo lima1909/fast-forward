@@ -24,8 +24,6 @@
 //!  "Inge"    | 2
 //!   ...      | ...
 //! ```
-
-#![allow(dead_code)]
 pub mod idx;
 pub mod map;
 pub mod uint;

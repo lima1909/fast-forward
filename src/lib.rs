@@ -1,4 +1,5 @@
-//! **Fast-Forward** is a library for searching items in a (large) list _faster_ than an `Iterator` ([`std::iter::Iterator::filter`]).
+//! **Fast-Forward** is a library for filtering items in a (large) list, _faster_ than an `Iterator` ([`std::iter::Iterator::filter`]).
+//!
 //! This _faster_ is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the list.
 //!
 //! An Index has two parts, a [`Key`] (item to search for) and a position (the index in the list) [`Idx`].
@@ -6,32 +7,31 @@
 //! ## A simple Example:
 //!
 //! ```text
-//! let _list_with_names = vec!["Paul", "Jasmin", "Inge", "Paul", ...];
+//! let _list_with_names = vec!["Paul", "Jon", "Inge", "Paul", ...];
 //! ```
 //!
 //! Index `Map(name, idx's)`:
 //!
 //! ```text
-//!  Key       | Idx
-//! -------------------
-//!  "Paul"    | 0, 3
-//!  "Jasmin"  | 1
-//!  "Inge"    | 2
-//!   ...      | ...
+//!  Key     | Idx
+//! ---------------
+//!  "Paul"  | 0, 3
+//!  "Jon"   | 1
+//!  "Inge"  | 2
+//!   ...    | ...
 //! ```
 //!
-//! To Find the [`Key::Str("Jasmin")`] with the [`Op::EQ`] is only one step necessary.
+//! To Find the [`Key::Str("Jon")`] with the [`Op::EQ`] is only one step necessary.
 //!
-
 pub mod error;
 pub mod index;
 pub mod query;
 
-/// `Idx` is the index/position in a List ([`std::vec::Vec`]).
-pub type Idx = usize;
-
 /// Default Result for index with the Ok(T) value or en [`error::Error`].
 type Result<T = ()> = std::result::Result<T, error::Error>;
+
+/// `Idx` is the index/position in a List ([`std::vec::Vec`]).
+pub type Idx = usize;
 
 /// Supported types for quering/filtering [`Predicate`].
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -5,7 +5,10 @@
 
 ⏩ Quering lists blazing fast.
 
-**Fast-Forward** is a library for searching items in a (large) list _faster_ than an `Iterator` ([`std::iter::Iterator::filter`]).
+# Overview
+
+**Fast-Forward** is a library for filtering items in a (large) list, _faster_ than an `Iterator` ([`std::iter::Iterator::filter`]).
+
 This _faster_ is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the list.
 
 An Index has two parts, a [`Key`] (item to search for) and a position (the index in the list) [`Idx`].
@@ -13,21 +16,21 @@ An Index has two parts, a [`Key`] (item to search for) and a position (the index
 ### A simple Example:
 
 ```
-let _list_with_names = vec!["Paul", "Jasmin", "Inge", "Paul", ...];
+let _list_with_names = vec!["Paul", "Jon", "Inge", "Paul", ...];
 ```
 
 Index `Map(name, idx's)`:
 
 ```
- Key       | Idx
--------------------
- "Paul"    | 0, 3
- "Jasmin"  | 1
- "Inge"    | 2
-  ...      | ...
+ Key     | Idx
+---------------
+ "Paul"  | 0, 3
+ "Jon"   | 1
+ "Inge"  | 2
+  ...    | ...
 ```
 
-To Find the [`Key::Str("Jasmin")`] with the [`Op::EQ`] is only one step necessary.
+To Find the [`Key::Str("Jon")`] with the [`Op::EQ`] is only one step necessary.
 
 
 <hr>
