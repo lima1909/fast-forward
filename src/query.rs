@@ -39,7 +39,7 @@ where
     Q: Queryable<'k>,
     B: BinOp,
 {
-    pub fn new(q: &'q Q) -> Self {
+    pub const fn new(q: &'q Q) -> Self {
         Self { q, _b: PhantomData }
     }
 
@@ -93,7 +93,7 @@ struct Ors<B: BinOp = HashSet<Idx>> {
 }
 
 impl<B: BinOp> Ors<B> {
-    fn new(b: B) -> Self {
+    const fn new(b: B) -> Self {
         Self {
             first: b,
             ors: vec![],

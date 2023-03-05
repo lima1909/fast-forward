@@ -11,7 +11,7 @@
 
 This _faster_ is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the list.
 
-An Index has two parts, a [`Key`] (item to search for) and a position (the index in the list) [`Idx`].
+An Index has two parts, a [`Key`] (item to searching for) and a position (the index in the list) [`Idx`].
 
 ### A simple Example:
 

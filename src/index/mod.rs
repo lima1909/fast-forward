@@ -71,7 +71,7 @@ pub struct FieldStore<'k, T> {
 }
 
 impl<'k, T> FieldStore<'k, T> {
-    pub fn new(
+    pub const fn new(
         field: &'static str,
         field_value_fn: FieldValueFn<'k, T>,
         store: Box<dyn FilterableStore<'k> + 'k>,
