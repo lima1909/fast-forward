@@ -48,15 +48,17 @@ where
         P: Into<Predicate<'k>>,
     {
         let idxs = self.q.filter(p.into());
-        let ors = Ors::new(B::from_idx(idxs));
-        Query { q: self.q, ors }
+        Query {
+            q: self.q,
+            ors: Ors::new(idxs),
+        }
     }
 }
 
 /// Query combines different filter. Filters can be linked using `and` and `or`.
 pub struct Query<'q, Q, B: BinOp = HashSet<Idx>> {
     q: &'q Q,
-    ors: Ors<B>,
+    ors: Ors<'q, B>,
 }
 
 impl<'q, 'k, Q, B> Query<'q, Q, B>
@@ -87,15 +89,17 @@ where
     }
 }
 
-struct Ors<B: BinOp = HashSet<Idx>> {
-    first: B,
+struct Ors<'i, B: BinOp = HashSet<Idx>> {
+    idxs: &'i [Idx], // lazy, convert to first<B>, only if added more B's with and/or
+    first: Option<B>,
     ors: Vec<B>,
 }
 
-impl<B: BinOp> Ors<B> {
-    const fn new(b: B) -> Self {
+impl<'i, B: BinOp> Ors<'i, B> {
+    const fn new(idxs: &'i [Idx]) -> Self {
         Self {
-            first: b,
+            idxs,
+            first: None,
             ors: vec![],
         }
     }
@@ -108,7 +112,14 @@ impl<B: BinOp> Ors<B> {
     #[inline]
     fn and(&mut self, b: B) {
         if self.ors.is_empty() {
-            self.first = self.first.and(&b);
+            let first = match &mut self.first {
+                Some(first) => first,
+                None => {
+                    self.first = Some(B::from_idx(self.idxs));
+                    self.first.as_mut().unwrap()
+                }
+            };
+            self.first = Some(first.and(&b));
         } else {
             let i = self.ors.len() - 1;
             self.ors[i] = self.ors[i].and(&b);
@@ -116,12 +127,24 @@ impl<B: BinOp> Ors<B> {
     }
 
     #[inline]
-    fn exec(mut self) -> Vec<Idx> {
+    fn exec(self) -> Vec<Idx> {
+        if self.ors.is_empty() {
+            return match self.first {
+                Some(first) => first.to_idx(),
+                None => Vec::from_iter(self.idxs.iter().cloned()),
+            };
+        }
+
+        let mut first = match self.first {
+            Some(first) => first,
+            None => B::from_idx(self.idxs),
+        };
+
         // TODO: maybe it is better a sorted Vec by B.len() before executed???
         for b in self.ors {
-            self.first = self.first.or(&b);
+            first = first.or(&b);
         }
-        self.first.to_idx()
+        first.to_idx()
     }
 }
 
