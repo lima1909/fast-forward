@@ -102,7 +102,7 @@ impl<'i, T> Indices<'i, T> {
     pub fn new(
         field: &'static str,
         field_value_fn: FieldValueFn<'i, T>,
-        store: Box<dyn FilterableStore<'i> + 'i>,
+        store: impl FilterableStore<'i> + 'i,
     ) -> Self {
         let mut s = Self(Vec::new());
         s.add_idx(field, field_value_fn, store);
@@ -113,9 +113,10 @@ impl<'i, T> Indices<'i, T> {
         &mut self,
         field: &'static str,
         field_value_fn: FieldValueFn<'i, T>,
-        store: Box<dyn FilterableStore<'i> + 'i>,
+        store: impl FilterableStore<'i> + 'i,
     ) {
-        self.0.push(FieldStore::new(field, field_value_fn, store))
+        self.0
+            .push(FieldStore::new(field, field_value_fn, Box::new(store)))
     }
 
     pub fn get_idx(&self, idx_name: &str) -> &FieldStore<'i, T> {
@@ -169,23 +170,19 @@ mod tests {
     fn person_indices() {
         let mut indices = Indices::new(
             "pk",
-            |p: &Person| Key::Usize(p.0),
-            Box::<UIntVecIndex<Unique>>::default(),
+            |p: &Person| p.0.into(),
+            UIntVecIndex::<Unique>::default(),
         );
         indices.add_idx(
             "second",
-            |p: &Person| Key::Usize(p.1),
-            Box::<UIntVecIndex<Multi>>::default(),
+            |p: &Person| p.1.into(),
+            UIntVecIndex::<Multi>::default(),
         );
-        indices.add_idx(
-            "name",
-            |p: &Person| Key::Str(p.2),
-            Box::<UniqueStrIdx>::default(),
-        );
+        indices.add_idx("name", |p: &Person| Key::Str(p.2), UniqueStrIdx::default());
         indices.add_idx(
             "gender",
             |p: &Person| p.3.into(),
-            Box::<UIntVecIndex<Multi>>::default(),
+            UIntVecIndex::<Multi>::default(),
         );
 
         indices
