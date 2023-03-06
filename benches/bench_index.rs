@@ -37,7 +37,7 @@ fn list_index(c: &mut Criterion) {
     let mut group = c.benchmark_group("index");
     group.bench_function("ff: pk", |b| {
         b.iter(|| {
-            let i = q.query(eq("pk", FIND_ID)).exec()[0];
+            let i = q.query(eq("pk", FIND_ID)).exec().next().unwrap();
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
@@ -53,7 +53,9 @@ fn list_index(c: &mut Criterion) {
             let i = q
                 .query(eq("pk", FIND_ID))
                 .and(eq("name", &FIND_PERSON.1))
-                .exec()[0];
+                .exec()
+                .next()
+                .unwrap();
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });

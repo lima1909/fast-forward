@@ -84,7 +84,7 @@ where
         self
     }
 
-    pub fn exec(self) -> Vec<Idx> {
+    pub fn exec(self) -> Iter<'q> {
         self.ors.exec()
     }
 }
@@ -127,11 +127,11 @@ impl<'i, B: BinOp> Ors<'i, B> {
     }
 
     #[inline]
-    fn exec(self) -> Vec<Idx> {
+    fn exec(mut self) -> Iter<'i> {
         if self.ors.is_empty() {
-            return match self.first {
-                Some(first) => first.to_idx(),
-                None => Vec::from_iter(self.idxs.iter().cloned()),
+            return match self.first.take() {
+                Some(first) => first.iter(),
+                None => Iter::Slice(self.idxs.iter()),
             };
         }
 
@@ -144,14 +144,33 @@ impl<'i, B: BinOp> Ors<'i, B> {
         for b in self.ors {
             first = first.or(&b);
         }
-        first.to_idx()
+        first.iter()
+    }
+}
+
+pub enum Iter<'a> {
+    Roaring(roaring::bitmap::IntoIter),
+    HashSet(std::collections::hash_set::IntoIter<Idx>),
+    Slice(std::slice::Iter<'a, Idx>),
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = Idx;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Iter::Slice(it) => it.next().copied(),
+            Iter::Roaring(it) => it.next().map(|u| u as usize),
+            Iter::HashSet(it) => it.next(),
+        }
     }
 }
 
 /// Support for binary logical operations, like `or` and `and`.
 pub trait BinOp {
+    //} <'a>: IntoIterator<Item = Idx, IntoIter = Iter<'a>> {
     fn from_idx(idx: &[Idx]) -> Self;
-    fn to_idx(&self) -> Vec<Idx>;
+    fn iter<'a>(self) -> Iter<'a>;
 
     fn or(&self, idx: &Self) -> Self;
     fn and(&self, idx: &Self) -> Self;
@@ -165,8 +184,8 @@ impl BinOp for HashSet<Idx> {
     }
 
     #[inline]
-    fn to_idx(&self) -> Vec<Idx> {
-        self.iter().copied().collect()
+    fn iter<'a>(self) -> Iter<'a> {
+        Iter::HashSet(self.into_iter())
     }
 
     #[inline]
@@ -187,8 +206,8 @@ impl BinOp for roaring::RoaringBitmap {
     }
 
     #[inline]
-    fn to_idx(&self) -> Vec<Idx> {
-        self.iter().map(|i| i as usize).collect()
+    fn iter<'a>(self) -> Iter<'a> {
+        Iter::Roaring(self.into_iter())
     }
 
     #[inline]

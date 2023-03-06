@@ -106,15 +106,15 @@ mod tests {
             idx.insert_str("Paul", 6).unwrap();
 
             let b = idx.query_builder::<HashSet<Idx>>();
-            let r = b.query("Mario").or("Paul").exec();
+            let r: Vec<Idx> = b.query("Mario").or("Paul").exec().collect();
             assert!(r.contains(&8));
             assert!(r.contains(&6));
 
-            let r = b.query("Paul").or("Blub").exec();
-            assert!(r.contains(&6));
+            let mut r = b.query("Paul").or("Blub").exec();
+            assert_eq!(r.next(), Some(6));
 
-            let r = b.query("Blub").or("Mario").exec();
-            assert!(r.contains(&8));
+            let mut r = b.query("Blub").or("Mario").exec();
+            assert_eq!(r.next(), Some(8));
         }
 
         #[test]
