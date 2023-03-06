@@ -145,8 +145,25 @@ mod tests {
     };
     use std::collections::HashSet;
 
-    #[derive(Default, Debug)]
-    struct Person(usize, usize, &'static str);
+    #[derive(Debug, Clone, Copy)]
+    enum Gender {
+        Male,
+        Female,
+        None,
+    }
+
+    impl<'a> From<Gender> for Key<'a> {
+        fn from(g: Gender) -> Self {
+            match g {
+                Gender::None => Key::Usize(0),
+                Gender::Male => Key::Usize(1),
+                Gender::Female => Key::Usize(2),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct Person(usize, usize, &'static str, Gender);
 
     #[test]
     fn person_indices() {
@@ -165,9 +182,21 @@ mod tests {
             |p: &Person| Key::Str(p.2),
             Box::<UniqueStrIdx>::default(),
         );
+        indices.add_idx(
+            "gender",
+            |p: &Person| p.3.into(),
+            Box::<UIntVecIndex<Multi>>::default(),
+        );
 
-        indices.insert(&Person(3, 7, "Jasmin"), 0).unwrap();
-        indices.insert(&Person(41, 7, "Mario"), 1).unwrap();
+        indices
+            .insert(&Person(3, 7, "Jasmin", Gender::Female), 0)
+            .unwrap();
+        indices
+            .insert(&Person(41, 7, "Mario", Gender::Male), 1)
+            .unwrap();
+        indices
+            .insert(&Person(111, 234, "Paul", Gender::Male), 99)
+            .unwrap();
 
         let b = indices.query_builder::<HashSet<Idx>>();
 
@@ -189,6 +218,12 @@ mod tests {
         let r = b.query(eq("name", "Jasmin")).or(eq("name", "Mario")).exec();
         assert!(r.contains(&0));
         assert!(r.contains(&1));
+
+        let r = b.query(eq("gender", Gender::Male)).exec();
+        assert!(r.contains(&99));
+        assert!(r.contains(&1));
+        let r = b.query(eq("gender", Gender::Female)).exec();
+        assert_eq!(r, vec![0]);
     }
 
     struct Idxs<'k>(
@@ -212,7 +247,7 @@ mod tests {
         idx_u.insert_idx(2, 2)?;
         idx_u.insert_idx(99, 0)?;
 
-        let p = Person(3, 7, "a");
+        let p = Person(3, 7, "a", Gender::None);
         let mut idx_s = UniqueStrIdx::default();
         idx_s.insert_str(p.2, 1)?;
         idx_s.insert_str("b", 2)?;
@@ -234,7 +269,7 @@ mod tests {
 
     #[test]
     fn collect_idxfilters() {
-        let p = Person(3, 7, "a");
+        let p = Person(3, 7, "a", Gender::None);
         let mut idx_s = UniqueStrIdx::default();
         idx_s.insert_str(p.2, 1).unwrap();
 
