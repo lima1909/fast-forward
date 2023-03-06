@@ -65,14 +65,14 @@ type FieldValueFn<'k, T> = fn(&T) -> Key<'k>;
 
 /// `FieldStore` extend a [`Store`] with an field-name and a function to get the value of an given object-type `<T>`
 pub struct FieldStore<'k, T> {
-    field: &'static str,
+    field: &'k str,
     field_value_fn: FieldValueFn<'k, T>,
     pub store: Box<dyn FilterableStore<'k> + 'k>,
 }
 
 impl<'k, T> FieldStore<'k, T> {
     pub const fn new(
-        field: &'static str,
+        field: &'k str,
         field_value_fn: FieldValueFn<'k, T>,
         store: Box<dyn FilterableStore<'k> + 'k>,
     ) -> Self {
@@ -100,7 +100,7 @@ impl<'k, T> Queryable<'k> for Indices<'k, T> {
 
 impl<'i, T> Indices<'i, T> {
     pub fn new(
-        field: &'static str,
+        field: &'i str,
         field_value_fn: FieldValueFn<'i, T>,
         store: impl FilterableStore<'i> + 'i,
     ) -> Self {
@@ -111,7 +111,7 @@ impl<'i, T> Indices<'i, T> {
 
     pub fn add_idx(
         &mut self,
-        field: &'static str,
+        field: &'i str,
         field_value_fn: FieldValueFn<'i, T>,
         store: impl FilterableStore<'i> + 'i,
     ) {

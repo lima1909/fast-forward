@@ -4,8 +4,8 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use fast_forward::index::uint::UIntVecIndex;
 use fast_forward::index::{Indices, Unique};
-use fast_forward::query::BinOp;
-use fast_forward::{Idx, Key, Op, Predicate};
+use fast_forward::query::{BinOp, Queryable};
+use fast_forward::{eq, Idx, Key};
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
@@ -20,27 +20,27 @@ fn list_index(c: &mut Criterion) {
 
     // create search index
     let uint_idx = UIntVecIndex::<Unique>::with_capacity(HOW_MUCH_PERSON);
-    let mut idx = Indices::new("pk", |p: &Person| Key::Usize(p.0), Box::new(uint_idx));
+    let mut idx = Indices::new("pk", |p: &Person| Key::Usize(p.0), uint_idx);
 
     for i in 0..=HOW_MUCH_PERSON {
         idx.insert(&Person(i, "Jasmin"), i).unwrap();
     }
 
-    let idx = idx.get_idx("pk");
-    let p = Predicate::new(Op::EQ, Key::Usize(FIND_ID));
+    let q = idx.query_builder::<HashSet<Idx>>();
 
     // group benchmark
     let mut group = c.benchmark_group("index");
     group.bench_function("list_index", |b| {
         b.iter(|| {
-            let i = idx.store.filter(p.clone())[0];
+            let i = q.query(eq("pk", FIND_ID)).exec()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
 
     group.bench_function("vector", |b| {
         b.iter(|| {
-            assert_eq!(&FIND_PERSON, v.iter().find(|p| p.0 == FIND_ID).unwrap());
+            let v: Vec<&Person> = v.iter().filter(|p| p.0 == FIND_ID).collect();
+            assert_eq!(&FIND_PERSON, v[0]);
         })
     });
 
