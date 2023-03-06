@@ -61,7 +61,7 @@ pub trait OpsFilter<'k>: Filterable<'k> {
 
 impl<'k, F: Filterable<'k>> OpsFilter<'k> for F {}
 
-type FieldValueFn<'k, T> = fn(&T) -> Key<'k>;
+type FieldValueFn<'k, T> = fn(&'k T) -> Key<'k>;
 
 /// `FieldStore` extend a [`Store`] with an field-name and a function to get the value of an given object-type `<T>`
 pub struct FieldStore<'k, T> {
@@ -123,7 +123,7 @@ impl<'i, T> Indices<'i, T> {
         self.0.iter().find(|i| i.field == idx_name).unwrap()
     }
 
-    pub fn insert(&mut self, t: &T, idx: Idx) -> Result {
+    pub fn insert(&mut self, t: &'i T, idx: Idx) -> Result {
         for s in &mut self.0 {
             let key = (s.field_value_fn)(t);
             s.store.insert(key, idx)?;
@@ -164,10 +164,16 @@ mod tests {
     }
 
     #[derive(Debug)]
-    struct Person(usize, usize, &'static str, Gender);
+    struct Person(usize, usize, String, Gender);
 
     #[test]
     fn person_indices() {
+        let persons = vec![
+            Person(3, 7, "Jasmin".to_string(), Gender::Female),
+            Person(41, 7, "Mario".to_string(), Gender::Male),
+            Person(111, 234, "Paul".to_string(), Gender::Male),
+        ];
+
         let mut indices = Indices::new(
             "pk",
             |p: &Person| p.0.into(),
@@ -178,22 +184,16 @@ mod tests {
             |p: &Person| p.1.into(),
             UIntVecIndex::<Multi>::default(),
         );
-        indices.add_idx("name", |p: &Person| Key::Str(p.2), UniqueStrIdx::default());
+        indices.add_idx("name", |p: &Person| (&p.2).into(), UniqueStrIdx::default());
         indices.add_idx(
             "gender",
             |p: &Person| p.3.into(),
             UIntVecIndex::<Multi>::default(),
         );
 
-        indices
-            .insert(&Person(3, 7, "Jasmin", Gender::Female), 0)
-            .unwrap();
-        indices
-            .insert(&Person(41, 7, "Mario", Gender::Male), 1)
-            .unwrap();
-        indices
-            .insert(&Person(111, 234, "Paul", Gender::Male), 99)
-            .unwrap();
+        indices.insert(&persons[0], 0).unwrap();
+        indices.insert(&persons[1], 1).unwrap();
+        indices.insert(&persons[2], 2).unwrap();
 
         let b = indices.query_builder::<HashSet<Idx>>();
 
@@ -217,7 +217,7 @@ mod tests {
         assert!(r.contains(&1));
 
         let r = b.query(eq("gender", Gender::Male)).exec();
-        assert!(r.contains(&99));
+        assert!(r.contains(&2));
         assert!(r.contains(&1));
         let r = b.query(eq("gender", Gender::Female)).exec();
         assert_eq!(r, vec![0]);
@@ -244,9 +244,9 @@ mod tests {
         idx_u.insert_idx(2, 2)?;
         idx_u.insert_idx(99, 0)?;
 
-        let p = Person(3, 7, "a", Gender::None);
+        let p = Person(3, 7, "a".to_string(), Gender::None);
         let mut idx_s = UniqueStrIdx::default();
-        idx_s.insert_str(p.2, 1)?;
+        idx_s.insert_str(&p.2, 1)?;
         idx_s.insert_str("b", 2)?;
         idx_s.insert_str("z", 0)?;
 
@@ -266,9 +266,9 @@ mod tests {
 
     #[test]
     fn collect_idxfilters() {
-        let p = Person(3, 7, "a", Gender::None);
+        let p = Person(3, 7, "a".to_string(), Gender::None);
         let mut idx_s = UniqueStrIdx::default();
-        idx_s.insert_str(p.2, 1).unwrap();
+        idx_s.insert_str(&p.2, 1).unwrap();
 
         let idxs = Idxs(Box::<PkUintIdx>::default(), Box::new(idx_s));
 

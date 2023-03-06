@@ -70,6 +70,12 @@ impl<'a> From<&'a str> for Key<'a> {
     }
 }
 
+impl<'a> From<&'a String> for Key<'a> {
+    fn from(s: &'a String) -> Self {
+        Key::Str(s)
+    }
+}
+
 /// Operations are primarily compare functions, like equal, greater than and so on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Op {
