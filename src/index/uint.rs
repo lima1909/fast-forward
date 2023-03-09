@@ -215,7 +215,7 @@ mod tests {
             i.insert_idx(2, 2).unwrap();
             i.insert_idx(2, 1).unwrap();
 
-            assert_eq!(i.eq(2), [2, 1]);
+            assert_eq!(i.eq(2), [1, 2]);
         }
     }
 }

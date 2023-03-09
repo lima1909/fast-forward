@@ -1,10 +1,11 @@
 use std::collections::HashSet;
+use std::ops::BitAnd;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use fast_forward::index::map::UniqueStrIdx;
 use fast_forward::index::uint::UIntVecIndex;
-use fast_forward::index::{Indices, Unique};
+use fast_forward::index::{Index, Indices, Multi, Unique};
 use fast_forward::query::{BinOp, Queryable};
 use fast_forward::{eq, Idx, Key};
 
@@ -73,9 +74,16 @@ fn list_index(c: &mut Criterion) {
 }
 
 fn bit_operation(c: &mut Criterion) {
+    let mut multi_1 = Multi::new(0);
+    let mut multi_2 = Multi::new(0);
+
     let mut v = Vec::new();
     for i in 0..50 {
         v.push(i);
+        if i > 0 {
+            multi_1.add(i).unwrap();
+            multi_2.add(i).unwrap();
+        }
     }
 
     let lbop = HashSet::<Idx>::from_idx(&v);
@@ -95,6 +103,24 @@ fn bit_operation(c: &mut Criterion) {
             let lbop = HashSet::<Idx>::from_idx(&v);
             let rbop = HashSet::<Idx>::from_idx(&v);
             let r = lbop.and(&rbop);
+            assert_eq!(50, r.len());
+        })
+    });
+
+    let lbop = roaring::RoaringBitmap::from_idx(&v);
+    let rbop = roaring::RoaringBitmap::from_idx(&v);
+
+    // group benchmark
+    group.bench_function("roaring", |b| {
+        b.iter(|| {
+            let r = lbop.and(&rbop);
+            assert_eq!(50, r.len());
+        })
+    });
+
+    group.bench_function("multi", |b| {
+        b.iter(|| {
+            let r = multi_1.bitand(&multi_2).unwrap();
             assert_eq!(50, r.len());
         })
     });

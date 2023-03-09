@@ -157,7 +157,7 @@ mod tests {
             i.insert_str("Jasmin", 2).unwrap();
             i.insert_str("Jasmin", 1).unwrap();
 
-            assert_eq!(i.eq("Jasmin"), &[2, 1]);
+            assert_eq!(i.eq("Jasmin"), &[1, 2]);
         }
     }
 }
