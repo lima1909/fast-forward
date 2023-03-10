@@ -85,34 +85,41 @@ fn bit_operation(c: &mut Criterion) {
         }
     }
 
-    let lbop = HashSet::<Idx>::from_idx(&v);
-    let rbop = HashSet::<Idx>::from_idx(&v);
+    // let lbop = HashSet::<Idx>::from_idx(&v);
+    // let rbop = HashSet::<Idx>::from_idx(&v);
 
     // group benchmark
     let mut group = c.benchmark_group("bitop");
-    group.bench_function("hashset", |b| {
-        b.iter(|| {
-            let r = lbop.and(&rbop);
-            assert_eq!(50, r.len());
-        })
-    });
+    // group.bench_function("hashset", |b| {
+    //     b.iter(|| {
+    //         let r = lbop.and(&rbop);
+    //         assert_eq!(50, r.len());
+    //     })
+    // });
 
-    group.bench_function("from_idx", |b| {
-        b.iter(|| {
-            let lbop = HashSet::<Idx>::from_idx(&v);
-            let rbop = HashSet::<Idx>::from_idx(&v);
-            let r = lbop.and(&rbop);
-            assert_eq!(50, r.len());
-        })
-    });
+    // group.bench_function("from_idx", |b| {
+    //     b.iter(|| {
+    //         let lbop = HashSet::<Idx>::from_idx(&v);
+    //         let rbop = HashSet::<Idx>::from_idx(&v);
+    //         let r = lbop.and(&rbop);
+    //         assert_eq!(50, r.len());
+    //     })
+    // });
 
     let lbop = roaring::RoaringBitmap::from_idx(&v);
     let rbop = roaring::RoaringBitmap::from_idx(&v);
 
     // group benchmark
-    group.bench_function("roaring", |b| {
+    group.bench_function("roaring and", |b| {
         b.iter(|| {
             let r = lbop.and(&rbop);
+            assert_eq!(50, r.len());
+        })
+    });
+
+    group.bench_function("roaring or", |b| {
+        b.iter(|| {
+            let r = lbop.or(&rbop);
             assert_eq!(50, r.len());
         })
     });

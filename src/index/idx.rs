@@ -80,9 +80,8 @@ impl Index for Multi {
 
     #[inline]
     fn add(&mut self, i: Idx) -> Result {
-        match self.0.binary_search(&i) {
-            Ok(_) => {} // i is already in vec
-            Err(index) => self.0.insert(index, i),
+        if let Err(pos) = self.0.binary_search(&i) {
+            self.0.insert(pos, i);
         }
         Ok(())
     }
@@ -131,18 +130,47 @@ impl Or for Multi {
     fn or(&self, other: &[Idx]) -> Multi {
         match (self.0.is_empty(), other.is_empty()) {
             (false, false) => {
-                let mut v: Vec<Idx> = (self.0[..]).into();
-                // v.extend_from_slice(&self.0[..]);
+                let sslice = &self.0[..];
+                let oslice = other;
 
-                // v.extend_from_slice(other);
-                // v.sort();
-                // v.dedup();
+                let ls = sslice.len();
+                let lo = oslice.len();
 
-                for o in other {
-                    match v.binary_search(o) {
-                        Ok(_) => {} // i is already in vec
-                        Err(index) => v.insert(index, *o),
+                let mut spos = 0;
+                let mut opos = 0;
+
+                let mut v = Vec::with_capacity(ls + lo);
+
+                loop {
+                    if spos == ls || opos == lo {
+                        break;
+                    } else {
+                        let ss = sslice[spos];
+                        let oo = oslice[opos];
+
+                        use std::cmp::Ordering::*;
+                        match ss.cmp(&oo) {
+                            Equal => {
+                                v.push(oo);
+                                opos += 1;
+                                spos += 1;
+                            }
+                            Less => {
+                                v.push(ss);
+                                spos += 1;
+                            }
+                            Greater => {
+                                v.push(oo);
+                                opos += 1;
+                            }
+                        }
                     }
+                }
+
+                if spos < ls {
+                    v.extend(self.0[spos..].iter());
+                } else if opos == lo {
+                    v.extend(other[opos..].iter());
                 }
 
                 Multi(v)
@@ -184,15 +212,35 @@ mod tests {
         use super::super::*;
 
         #[test]
-        fn and_1_to_10() {
+        fn or_1_to_10() {
             let m1 = Multi::new(1);
             let mut m2 = Multi::new(1);
             m2.add(0).unwrap();
 
-            let mut r = Multi::new(0);
-            r.add(1).unwrap();
+            // 1 - 0 1 => 0 1
+            assert_eq!(m1.or(m2.get()).get(), &vec![0, 1]);
+            assert_eq!(m2.or(m1.get()).get(), &vec![0, 1]);
+        }
 
-            assert_eq!(m1.or(m2.get()), r);
+        #[test]
+        fn or_10_to_1() {
+            let mut m1 = Multi::new(1);
+            m1.add(0).unwrap();
+            let m2 = Multi::new(1);
+
+            // 0 1 - 1 => 0 1
+            assert_eq!(m1.or(m2.get()).get(), &vec![0, 1]);
+            assert_eq!(m2.or(m1.get()).get(), &vec![0, 1]);
+        }
+
+        #[test]
+        fn or_unique_5_to_1_99() {
+            let u = Unique::new(5);
+            let mut m = Multi::new(99);
+            m.add(1).unwrap();
+
+            // 5 - 1 99 => 1 5 99
+            assert_eq!(m.or(u.get()).get(), &vec![1, 5, 99]);
         }
     }
 
