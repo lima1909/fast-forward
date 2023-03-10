@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData, ops::BitAnd};
+use std::{fmt::Debug, marker::PhantomData};
 
 use crate::{error::Error, Idx, Result};
 
@@ -10,7 +10,12 @@ pub trait Index: Debug {
     fn len(&self) -> usize;
 }
 
-#[derive(Debug, Default, Clone)]
+// Logical `And`, the intersection of two Inices.
+pub trait And: Sized {
+    fn and(&self, other: &[Idx]) -> Option<Self>;
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Unique([Idx; 1]);
 
 impl Index for Unique {
@@ -35,16 +40,14 @@ impl Index for Unique {
     }
 }
 
-impl BitAnd for &Unique {
-    type Output = Option<Unique>;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
+impl And for Unique {
+    fn and(&self, other: &[Idx]) -> Option<Self> {
         let idx = self.0[0];
-        if idx != rhs.0[0] {
-            return None;
+        if other.contains(&idx) {
+            return Some(Unique([idx]));
         }
 
-        Some(Unique([idx]))
+        None
     }
 }
 
@@ -77,20 +80,17 @@ impl Index for Multi {
     }
 }
 
-impl BitAnd for &Multi {
-    type Output = Option<Multi>;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
-        let mut small = &self.0;
-        let mut b = &rhs.0;
+impl And for Multi {
+    fn and(&self, other: &[Idx]) -> Option<Self> {
+        let mut small = &self.0[..];
+        let mut b = other;
 
         if b.len() < small.len() {
-            small = &rhs.0;
+            small = other;
             b = &self.0;
         }
 
         let mut v = Vec::with_capacity(small.len());
-
         let len = b.len();
         let mut found = 0;
 
@@ -106,23 +106,6 @@ impl BitAnd for &Multi {
         }
 
         Some(Multi(v))
-
-        // let mut small = &self.0;
-        // let mut b = &rhs.0;
-
-        // if b.len() < small.len() {
-        //     small = &rhs.0;
-        //     b = &self.0;
-        // }
-
-        // let mut v = Vec::with_capacity(small.len());
-        // for i in small.iter() {
-        //     if b.contains(i) {
-        //         v.push(*i);
-        //     }
-        // }
-
-        // Some(Multi(v))
     }
 }
 
@@ -151,7 +134,7 @@ impl<I: Index> Positions<I> {
 #[cfg(test)]
 mod tests {
 
-    mod multi {
+    mod and {
         use super::super::*;
 
         #[test]
@@ -160,7 +143,7 @@ mod tests {
             let mut m2 = Multi::new(1);
             m2.add(0).unwrap();
 
-            assert_eq!(m1.bitand(&m2).unwrap(), Multi::new(1));
+            assert_eq!(m1.and(m2.get()).unwrap(), Multi::new(1));
         }
 
         #[test]
@@ -169,7 +152,7 @@ mod tests {
             m1.add(0).unwrap();
             let m2 = Multi::new(1);
 
-            assert_eq!(m1.bitand(&m2).unwrap(), Multi::new(1));
+            assert_eq!(m1.and(m2.get()).unwrap(), Multi::new(1));
         }
 
         #[test]
@@ -183,7 +166,64 @@ mod tests {
             m2.add(200).unwrap();
 
             // 1 0 99 - 1 99 200 => 1 99
-            assert_eq!(m1.bitand(&m2).unwrap(), Multi(vec![1, 99]));
+            assert_eq!(m1.and(m2.get()).unwrap(), Multi(vec![1, 99]));
+        }
+
+        #[test]
+        fn and_many_duplicate() {
+            let mut m1 = Multi::new(1);
+            m1.add(99).unwrap();
+            m1.add(0).unwrap();
+            m1.add(99).unwrap();
+
+            let mut m2 = Multi::new(1);
+            m2.add(99).unwrap();
+            m2.add(200).unwrap();
+            m2.add(1).unwrap();
+
+            // 1 (99) 0 99 - 1 99 200 (1) => 1 99
+            assert_eq!(m1.and(m2.get()).unwrap(), Multi(vec![1, 99]));
+        }
+
+        #[test]
+        fn and_many_and_unique() {
+            let mut m1 = Multi::new(1);
+            m1.add(0).unwrap();
+            m1.add(99).unwrap();
+
+            let mut m2 = Multi::new(1);
+            m2.add(99).unwrap();
+            m2.add(200).unwrap();
+
+            // 1 0 99 - 1 99 200 - 99 => 99
+            assert_eq!(
+                m1.and(m2.get())
+                    .unwrap()
+                    .and(Unique::new(99).get())
+                    .unwrap(),
+                Multi(vec![99])
+            );
+        }
+
+        #[test]
+        fn and_unique_and_many() {
+            let mut m1 = Multi::new(1);
+            m1.add(0).unwrap();
+            m1.add(99).unwrap();
+
+            let mut m2 = Multi::new(1);
+            m2.add(99).unwrap();
+            m2.add(200).unwrap();
+
+            // 99 - 1 99 200 - 1 0 99 => 99
+            assert_eq!(
+                Unique::new(99)
+                    .and(m2.get())
+                    .unwrap()
+                    .and(m1.get())
+                    .unwrap(),
+                Unique([99])
+            );
         }
     }
 }

@@ -1,11 +1,10 @@
 use std::collections::HashSet;
-use std::ops::BitAnd;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use fast_forward::index::map::UniqueStrIdx;
 use fast_forward::index::uint::UIntVecIndex;
-use fast_forward::index::{Index, Indices, Multi, Unique};
+use fast_forward::index::{And, Index, Indices, Multi, Unique};
 use fast_forward::query::{BinOp, Queryable};
 use fast_forward::{eq, Idx, Key};
 
@@ -120,7 +119,7 @@ fn bit_operation(c: &mut Criterion) {
 
     group.bench_function("multi", |b| {
         b.iter(|| {
-            let r = multi_1.bitand(&multi_2).unwrap();
+            let r = multi_1.and(multi_2.get()).unwrap();
             assert_eq!(50, r.len());
         })
     });
