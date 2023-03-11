@@ -62,9 +62,10 @@ impl Or for Unique {
             return Multi(vec![self.0[0]]);
         }
 
-        let mut v = Vec::with_capacity(1 + other.len());
-        v.extend_from_slice(other);
-        if !v.contains(&self.0[0]) {}
+        let mut v = Vec::from_iter(other.iter().copied());
+        if !v.contains(&self.0[0]) {
+            v.push(self.0[0])
+        }
         Multi(v)
     }
 }
@@ -100,23 +101,28 @@ impl Index for Multi {
 impl And for Multi {
     fn and(&self, other: &[Idx]) -> Option<Self> {
         let mut small = &self.0[..];
-        let mut b = other;
+        let mut big = other;
 
-        if b.len() < small.len() {
+        let mut ls = small.len();
+        let mut lb = big.len();
+
+        if lb < ls {
             small = other;
-            b = &self.0;
+            big = &self.0;
+            ls = other.len();
+            lb = self.0.len();
         }
 
-        let mut v = Vec::with_capacity(small.len());
-        let len = b.len();
-        let mut found = 0;
+        let mut v = Vec::with_capacity(ls);
+        let mut foundb = 0;
 
-        for i in small.iter() {
+        for ss in small.iter() {
             #[allow(clippy::needless_range_loop)]
-            for j in found..len {
-                if i == &b[j] {
-                    v.push(*i);
-                    found = j;
+            for j in foundb..lb {
+                let bb = big[j];
+                if ss == &bb {
+                    v.push(bb);
+                    foundb += 1;
                     break;
                 }
             }
@@ -130,6 +136,8 @@ impl Or for Multi {
     fn or(&self, other: &[Idx]) -> Multi {
         match (self.0.is_empty(), other.is_empty()) {
             (false, false) => {
+                use std::cmp::Ordering::*;
+
                 let sslice = &self.0[..];
                 let oslice = other;
 
@@ -141,28 +149,23 @@ impl Or for Multi {
 
                 let mut v = Vec::with_capacity(ls + lo);
 
-                loop {
-                    if spos == ls || opos == lo {
-                        break;
-                    } else {
-                        let ss = sslice[spos];
-                        let oo = oslice[opos];
+                while spos != ls && opos != lo {
+                    let ss = sslice[spos];
+                    let oo = oslice[opos];
 
-                        use std::cmp::Ordering::*;
-                        match ss.cmp(&oo) {
-                            Equal => {
-                                v.push(oo);
-                                opos += 1;
-                                spos += 1;
-                            }
-                            Less => {
-                                v.push(ss);
-                                spos += 1;
-                            }
-                            Greater => {
-                                v.push(oo);
-                                opos += 1;
-                            }
+                    match ss.cmp(&oo) {
+                        Equal => {
+                            v.push(oo);
+                            opos += 1;
+                            spos += 1;
+                        }
+                        Less => {
+                            v.push(ss);
+                            spos += 1;
+                        }
+                        Greater => {
+                            v.push(oo);
+                            opos += 1;
                         }
                     }
                 }
