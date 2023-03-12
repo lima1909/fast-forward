@@ -138,42 +138,48 @@ impl Or for Multi {
             (false, false) => {
                 use std::cmp::Ordering::*;
 
-                let sslice = &self.0[..];
-                let oslice = other;
+                let mut small = &self.0[..];
+                let mut big = other;
 
-                let ls = sslice.len();
-                let lo = oslice.len();
+                let mut ls = small.len();
+                let mut lb = big.len();
 
-                let mut spos = 0;
-                let mut opos = 0;
+                if lb < ls {
+                    small = other;
+                    big = &self.0;
+                    ls = other.len();
+                    lb = self.0.len();
+                }
 
-                let mut v = Vec::with_capacity(ls + lo);
+                let mut v = Vec::with_capacity(ls + lb);
+                let mut foundb = 0;
 
-                while spos != ls && opos != lo {
-                    let ss = sslice[spos];
-                    let oo = oslice[opos];
+                for ss in small {
+                    #[allow(clippy::needless_range_loop)]
+                    #[allow(clippy::mut_range_bound)]
+                    for j in foundb..lb {
+                        let bb = big[j];
 
-                    match ss.cmp(&oo) {
-                        Equal => {
-                            v.push(oo);
-                            opos += 1;
-                            spos += 1;
-                        }
-                        Less => {
-                            v.push(ss);
-                            spos += 1;
-                        }
-                        Greater => {
-                            v.push(oo);
-                            opos += 1;
+                        match ss.cmp(&bb) {
+                            Equal => {
+                                v.push(bb);
+                                foundb += 1;
+                                break;
+                            }
+                            Less => {
+                                v.push(*ss);
+                                break;
+                            }
+                            Greater => {
+                                v.push(bb);
+                                foundb += 1;
+                            }
                         }
                     }
                 }
 
-                if spos < ls {
-                    v.extend(self.0[spos..].iter());
-                } else if opos == lo {
-                    v.extend(other[opos..].iter());
+                if foundb < lb {
+                    v.extend(big[foundb..].iter());
                 }
 
                 Multi(v)
