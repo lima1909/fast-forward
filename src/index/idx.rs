@@ -116,11 +116,15 @@ impl And for Multi {
         let mut v = Vec::with_capacity(ls);
         let mut foundb = 0;
 
-        for ss in small.iter() {
+        for ss in small {
             #[allow(clippy::needless_range_loop)]
             for j in foundb..lb {
                 let bb = big[j];
-                if ss == &bb {
+
+                #[allow(clippy::comparison_chain)]
+                if ss < &bb {
+                    break;
+                } else if ss == &bb {
                     v.push(bb);
                     foundb += 1;
                     break;
@@ -155,6 +159,10 @@ impl Or for Multi {
                 let mut foundb = 0;
 
                 for ss in small {
+                    if foundb == lb {
+                        v.push(*ss);
+                    }
+
                     #[allow(clippy::needless_range_loop)]
                     #[allow(clippy::mut_range_bound)]
                     for j in foundb..lb {
@@ -216,6 +224,37 @@ impl<I: Index> Positions<I> {
 
 #[cfg(test)]
 mod tests {
+
+    mod overlapping {
+        use super::super::*;
+
+        #[test]
+        fn overlapping() {
+            let mut lm = Multi::new(0);
+            let mut lv = Vec::new();
+            for i in 0..50 {
+                lv.push(i);
+                if i > 0 {
+                    lm.add(i).unwrap();
+                }
+            }
+
+            let mut rm = Multi::new(25);
+            let mut rv = Vec::new();
+            for i in 25..75 {
+                rv.push(i);
+                if i > 25 {
+                    rm.add(i).unwrap();
+                }
+            }
+
+            assert_eq!(25, lm.and(rm.get()).unwrap().len());
+            assert_eq!(25, rm.and(lm.get()).unwrap().len());
+
+            assert_eq!(75, lm.or(rm.get()).len());
+            assert_eq!(75, rm.or(lm.get()).len());
+        }
+    }
 
     mod or {
         use super::super::*;

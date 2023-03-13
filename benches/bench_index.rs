@@ -73,68 +73,56 @@ fn list_index(c: &mut Criterion) {
 }
 
 fn bit_operation(c: &mut Criterion) {
-    let mut multi_1 = Multi::new(0);
-    let mut multi_2 = Multi::new(0);
-
-    let mut v = Vec::new();
+    let mut lm = Multi::new(0);
+    let mut lv = Vec::new();
     for i in 0..50 {
-        v.push(i);
+        lv.push(i);
         if i > 0 {
-            multi_1.add(i).unwrap();
-            multi_2.add(i).unwrap();
+            lm.add(i).unwrap();
         }
     }
 
-    // let lbop = HashSet::<Idx>::from_idx(&v);
-    // let rbop = HashSet::<Idx>::from_idx(&v);
+    let mut rm = Multi::new(25);
+    let mut rv = Vec::new();
+    for i in 25..75 {
+        rv.push(i);
+        if i > 25 {
+            rm.add(i).unwrap();
+        }
+    }
 
     // group benchmark
     let mut group = c.benchmark_group("bitop");
-    // group.bench_function("hashset", |b| {
-    //     b.iter(|| {
-    //         let r = lbop.and(&rbop);
-    //         assert_eq!(50, r.len());
-    //     })
-    // });
 
-    // group.bench_function("from_idx", |b| {
-    //     b.iter(|| {
-    //         let lbop = HashSet::<Idx>::from_idx(&v);
-    //         let rbop = HashSet::<Idx>::from_idx(&v);
-    //         let r = lbop.and(&rbop);
-    //         assert_eq!(50, r.len());
-    //     })
-    // });
-
-    let lbop = roaring::RoaringBitmap::from_idx(&v);
-    let rbop = roaring::RoaringBitmap::from_idx(&v);
+    let lbop = roaring::RoaringBitmap::from_idx(&lv);
+    let rbop = roaring::RoaringBitmap::from_idx(&rv);
 
     // group benchmark
     group.bench_function("roaring and", |b| {
         b.iter(|| {
             let r = lbop.and(&rbop);
-            assert_eq!(50, r.len());
+            assert_eq!(25, r.len());
         })
     });
 
     group.bench_function("roaring or", |b| {
         b.iter(|| {
             let r = lbop.or(&rbop);
-            assert_eq!(50, r.len());
+            assert_eq!(75, r.len());
         })
     });
 
     group.bench_function("multi and", |b| {
         b.iter(|| {
-            let r = multi_1.and(multi_2.get()).unwrap();
-            assert_eq!(50, r.len());
+            let r = lm.and(rm.get()).unwrap();
+            assert_eq!(25, r.len());
         })
     });
 
     group.bench_function("multi or", |b| {
         b.iter(|| {
-            let r = multi_1.or(multi_2.get());
-            assert_eq!(50, r.len());
+            let r = lm.or(rm.get());
+            assert_eq!(75, r.len());
         })
     });
 
