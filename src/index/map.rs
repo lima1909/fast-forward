@@ -31,6 +31,7 @@ use crate::{
     Idx, Key,
 };
 use std::{
+    borrow::Cow,
     collections::{btree_map::Entry, BTreeMap},
     fmt::Debug,
 };
@@ -43,10 +44,10 @@ pub type MultiStrIdx<'a> = StrMapIndex<'a, Multi>;
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
-pub struct StrMapIndex<'a, I: Index>(BTreeMap<&'a str, I>);
+pub struct StrMapIndex<'s, I: Index>(BTreeMap<&'s str, I>);
 
-impl<'k, I: Index> Store<'k> for StrMapIndex<'k, I> {
-    fn insert(&mut self, k: Key<'k>, i: Idx) -> super::Result {
+impl<'s, I: Index> Store<'s> for StrMapIndex<'s, I> {
+    fn insert(&mut self, k: Key<'s>, i: Idx) -> super::Result {
         match self.0.entry(k.into()) {
             Entry::Vacant(e) => {
                 e.insert(I::new(i));
@@ -57,17 +58,17 @@ impl<'k, I: Index> Store<'k> for StrMapIndex<'k, I> {
     }
 }
 
-impl<'k, I: Index> Filterable<'k> for StrMapIndex<'k, I> {
-    fn filter(&self, p: Predicate<'k>) -> &[Idx] {
+impl<'k, 's, I: Index> Filterable<'k> for StrMapIndex<'s, I> {
+    fn filter(&self, p: Predicate<'k>) -> Cow<[usize]> {
         match self.0.get(p.2.into()) {
-            Some(i) => i.get(),
-            None => &[],
+            Some(i) => Cow::Borrowed(i.get()),
+            None => Cow::Borrowed(&[]),
         }
     }
 }
 
-impl<'k, I: Index> StrMapIndex<'k, I> {
-    pub fn insert_str(&mut self, k: &'k str, i: Idx) -> super::Result {
+impl<'s, I: Index> StrMapIndex<'s, I> {
+    pub fn insert_str(&mut self, k: &'s str, i: Idx) -> super::Result {
         self.insert(k.into(), i)
     }
 }
@@ -94,7 +95,7 @@ mod tests {
             let mut i = UniqueStrIdx::default();
             i.insert_str("Jasmin", 4).unwrap();
 
-            assert_eq!(i.eq("Jasmin"), &[4]);
+            assert_eq!(*i.eq("Jasmin"), [4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -147,7 +148,7 @@ mod tests {
             let mut i = MultiStrIdx::default();
             i.insert_str("Jasmin", 2).unwrap();
 
-            assert_eq!(i.eq("Jasmin"), &[2]);
+            assert_eq!(*i.eq("Jasmin"), [2]);
             assert_eq!(1, i.0.len());
         }
 
@@ -157,7 +158,7 @@ mod tests {
             i.insert_str("Jasmin", 2).unwrap();
             i.insert_str("Jasmin", 1).unwrap();
 
-            assert_eq!(i.eq("Jasmin"), &[1, 2]);
+            assert_eq!(*i.eq("Jasmin"), [1, 2]);
         }
     }
 }

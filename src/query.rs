@@ -1,6 +1,7 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
 use crate::{index::Filterable, Idx, Predicate};
 use std::{
+    borrow::Cow,
     collections::HashSet,
     marker::PhantomData,
     ops::{BitAnd, BitOr},
@@ -8,7 +9,7 @@ use std::{
 
 pub trait Queryable<'k> {
     /// `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
-    fn filter<P>(&self, p: P) -> &[Idx]
+    fn filter<P>(&self, p: P) -> Cow<[usize]>
     where
         P: Into<Predicate<'k>>;
 
@@ -21,7 +22,7 @@ pub trait Queryable<'k> {
 }
 
 impl<'k, F: Filterable<'k>> Queryable<'k> for F {
-    fn filter<P>(&self, p: P) -> &[Idx]
+    fn filter<P>(&self, p: P) -> Cow<[usize]>
     where
         P: Into<Predicate<'k>>,
     {
@@ -34,7 +35,7 @@ pub struct QueryBuilder<'q, Q, B: BinOp = HashSet<Idx>> {
     _b: PhantomData<B>,
 }
 
-impl<'q, 'k, Q, B> QueryBuilder<'q, Q, B>
+impl<'k, 'q, Q, B> QueryBuilder<'q, Q, B>
 where
     Q: Queryable<'k>,
     B: BinOp,
@@ -61,9 +62,9 @@ pub struct Query<'q, Q, B: BinOp = HashSet<Idx>> {
     ors: Ors<'q, B>,
 }
 
-impl<'q, 'k, Q, B> Query<'q, Q, B>
+impl<'k, 'q, Q, B> Query<'q, Q, B>
 where
-    Q: Queryable<'k> + 'q,
+    Q: Queryable<'k>,
     B: BinOp,
 {
     pub fn or<P>(mut self, p: P) -> Self
@@ -71,7 +72,7 @@ where
         P: Into<Predicate<'k>>,
     {
         let idxs = self.q.filter(p.into());
-        self.ors.or(B::from_idx(idxs));
+        self.ors.or(B::from_idx(&idxs));
         self
     }
 
@@ -80,7 +81,7 @@ where
         P: Into<Predicate<'k>>,
     {
         let idxs = self.q.filter(p.into());
-        self.ors.and(B::from_idx(idxs));
+        self.ors.and(B::from_idx(&idxs));
         self
     }
 
@@ -89,14 +90,14 @@ where
     }
 }
 
-struct Ors<'i, B: BinOp = HashSet<Idx>> {
-    idxs: &'i [Idx], // lazy, convert to first<B>, only if added more B's with and/or
+struct Ors<'s, B: BinOp = HashSet<Idx>> {
+    idxs: Cow<'s, [usize]>, // lazy, convert to first<B>, only if added more B's with and/or
     first: Option<B>,
     ors: Vec<B>,
 }
 
-impl<'i, B: BinOp> Ors<'i, B> {
-    const fn new(idxs: &'i [Idx]) -> Self {
+impl<'s, B: BinOp> Ors<'s, B> {
+    const fn new(idxs: Cow<'s, [usize]>) -> Self {
         Self {
             idxs,
             first: None,
@@ -115,7 +116,7 @@ impl<'i, B: BinOp> Ors<'i, B> {
             let first = match &mut self.first {
                 Some(first) => first,
                 None => {
-                    self.first = Some(B::from_idx(self.idxs));
+                    self.first = Some(B::from_idx(&self.idxs));
                     self.first.as_mut().unwrap()
                 }
             };
@@ -127,17 +128,18 @@ impl<'i, B: BinOp> Ors<'i, B> {
     }
 
     #[inline]
-    fn exec(mut self) -> Iter<'i> {
+    fn exec(mut self) -> Iter<'s> {
         if self.ors.is_empty() {
             return match self.first.take() {
                 Some(first) => first.iter(),
-                None => Iter::Slice(self.idxs.iter()),
+                // None => Iter::Slice((self.idxs).iter().collect()), TODO !!!
+                _ => B::from_idx(&self.idxs).iter(),
             };
         }
 
         let mut first = match self.first {
             Some(first) => first,
-            None => B::from_idx(self.idxs),
+            None => B::from_idx(&self.idxs),
         };
 
         // TODO: maybe it is better a sorted Vec by B.len() before executed???

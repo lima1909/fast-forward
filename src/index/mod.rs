@@ -28,53 +28,55 @@ pub mod idx;
 pub mod map;
 pub mod uint;
 
+use std::borrow::Cow;
+
 pub use idx::{And, Index, Multi, Or, Positions, Unique};
 
 use crate::{query::Queryable, Idx, Key, Op, Predicate, Result};
 
 /// A Store for a mapping from a given Key to one or many Indices.
-pub trait Store<'k> {
+pub trait Store<'s> {
     /// Insert all indices for a given `Key`.
-    fn insert(&mut self, k: Key<'k>, i: Idx) -> Result;
+    fn insert(&mut self, k: Key<'s>, i: Idx) -> Result;
 }
 
 /// Filtering the [`Store`] with a given [`Predicate`]
 pub trait Filterable<'k> {
     /// find for the given `Key` all indices.
-    fn filter(&self, p: Predicate<'k>) -> &[Idx];
+    fn filter(&self, p: Predicate<'k>) -> Cow<[usize]>;
 }
 
-pub trait FilterableStore<'k>: Store<'k> + Filterable<'k> {}
+pub trait FilterableStore<'k, 's>: Store<'s> + Filterable<'k> {}
 
-impl<'k, F: Store<'k> + Filterable<'k>> FilterableStore<'k> for F {}
+impl<'k, 's, F: Store<'s> + Filterable<'k>> FilterableStore<'k, 's> for F {}
 
 /// Find all [`Idx`] for an given [`Predicate`] ([`crate::Op`]) and [`crate::Key`].
 pub trait OpsFilter<'k>: Filterable<'k> {
-    fn eq<K: Into<Key<'k>>>(&self, k: K) -> &[Idx] {
+    fn eq<K: Into<Key<'k>>>(&self, k: K) -> Cow<[usize]> {
         self.filter(Predicate::new_eq(k.into()))
     }
 
-    fn ne<K: Into<Key<'k>>>(&self, k: K) -> &[Idx] {
+    fn ne<K: Into<Key<'k>>>(&self, k: K) -> Cow<[usize]> {
         self.filter(Predicate::new(Op::NE, k.into()))
     }
 }
 
 impl<'k, F: Filterable<'k>> OpsFilter<'k> for F {}
 
-type FieldValueFn<'k, T> = fn(&'k T) -> Key<'k>;
+type FieldValueFn<'s, T> = fn(&'s T) -> Key<'s>;
 
 /// `FieldStore` extend a [`Store`] with an field-name and a function to get the value of an given object-type `<T>`
-pub struct FieldStore<'k, T> {
-    field: &'k str,
-    field_value_fn: FieldValueFn<'k, T>,
-    pub store: Box<dyn FilterableStore<'k> + 'k>,
+pub struct FieldStore<'k, 's, T> {
+    field: &'s str,
+    field_value_fn: FieldValueFn<'s, T>,
+    pub store: Box<dyn FilterableStore<'k, 's> + 's>,
 }
 
-impl<'k, T> FieldStore<'k, T> {
+impl<'k, 's, T> FieldStore<'k, 's, T> {
     pub const fn new(
-        field: &'k str,
-        field_value_fn: FieldValueFn<'k, T>,
-        store: Box<dyn FilterableStore<'k> + 'k>,
+        field: &'s str,
+        field_value_fn: FieldValueFn<'s, T>,
+        store: Box<dyn FilterableStore<'k, 's> + 's>,
     ) -> Self {
         Self {
             field,
@@ -86,10 +88,10 @@ impl<'k, T> FieldStore<'k, T> {
 
 /// Collection of indices ([`FieldStore`]s).
 #[derive(Default)]
-pub struct Indices<'i, T>(Vec<FieldStore<'i, T>>);
+pub struct Indices<'k, 'i, T>(Vec<FieldStore<'k, 'i, T>>);
 
-impl<'k, T> Queryable<'k> for Indices<'k, T> {
-    fn filter<P>(&self, p: P) -> &[Idx]
+impl<'k, 'i, T> Queryable<'k> for Indices<'k, 'i, T> {
+    fn filter<P>(&self, p: P) -> Cow<[usize]>
     where
         P: Into<Predicate<'k>>,
     {
@@ -98,11 +100,11 @@ impl<'k, T> Queryable<'k> for Indices<'k, T> {
     }
 }
 
-impl<'i, T> Indices<'i, T> {
+impl<'k, 'i, T> Indices<'k, 'i, T> {
     pub fn new(
         field: &'i str,
         field_value_fn: FieldValueFn<'i, T>,
-        store: impl FilterableStore<'i> + 'i,
+        store: impl FilterableStore<'k, 'i> + 'i,
     ) -> Self {
         let mut s = Self(Vec::new());
         s.add_idx(field, field_value_fn, store);
@@ -113,13 +115,13 @@ impl<'i, T> Indices<'i, T> {
         &mut self,
         field: &'i str,
         field_value_fn: FieldValueFn<'i, T>,
-        store: impl FilterableStore<'i> + 'i,
+        store: impl FilterableStore<'k, 'i> + 'i,
     ) {
         self.0
             .push(FieldStore::new(field, field_value_fn, Box::new(store)))
     }
 
-    pub fn get_idx(&self, idx_name: &str) -> &FieldStore<'i, T> {
+    pub fn get_idx(&self, idx_name: &'k str) -> &FieldStore<'k, 'i, T> {
         self.0.iter().find(|i| i.field == idx_name).unwrap()
     }
 
@@ -231,13 +233,13 @@ mod tests {
         assert_eq!(r, Some(0));
     }
 
-    struct Idxs<'k>(
-        Box<dyn FilterableStore<'k> + 'k>,
-        Box<dyn FilterableStore<'k> + 'k>,
+    struct Idxs<'k, 's>(
+        Box<dyn FilterableStore<'k, 's> + 's>,
+        Box<dyn FilterableStore<'k, 's> + 's>,
     );
 
-    impl<'k> Filterable<'k> for Idxs<'k> {
-        fn filter(&self, p: Predicate<'k>) -> &[Idx] {
+    impl<'k, 's> Filterable<'k> for Idxs<'k, 's> {
+        fn filter(&self, p: Predicate<'k>) -> Cow<[usize]> {
             match &p.2 {
                 Key::Usize(_u) => self.0.filter(p),
                 Key::Str(_s) => self.1.filter(p),

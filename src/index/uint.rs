@@ -35,7 +35,7 @@ use crate::{
     index::{Filterable, Idx, Index, Multi, Predicate, Result, Store, Unique},
     Key,
 };
-use std::ops::Deref;
+use std::{borrow::Cow, ops::Deref};
 
 /// Unique `Primary Key` from type [`usize`].
 pub type PkUintIdx = UIntVecIndex<Unique>;
@@ -47,8 +47,8 @@ pub type MultiUintIdx = UIntVecIndex<Multi>;
 #[derive(Debug, Default)]
 pub struct UIntVecIndex<I: Index>(Vec<Option<I>>);
 
-impl<'k, I: Index + Clone> Store<'k> for UIntVecIndex<I> {
-    fn insert(&mut self, key: Key<'k>, i: Idx) -> Result {
+impl<'s, I: Index + Clone> Store<'s> for UIntVecIndex<I> {
+    fn insert(&mut self, key: Key<'s>, i: Idx) -> Result {
         let k = key.into();
         if self.0.len() <= k {
             self.0.resize(k + 1, None);
@@ -64,11 +64,11 @@ impl<'k, I: Index + Clone> Store<'k> for UIntVecIndex<I> {
 }
 
 impl<'k, I: Index> Filterable<'k> for UIntVecIndex<I> {
-    fn filter(&self, p: Predicate<'k>) -> &[Idx] {
+    fn filter(&self, p: Predicate<'k>) -> Cow<[usize]> {
         let i: Idx = p.2.into();
         match &self.0.get(i) {
-            Some(Some(idx)) => idx.get(),
-            _ => &[],
+            Some(Some(idx)) => Cow::Borrowed(idx.get()),
+            _ => Cow::Borrowed(&[]),
         }
     }
 }
@@ -114,7 +114,7 @@ mod tests {
             let mut i = PkUintIdx::default();
             i.insert_idx(2, 4).unwrap();
 
-            assert_eq!(i.eq(2), &[4]);
+            assert_eq!(*i.eq(2), [4]);
             // assert_eq!(i.ne(3), &[]);  TODO: `ne` do not work now
             assert_eq!(3, i.0.len());
         }
@@ -205,7 +205,7 @@ mod tests {
             let mut i = MultiUintIdx::default();
             i.insert_idx(2, 2).unwrap();
 
-            assert_eq!(i.eq(2), &[2]);
+            assert_eq!(*i.eq(2), [2]);
             assert_eq!(3, i.0.len());
         }
 
@@ -215,7 +215,7 @@ mod tests {
             i.insert_idx(2, 2).unwrap();
             i.insert_idx(2, 1).unwrap();
 
-            assert_eq!(i.eq(2), [1, 2]);
+            assert_eq!(*i.eq(2), [1, 2]);
         }
     }
 }
