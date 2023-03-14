@@ -138,64 +138,53 @@ impl And for Multi {
 
 impl Or for Multi {
     fn or(&self, other: &[Idx]) -> Multi {
-        match (self.0.is_empty(), other.is_empty()) {
+        let inner = &self.0[..];
+
+        match (inner.is_empty(), other.is_empty()) {
             (false, false) => {
                 use std::cmp::Ordering::*;
 
-                let mut small = &self.0[..];
-                let mut big = other;
+                let li = inner.len();
+                let lo = other.len();
 
-                let mut ls = small.len();
-                let mut lb = big.len();
+                let mut v = Vec::with_capacity(li + lo);
+                let mut i = 0;
+                let mut o = 0;
 
-                if lb < ls {
-                    small = other;
-                    big = &self.0;
-                    ls = other.len();
-                    lb = self.0.len();
-                }
+                loop {
+                    let ii = inner[i];
+                    let oo = other[o];
 
-                let mut v = Vec::with_capacity(ls + lb);
-                let mut foundb = 0;
-
-                for ss in small {
-                    if foundb == lb {
-                        v.push(*ss);
-                    }
-
-                    #[allow(clippy::needless_range_loop)]
-                    #[allow(clippy::mut_range_bound)]
-                    for j in foundb..lb {
-                        let bb = big[j];
-
-                        match ss.cmp(&bb) {
-                            Equal => {
-                                v.push(bb);
-                                foundb += 1;
-                                break;
-                            }
-                            Less => {
-                                v.push(*ss);
-                                break;
-                            }
-                            Greater => {
-                                v.push(bb);
-                                foundb += 1;
-                            }
+                    match ii.cmp(&oo) {
+                        Equal => {
+                            v.push(ii);
+                            o += 1;
+                            i += 1;
+                        }
+                        Less => {
+                            v.push(ii);
+                            i += 1;
+                        }
+                        Greater => {
+                            v.push(oo);
+                            o += 1;
                         }
                     }
-                }
 
-                if foundb < lb {
-                    v.extend(big[foundb..].iter());
+                    if i == li {
+                        v.extend(other[o..].iter());
+                        break;
+                    } else if o == lo {
+                        v.extend(inner[i..].iter());
+                        break;
+                    }
                 }
 
                 Multi(v)
             }
-            (true, false) => return Multi(Vec::from_iter(other.iter().copied())),
-            (false, true) => return Multi(Vec::from_iter(self.0.iter().copied())),
-            // should be impossible
-            (true, true) => unreachable!("Not valid OR state, self and other are empty"),
+            (true, false) => Multi(Vec::from_iter(other.iter().copied())),
+            (false, true) => Multi(Vec::from_iter(inner.iter().copied())),
+            (true, true) => Multi(Vec::new()),
         }
     }
 }
@@ -265,7 +254,31 @@ mod tests {
         use super::super::*;
 
         #[test]
-        fn overlapping() {
+        fn overlapping_changed() {
+            let mut lm = Multi::new(1);
+            lm.add(2).unwrap();
+            lm.add(8).unwrap();
+            lm.add(9).unwrap();
+            lm.add(12).unwrap();
+
+            let mut rm = Multi::new(2);
+            rm.add(5).unwrap();
+            rm.add(6).unwrap();
+            rm.add(10).unwrap();
+
+            // 1, 2, 8, 9, 12
+            // 2, 5, 6, 10
+            assert_eq!(&[2], lm.and(rm.get()).unwrap().get());
+            assert_eq!(&[1, 2, 5, 6, 8, 9, 10, 12], lm.or(rm.get()).get());
+
+            // 2, 5, 6, 10
+            // 1, 2, 3, 8
+            assert_eq!(&[2], rm.and(lm.get()).unwrap().get());
+            assert_eq!(&[1, 2, 5, 6, 8, 9, 10, 12], rm.or(lm.get()).get());
+        }
+
+        #[test]
+        fn overlapping_order() {
             let mut lm = Multi::new(1);
             lm.add(2).unwrap();
 
