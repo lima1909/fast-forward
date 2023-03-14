@@ -225,37 +225,6 @@ impl<I: Index> Positions<I> {
 #[cfg(test)]
 mod tests {
 
-    mod overlapping {
-        use super::super::*;
-
-        #[test]
-        fn overlapping() {
-            let mut lm = Multi::new(0);
-            let mut lv = Vec::new();
-            for i in 0..50 {
-                lv.push(i);
-                if i > 0 {
-                    lm.add(i).unwrap();
-                }
-            }
-
-            let mut rm = Multi::new(25);
-            let mut rv = Vec::new();
-            for i in 25..75 {
-                rv.push(i);
-                if i > 25 {
-                    rm.add(i).unwrap();
-                }
-            }
-
-            assert_eq!(25, lm.and(rm.get()).unwrap().len());
-            assert_eq!(25, rm.and(lm.get()).unwrap().len());
-
-            assert_eq!(75, lm.or(rm.get()).len());
-            assert_eq!(75, rm.or(lm.get()).len());
-        }
-    }
-
     mod or {
         use super::super::*;
 
@@ -294,6 +263,30 @@ mod tests {
 
     mod and {
         use super::super::*;
+
+        #[test]
+        fn overlapping() {
+            let mut lm = Multi::new(1);
+            lm.add(2).unwrap();
+
+            let mut rm = Multi::new(2);
+            rm.add(3).unwrap();
+
+            // 1, 2
+            // 2, 3
+            // => And: 2
+            // => OR: 1, 2, 3
+
+            assert_eq!(&[2], lm.and(rm.get()).unwrap().get());
+            assert_eq!(&[1, 2, 3], lm.or(rm.get()).get());
+
+            // 2, 3
+            // 1, 2
+            // => And: 2
+            // => OR: 1, 2, 3
+            assert_eq!(&[2], rm.and(lm.get()).unwrap().get());
+            assert_eq!(&[1, 2, 3], rm.or(lm.get()).get());
+        }
 
         #[test]
         fn and_1_to_10() {
