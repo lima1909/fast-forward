@@ -24,6 +24,7 @@
 //!  "Inge"    | 2
 //!   ...      | ...
 //! ```
+pub mod blo;
 pub mod idx;
 pub mod map;
 pub mod uint;

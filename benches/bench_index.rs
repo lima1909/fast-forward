@@ -2,9 +2,10 @@ use std::collections::HashSet;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
+use fast_forward::index::blo::{and, or};
 use fast_forward::index::map::UniqueStrIdx;
 use fast_forward::index::uint::UIntVecIndex;
-use fast_forward::index::{And, Index, Indices, Multi, Or, Unique};
+use fast_forward::index::{Indices, Unique};
 use fast_forward::query::{BinOp, Queryable};
 use fast_forward::{eq, Idx, Key};
 
@@ -73,22 +74,14 @@ fn list_index(c: &mut Criterion) {
 }
 
 fn bit_operation(c: &mut Criterion) {
-    let mut lm = Multi::new(0);
     let mut lv = Vec::new();
     for i in 0..50 {
         lv.push(i);
-        if i > 0 {
-            lm.add(i).unwrap();
-        }
     }
 
-    let mut rm = Multi::new(25);
     let mut rv = Vec::new();
     for i in 25..75 {
         rv.push(i);
-        if i > 25 {
-            rm.add(i).unwrap();
-        }
     }
 
     // group benchmark
@@ -114,15 +107,13 @@ fn bit_operation(c: &mut Criterion) {
 
     group.bench_function("multi and", |b| {
         b.iter(|| {
-            let r = lm.and(rm.get()).unwrap();
-            assert_eq!(25, r.len());
+            assert_eq!(25, and(&lv, &rv).len());
         })
     });
 
     group.bench_function("multi or", |b| {
         b.iter(|| {
-            let r = lm.or(rm.get());
-            assert_eq!(75, r.len());
+            assert_eq!(75, or(&lv, &rv).len());
         })
     });
 
