@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cmp::{min, Ordering::*};
 
 use crate::Idx;
 
@@ -7,15 +8,12 @@ pub const EMPTY: &[Idx] = &[];
 pub fn or<'a>(lhs: &'a [Idx], rhs: &'a [Idx]) -> Cow<'a, [Idx]> {
     match (lhs.is_empty(), rhs.is_empty()) {
         (false, false) => {
-            use std::cmp::Ordering::*;
-
             let ll = lhs.len();
             let lr = rhs.len();
+            let mut v = Vec::with_capacity(ll + lr);
 
             let mut li = 0;
             let mut ri = 0;
-
-            let mut v = Vec::with_capacity(ll + lr);
 
             loop {
                 let l = lhs[li];
@@ -39,14 +37,12 @@ pub fn or<'a>(lhs: &'a [Idx], rhs: &'a [Idx]) -> Cow<'a, [Idx]> {
 
                 if ll == li {
                     v.extend(rhs[ri..].iter());
-                    break;
+                    return Cow::Owned(v);
                 } else if lr == ri {
                     v.extend(lhs[li..].iter());
-                    break;
+                    return Cow::Owned(v);
                 }
             }
-
-            Cow::Owned(v)
         }
         (true, false) => Cow::Borrowed(rhs),
         (false, true) => Cow::Borrowed(lhs),
@@ -55,35 +51,34 @@ pub fn or<'a>(lhs: &'a [Idx], rhs: &'a [Idx]) -> Cow<'a, [Idx]> {
 }
 
 pub fn and<'a>(lhs: &'a [Idx], rhs: &'a [Idx]) -> Cow<'a, [Idx]> {
-    let ll = lhs.len();
-    let lr = rhs.len();
-
-    // if ll == 0 || lr == 0 {
-    //     Cow::Borrowed(EMPTY)
-    // } else {
-    let len = if ll > lr { ll } else { lr };
-
-    let mut v = Vec::with_capacity(len);
-    let mut found = 0;
-
-    for l in lhs {
-        #[allow(clippy::needless_range_loop)]
-        for i in found..lr {
-            let r = rhs[i];
-
-            #[allow(clippy::comparison_chain)]
-            if l < &r {
-                break;
-            } else if l == &r {
-                v.push(r);
-                found += 1;
-                break;
-            }
-        }
+    if lhs.is_empty() || rhs.is_empty() {
+        return Cow::Borrowed(EMPTY);
     }
 
-    Cow::Owned(v)
-    // }
+    let ll = lhs.len();
+    let lr = rhs.len();
+    let mut v = Vec::with_capacity(min(ll, lr));
+
+    let mut li = 0;
+    let mut ri = 0;
+
+    loop {
+        let l = lhs[li];
+
+        match l.cmp(&rhs[ri]) {
+            Equal => {
+                v.push(l);
+                li += 1;
+                ri += 1;
+            }
+            Less => li += 1,
+            Greater => ri += 1,
+        }
+
+        if li == ll || ri == lr {
+            return Cow::Owned(v);
+        }
+    }
 }
 
 #[cfg(test)]
