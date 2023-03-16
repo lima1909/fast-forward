@@ -126,29 +126,27 @@ mod tests {
             idx.insert_idx(3, 6).unwrap();
 
             {
-                let b = idx.query_builder();
-                let r = b.query(3).or(4).exec();
+                let r = idx.query(3).or(4).exec();
                 assert_eq!(*r, [6, 8]);
 
                 // reuse the query without `new`
-                let q = b.query(3);
+                let q = idx.query(3);
                 let r = q.and(3).exec();
                 assert_eq!(*r, [6]);
 
-                let r = b.query(3).or(99).exec();
+                let r = idx.query(3).or(99).exec();
                 assert_eq!(*r, [6]);
 
-                let r = b.query(99).or(4).exec();
+                let r = idx.query(99).or(4).exec();
                 assert_eq!(*r, [8]);
 
-                let r = b.query(3).and(4).exec();
+                let r = idx.query(3).and(4).exec();
                 assert_eq!(*r, []);
             }
 
             // add a new index after creating a QueryBuilder
             idx.insert_idx(99, 0).unwrap();
-            let b = idx.query_builder();
-            let r = b.query(99).exec();
+            let r = idx.query(99).exec();
             assert_eq!(*r, [0]);
         }
 
@@ -159,11 +157,10 @@ mod tests {
             idx.insert_idx(4, 8).unwrap();
             idx.insert_idx(3, 6).unwrap();
 
-            let b = idx.query_builder();
-            let r = b.query(3).and(2).exec();
+            let r = idx.query(3).and(2).exec();
             assert_eq!(*r, []);
 
-            let r = b.query(3).or(4).and(2).exec();
+            let r = idx.query(3).or(4).and(2).exec();
             // =3 or =4 and =2 =>
             // (
             // (4 and 2 = false) // `and` has higher prio than `or`

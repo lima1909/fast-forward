@@ -105,14 +105,13 @@ mod tests {
             idx.insert_str("Mario", 8).unwrap();
             idx.insert_str("Paul", 6).unwrap();
 
-            let b = idx.query_builder();
-            let r = b.query("Mario").or("Paul").exec();
+            let r = idx.query("Mario").or("Paul").exec();
             assert_eq!(*r, [6, 8]);
 
-            let r = b.query("Paul").or("Blub").exec();
+            let r = idx.query("Paul").or("Blub").exec();
             assert_eq!(*r, [6]);
 
-            let r = b.query("Blub").or("Mario").exec();
+            let r = idx.query("Blub").or("Mario").exec();
             assert_eq!(*r, [8]);
         }
 

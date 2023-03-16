@@ -31,16 +31,22 @@ fn list_index(c: &mut Criterion) {
     for (i, p) in v.iter().enumerate() {
         idx.insert(p, i).unwrap();
     }
-    let q = idx.query_builder();
 
     // group benchmark
     let mut group = c.benchmark_group("index");
-    group.bench_function("ff: pk", |b| {
+    group.bench_function("ff: query pk", |b| {
         b.iter(|| {
-            let i = q.query(eq("pk", FIND_ID)).exec()[0];
+            let i = idx.query(eq("pk", FIND_ID)).exec()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
+    group.bench_function("ff: filter pk", |b| {
+        b.iter(|| {
+            let i = idx.filter(eq("pk", FIND_ID))[0];
+            assert_eq!(&FIND_PERSON, &v[i]);
+        })
+    });
+
     group.bench_function("vec-iter: pk", |b| {
         b.iter(|| {
             let v: Vec<&Person> = v.iter().filter(|p| p.0 == FIND_ID).collect();
@@ -50,7 +56,7 @@ fn list_index(c: &mut Criterion) {
 
     group.bench_function("ff: pk and name", |b| {
         b.iter(|| {
-            let i = q
+            let i = idx
                 .query(eq("pk", FIND_ID))
                 .and(eq("name", &FIND_PERSON.1))
                 .exec()[0];

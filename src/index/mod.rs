@@ -196,28 +196,29 @@ mod tests {
         indices.insert(&persons[1], 1).unwrap();
         indices.insert(&persons[2], 2).unwrap();
 
-        let b = indices.query_builder();
+        assert_eq!([1], *indices.query(eq("pk", 41)).exec());
+        assert_eq!([0], *indices.query(eq("pk", 3)).exec());
+        assert!(indices.query(eq("pk", 101)).exec().is_empty());
 
-        assert_eq!([1], *b.query(eq("pk", 41)).exec());
-        assert_eq!([0], *b.query(eq("pk", 3)).exec());
-        assert!(b.query(eq("pk", 101)).exec().is_empty());
-
-        let r = b.query(eq("second", 7)).exec();
+        let r = indices.query(eq("second", 7)).exec();
         assert_eq!(*r, [0, 1]);
 
-        let r = b.query(eq("second", 3)).or(eq("second", 7)).exec();
+        let r = indices.query(eq("second", 3)).or(eq("second", 7)).exec();
         assert_eq!(*r, [0, 1]);
 
-        let r = b.query(eq("name", "Jasmin")).exec();
+        let r = indices.query(eq("name", "Jasmin")).exec();
         assert_eq!(*r, [0]);
 
-        let r = b.query(eq("name", "Jasmin")).or(eq("name", "Mario")).exec();
+        let r = indices
+            .query(eq("name", "Jasmin"))
+            .or(eq("name", "Mario"))
+            .exec();
         assert_eq!(*r, [0, 1]);
 
-        let r = b.query(eq("gender", Gender::Male)).exec();
+        let r = indices.query(eq("gender", Gender::Male)).exec();
         assert_eq!(*r, [1, 2]);
 
-        let r = b.query(eq("gender", Gender::Female)).exec();
+        let r = indices.query(eq("gender", Gender::Female)).exec();
         assert_eq!(*r, [0]);
     }
 
@@ -250,11 +251,10 @@ mod tests {
 
         let idxs = Idxs(Box::new(idx_u), Box::new(idx_s));
 
-        let b = idxs.query_builder();
-        let r = b.query(1).and("a").exec();
+        let r = idxs.query(1).and("a").exec();
         assert_eq!(*r, [1]);
 
-        let r = b.query("z").or(1).and("a").exec();
+        let r = idxs.query("z").or(1).and("a").exec();
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
         assert_eq!(*r, [0, 1]);
 

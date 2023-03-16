@@ -7,17 +7,24 @@ use std::{
 
 pub const EMPTY: &[Idx] = &[];
 
-pub trait Queryable<'k> {
-    /// `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
+pub trait Queryable<'k>: Sized {
+    /// Filter is the fastes way to ask with one [`Predicate`].
+    /// For example: `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
     fn filter<P>(&self, p: P) -> Cow<[usize]>
     where
         P: Into<Predicate<'k>>;
 
-    fn query_builder(&self) -> QueryBuilder<Self>
+    /// Query combined different `filter` with an logical `or` or `and`.
+    fn query<P>(&self, p: P) -> Query<Self>
     where
-        Self: Sized,
+        P: Into<Predicate<'k>>,
     {
-        QueryBuilder::<_>::new(self)
+        let idxs = self.filter(p.into());
+        Query {
+            q: self,
+            first: idxs,
+            ors: vec![],
+        }
     }
 }
 
@@ -27,29 +34,6 @@ impl<'k, F: Filterable<'k>> Queryable<'k> for F {
         P: Into<Predicate<'k>>,
     {
         Filterable::filter(self, p.into())
-    }
-}
-
-pub struct QueryBuilder<'q, Q>(&'q Q);
-
-impl<'k, 'q, Q> QueryBuilder<'q, Q>
-where
-    Q: Queryable<'k>,
-{
-    pub const fn new(q: &'q Q) -> Self {
-        Self(q)
-    }
-
-    pub fn query<P>(&self, p: P) -> Query<Q>
-    where
-        P: Into<Predicate<'k>>,
-    {
-        let idxs = self.0.filter(p.into());
-        Query {
-            q: self.0,
-            first: idxs,
-            ors: vec![],
-        }
     }
 }
 
