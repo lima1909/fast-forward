@@ -1,13 +1,12 @@
-use std::collections::HashSet;
+use std::borrow::Cow;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use fast_forward::index::blo::{and, or};
 use fast_forward::index::map::UniqueStrIdx;
 use fast_forward::index::uint::UIntVecIndex;
 use fast_forward::index::{Indices, Unique};
-use fast_forward::query::{BinOp, Queryable};
-use fast_forward::{eq, Idx, Key};
+use fast_forward::query::{and, or, Queryable};
+use fast_forward::{eq, Key};
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
@@ -32,13 +31,13 @@ fn list_index(c: &mut Criterion) {
     for (i, p) in v.iter().enumerate() {
         idx.insert(p, i).unwrap();
     }
-    let q = idx.query_builder::<HashSet<Idx>>();
+    let q = idx.query_builder();
 
     // group benchmark
     let mut group = c.benchmark_group("index");
     group.bench_function("ff: pk", |b| {
         b.iter(|| {
-            let i = q.query(eq("pk", FIND_ID)).exec().next().unwrap();
+            let i = q.query(eq("pk", FIND_ID)).exec()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
@@ -54,9 +53,7 @@ fn list_index(c: &mut Criterion) {
             let i = q
                 .query(eq("pk", FIND_ID))
                 .and(eq("name", &FIND_PERSON.1))
-                .exec()
-                .next()
-                .unwrap();
+                .exec()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
@@ -86,24 +83,20 @@ fn bit_operation(c: &mut Criterion) {
 
     // group benchmark
     let mut group = c.benchmark_group("bitop");
-
-    let lbop = roaring::RoaringBitmap::from_idx(&lv);
-    let rbop = roaring::RoaringBitmap::from_idx(&rv);
-
     // group benchmark
-    group.bench_function("roaring and", |b| {
-        b.iter(|| {
-            let r = lbop.and(&rbop);
-            assert_eq!(25, r.len());
-        })
-    });
+    // group.bench_function("roaring and", |b| {
+    //     b.iter(|| {
+    //         let r = lbop.and(&rbop);
+    //         assert_eq!(25, r.len());
+    //     })
+    // });
 
-    group.bench_function("roaring or", |b| {
-        b.iter(|| {
-            let r = lbop.or(&rbop);
-            assert_eq!(75, r.len());
-        })
-    });
+    // group.bench_function("roaring or", |b| {
+    //     b.iter(|| {
+    //         let r = lbop.or(&rbop);
+    //         assert_eq!(75, r.len());
+    //     })
+    // });
 
     group.bench_function("multi and", |b| {
         b.iter(|| {
@@ -113,7 +106,7 @@ fn bit_operation(c: &mut Criterion) {
 
     group.bench_function("multi or", |b| {
         b.iter(|| {
-            assert_eq!(75, or(&lv, &rv).len());
+            assert_eq!(75, or(Cow::Borrowed(&lv), Cow::Borrowed(&rv)).len());
         })
     });
 

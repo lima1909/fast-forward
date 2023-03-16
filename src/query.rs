@@ -2,9 +2,7 @@
 use crate::{index::Filterable, Idx, Predicate};
 use std::{
     borrow::Cow,
-    collections::HashSet,
-    marker::PhantomData,
-    ops::{BitAnd, BitOr},
+    cmp::{min, Ordering::*},
 };
 
 pub trait Queryable<'k> {
@@ -13,11 +11,11 @@ pub trait Queryable<'k> {
     where
         P: Into<Predicate<'k>>;
 
-    fn query_builder<B: BinOp>(&self) -> QueryBuilder<Self, B>
+    fn query_builder(&self) -> QueryBuilder<Self>
     where
         Self: Sized,
     {
-        QueryBuilder::<_, B>::new(self)
+        QueryBuilder::<_>::new(self)
     }
 }
 
@@ -30,49 +28,44 @@ impl<'k, F: Filterable<'k>> Queryable<'k> for F {
     }
 }
 
-pub struct QueryBuilder<'q, Q, B: BinOp = HashSet<Idx>> {
-    q: &'q Q,
-    _b: PhantomData<B>,
-}
+pub struct QueryBuilder<'q, Q>(&'q Q);
 
-impl<'k, 'q, Q, B> QueryBuilder<'q, Q, B>
+impl<'k, 'q, Q> QueryBuilder<'q, Q>
 where
     Q: Queryable<'k>,
-    B: BinOp,
 {
     pub const fn new(q: &'q Q) -> Self {
-        Self { q, _b: PhantomData }
+        Self(q)
     }
 
-    pub fn query<P>(&self, p: P) -> Query<Q, B>
+    pub fn query<P>(&self, p: P) -> Query<Q>
     where
         P: Into<Predicate<'k>>,
     {
-        let idxs = self.q.filter(p.into());
+        let idxs = self.0.filter(p.into());
         Query {
-            q: self.q,
+            q: self.0,
             ors: Ors::new(idxs),
         }
     }
 }
 
 /// Query combines different filter. Filters can be linked using `and` and `or`.
-pub struct Query<'q, Q, B: BinOp = HashSet<Idx>> {
+pub struct Query<'q, Q> {
     q: &'q Q,
-    ors: Ors<'q, B>,
+    ors: Ors<'q>,
 }
 
-impl<'k, 'q, Q, B> Query<'q, Q, B>
+impl<'k, 'q, Q> Query<'q, Q>
 where
     Q: Queryable<'k>,
-    B: BinOp,
 {
     pub fn or<P>(mut self, p: P) -> Self
     where
         P: Into<Predicate<'k>>,
     {
         let idxs = self.q.filter(p.into());
-        self.ors.or(B::from_idx(&idxs));
+        self.ors.or(idxs);
         self
     }
 
@@ -81,144 +74,233 @@ where
         P: Into<Predicate<'k>>,
     {
         let idxs = self.q.filter(p.into());
-        self.ors.and(B::from_idx(&idxs));
+        self.ors.and(idxs);
         self
     }
 
-    pub fn exec(self) -> Iter<'q> {
+    pub fn exec(self) -> Cow<'q, [usize]> {
         self.ors.exec()
     }
 }
 
-struct Ors<'s, B: BinOp = HashSet<Idx>> {
-    idxs: Cow<'s, [usize]>, // lazy, convert to first<B>, only if added more B's with and/or
-    first: Option<B>,
-    ors: Vec<B>,
+struct Ors<'s> {
+    first: Cow<'s, [usize]>,
+    ors: Vec<Cow<'s, [usize]>>,
 }
 
-impl<'s, B: BinOp> Ors<'s, B> {
+impl<'s> Ors<'s> {
     const fn new(idxs: Cow<'s, [usize]>) -> Self {
         Self {
-            idxs,
-            first: None,
+            first: idxs,
             ors: vec![],
         }
     }
 
     #[inline]
-    fn or(&mut self, b: B) {
-        self.ors.push(b);
+    fn or(&mut self, idxs: Cow<'s, [usize]>) {
+        self.ors.push(idxs);
     }
 
     #[inline]
-    fn and(&mut self, b: B) {
+    fn and(&mut self, idxs: Cow<'s, [usize]>) {
         if self.ors.is_empty() {
-            let first = match &mut self.first {
-                Some(first) => first,
-                None => {
-                    self.first = Some(B::from_idx(&self.idxs));
-                    self.first.as_mut().unwrap()
-                }
-            };
-            self.first = Some(first.and(&b));
+            self.first = and(&self.first, &idxs);
         } else {
             let i = self.ors.len() - 1;
-            self.ors[i] = self.ors[i].and(&b);
+            self.ors[i] = and(&self.ors[i], &idxs);
         }
     }
 
     #[inline]
-    fn exec(mut self) -> Iter<'s> {
-        if self.ors.is_empty() {
-            return match self.first.take() {
-                Some(first) => first.iter(),
-                // None => Iter::Slice((self.idxs).iter().collect()), TODO !!!
-                _ => B::from_idx(&self.idxs).iter(),
-            };
+    fn exec(mut self) -> Cow<'s, [usize]> {
+        for next in self.ors {
+            self.first = or(self.first, next);
+        }
+        self.first
+    }
+}
+
+pub const EMPTY: &[Idx] = &[];
+
+// pub fn or<'a>(lhs: &'a [Idx], rhs: &'a [Idx]) -> Cow<'a, [Idx]> {
+pub fn or<'a>(lhs: Cow<'a, [Idx]>, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
+    match (lhs.is_empty(), rhs.is_empty()) {
+        (false, false) => {
+            let ll = lhs.len();
+            let lr = rhs.len();
+            let mut v = Vec::with_capacity(ll + lr);
+
+            let mut li = 0;
+            let mut ri = 0;
+
+            loop {
+                let l = lhs[li];
+                let r = rhs[ri];
+
+                match l.cmp(&r) {
+                    Equal => {
+                        v.push(l);
+                        li += 1;
+                        ri += 1;
+                    }
+                    Less => {
+                        v.push(l);
+                        li += 1;
+                    }
+                    Greater => {
+                        v.push(r);
+                        ri += 1;
+                    }
+                }
+
+                if ll == li {
+                    v.extend(rhs[ri..].iter());
+                    return Cow::Owned(v);
+                } else if lr == ri {
+                    v.extend(lhs[li..].iter());
+                    return Cow::Owned(v);
+                }
+            }
+        }
+        (true, false) => rhs,
+        (false, true) => lhs,
+        (true, true) => Cow::Borrowed(EMPTY),
+    }
+}
+
+pub fn and<'a>(lhs: &[Idx], rhs: &[Idx]) -> Cow<'a, [Idx]> {
+    if lhs.is_empty() || rhs.is_empty() {
+        return Cow::Borrowed(EMPTY);
+    }
+
+    let ll = lhs.len();
+    let lr = rhs.len();
+    let mut v = Vec::with_capacity(min(ll, lr));
+
+    let mut li = 0;
+    let mut ri = 0;
+
+    loop {
+        let l = lhs[li];
+
+        match l.cmp(&rhs[ri]) {
+            Equal => {
+                v.push(l);
+                li += 1;
+                ri += 1;
+            }
+            Less => li += 1,
+            Greater => ri += 1,
         }
 
-        let mut first = match self.first {
-            Some(first) => first,
-            None => B::from_idx(&self.idxs),
-        };
-
-        // TODO: maybe it is better a sorted Vec by B.len() before executed???
-        for b in self.ors {
-            first = first.or(&b);
-        }
-        first.iter()
-    }
-}
-
-pub enum Iter<'a> {
-    Roaring(roaring::bitmap::IntoIter),
-    HashSet(std::collections::hash_set::IntoIter<Idx>),
-    Slice(std::slice::Iter<'a, Idx>),
-}
-
-impl<'a> Iterator for Iter<'a> {
-    type Item = Idx;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Iter::Slice(it) => it.next().copied(),
-            Iter::Roaring(it) => it.next().map(|u| u as usize),
-            Iter::HashSet(it) => it.next(),
+        if li == ll || ri == lr {
+            return Cow::Owned(v);
         }
     }
 }
 
-/// Support for binary logical operations, like `or` and `and`.
-pub trait BinOp {
-    //} <'a>: IntoIterator<Item = Idx, IntoIter = Iter<'a>> {
-    fn from_idx(idx: &[Idx]) -> Self;
-    fn iter<'a>(self) -> Iter<'a>;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    fn or(&self, idx: &Self) -> Self;
-    fn and(&self, idx: &Self) -> Self;
-}
+    //     mod or {
+    //         use super::*;
 
-impl BinOp for HashSet<Idx> {
-    fn from_idx(idx: &[Idx]) -> Self {
-        let mut hs = HashSet::with_capacity(idx.len());
-        hs.extend(idx);
-        hs
-    }
+    //         #[test]
+    //         fn both_empty() {
+    //             assert_eq!(EMPTY, &*or(EMPTY, EMPTY));
+    //         }
 
-    #[inline]
-    fn iter<'a>(self) -> Iter<'a> {
-        Iter::HashSet(self.into_iter())
-    }
+    //         #[test]
+    //         fn only_left() {
+    //             assert_eq!([1, 2], *or(&[1, 2], EMPTY));
+    //         }
 
-    #[inline]
-    fn or(&self, idx: &Self) -> Self {
-        self.bitor(idx)
-    }
+    //         #[test]
+    //         fn only_right() {
+    //             assert_eq!([1, 2], *or(EMPTY, &[1, 2]));
+    //         }
 
-    #[inline]
-    fn and(&self, idx: &Self) -> Self {
-        self.bitand(idx)
-    }
-}
+    //         #[test]
+    //         fn diff_len() {
+    //             assert_eq!([1, 2, 3], *or(&[1], &[2, 3]),);
+    //             assert_eq!([1, 2, 3], *or(&[2, 3], &[1]),);
+    //         }
 
-#[cfg(feature = "roaring")]
-impl BinOp for roaring::RoaringBitmap {
-    fn from_idx(idx: &[Idx]) -> Self {
-        idx.iter().map(|i| *i as u32).collect()
-    }
+    //         #[test]
+    //         fn overlapping_simple() {
+    //             assert_eq!([1, 2, 3], *or(&[1, 2], &[2, 3]),);
+    //             assert_eq!([1, 2, 3], *or(&[2, 3], &[1, 2]),);
+    //         }
 
-    #[inline]
-    fn iter<'a>(self) -> Iter<'a> {
-        Iter::Roaring(self.into_iter())
-    }
+    //         #[test]
+    //         fn overlapping_diff_len() {
+    //             // 1, 2, 8, 9, 12
+    //             // 2, 5, 6, 10
+    //             assert_eq!(
+    //                 *or(&[1, 2, 8, 9, 12], &[2, 5, 6, 10]),
+    //                 [1, 2, 5, 6, 8, 9, 10, 12]
+    //             );
 
-    #[inline]
-    fn or(&self, idx: &Self) -> Self {
-        self.bitor(idx)
-    }
+    //             // 2, 5, 6, 10
+    //             // 1, 2, 8, 9, 12
+    //             assert_eq!(
+    //                 *or(&[2, 5, 6, 10], &[1, 2, 8, 9, 12]),
+    //                 [1, 2, 5, 6, 8, 9, 10, 12]
+    //             );
+    //         }
+    //     }
 
-    #[inline]
-    fn and(&self, idx: &Self) -> Self {
-        self.bitand(idx)
+    mod and {
+        use super::*;
+
+        #[test]
+        fn both_empty() {
+            assert_eq!(EMPTY, &*and(EMPTY, EMPTY));
+        }
+
+        #[test]
+        fn only_left() {
+            assert_eq!(EMPTY, &*and(&[1, 2], EMPTY));
+        }
+
+        #[test]
+        fn only_right() {
+            assert_eq!(EMPTY, &*and(EMPTY, &[1, 2]));
+        }
+
+        #[test]
+        fn diff_len() {
+            assert_eq!(EMPTY, &*and(&[1], &[2, 3]));
+            assert_eq!(EMPTY, &*and(&[2, 3], &[1]));
+
+            assert_eq!([2], *and(&[2], &[2, 5]));
+            assert_eq!([2], *and(&[2], &[1, 2, 3]));
+            assert_eq!([2], *and(&[2], &[0, 1, 2]));
+
+            assert_eq!([2], *and(&[2, 5], &[2]));
+            assert_eq!([2], *and(&[1, 2, 3], &[2]));
+            assert_eq!([2], *and(&[0, 1, 2], &[2]));
+        }
+
+        #[test]
+        fn overlapping_simple() {
+            assert_eq!([2], *and(&[1, 2], &[2, 3]),);
+            assert_eq!([2], *and(&[2, 3], &[1, 2]),);
+
+            assert_eq!([1], *and(&[1, 2], &[1, 3]),);
+            assert_eq!([1], *and(&[1, 3], &[1, 2]),);
+        }
+
+        #[test]
+        fn overlapping_diff_len() {
+            // 1, 2, 8, 9, 12
+            // 2, 5, 6, 10
+            assert_eq!([2, 12], *and(&[1, 2, 8, 9, 12], &[2, 5, 6, 10, 12, 13, 15]));
+
+            // 2, 5, 6, 10
+            // 1, 2, 8, 9, 12
+            assert_eq!([2, 12], *and(&[2, 5, 6, 10, 12, 13, 15], &[1, 2, 8, 9, 12]));
+        }
     }
 }

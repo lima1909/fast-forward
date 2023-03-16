@@ -78,7 +78,6 @@ mod tests {
     use super::*;
     use crate::query::Queryable;
     use crate::{error::Error, index::OpsFilter};
-    use std::collections::HashSet;
 
     mod unique {
         use super::*;
@@ -106,16 +105,15 @@ mod tests {
             idx.insert_str("Mario", 8).unwrap();
             idx.insert_str("Paul", 6).unwrap();
 
-            let b = idx.query_builder::<HashSet<Idx>>();
-            let r: Vec<Idx> = b.query("Mario").or("Paul").exec().collect();
-            assert!(r.contains(&8));
-            assert!(r.contains(&6));
+            let b = idx.query_builder();
+            let r = b.query("Mario").or("Paul").exec();
+            assert_eq!(*r, [6, 8]);
 
-            let mut r = b.query("Paul").or("Blub").exec();
-            assert_eq!(r.next(), Some(6));
+            let r = b.query("Paul").or("Blub").exec();
+            assert_eq!(*r, [6]);
 
-            let mut r = b.query("Blub").or("Mario").exec();
-            assert_eq!(r.next(), Some(8));
+            let r = b.query("Blub").or("Mario").exec();
+            assert_eq!(*r, [8]);
         }
 
         #[test]

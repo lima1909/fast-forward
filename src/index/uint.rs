@@ -97,7 +97,6 @@ mod tests {
     use super::*;
     use crate::query::Queryable;
     use crate::{error::Error, index::OpsFilter};
-    use std::collections::HashSet;
 
     mod unique {
         use super::*;
@@ -127,31 +126,30 @@ mod tests {
             idx.insert_idx(3, 6).unwrap();
 
             {
-                let b = idx.query_builder::<HashSet<Idx>>();
-                let r: Vec<Idx> = b.query(3).or(4).exec().collect();
-                assert!(r.contains(&8));
-                assert!(r.contains(&6));
+                let b = idx.query_builder();
+                let r = b.query(3).or(4).exec();
+                assert_eq!(*r, [6, 8]);
 
                 // reuse the query without `new`
                 let q = b.query(3);
-                let r = q.and(3).exec().next();
-                assert_eq!(Some(6), r);
+                let r = q.and(3).exec();
+                assert_eq!(*r, [6]);
 
-                let r = b.query(3).or(99).exec().next();
-                assert_eq!(r, Some(6));
+                let r = b.query(3).or(99).exec();
+                assert_eq!(*r, [6]);
 
-                let r = b.query(99).or(4).exec().next();
-                assert_eq!(r, Some(8));
+                let r = b.query(99).or(4).exec();
+                assert_eq!(*r, [8]);
 
-                let r = b.query(3).and(4).exec().next();
-                assert_eq!(r, None);
+                let r = b.query(3).and(4).exec();
+                assert_eq!(*r, []);
             }
 
             // add a new index after creating a QueryBuilder
             idx.insert_idx(99, 0).unwrap();
-            let b = idx.query_builder::<HashSet<Idx>>();
-            let mut r = b.query(99).exec();
-            assert_eq!(r.next(), Some(0));
+            let b = idx.query_builder();
+            let r = b.query(99).exec();
+            assert_eq!(*r, [0]);
         }
 
         #[test]
@@ -161,18 +159,18 @@ mod tests {
             idx.insert_idx(4, 8).unwrap();
             idx.insert_idx(3, 6).unwrap();
 
-            let b = idx.query_builder::<HashSet<Idx>>();
-            let mut r = b.query(3).and(2).exec();
-            assert_eq!(r.next(), None);
+            let b = idx.query_builder();
+            let r = b.query(3).and(2).exec();
+            assert_eq!(*r, []);
 
-            let mut r = b.query(3).or(4).and(2).exec();
+            let r = b.query(3).or(4).and(2).exec();
             // =3 or =4 and =2 =>
             // (
             // (4 and 2 = false) // `and` has higher prio than `or`
             //  or 3 = true
             // )
             // => 3 -> 6
-            assert_eq!(Some(6), r.next());
+            assert_eq!(*r, [6]);
         }
 
         #[test]

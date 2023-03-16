@@ -24,7 +24,6 @@
 //!  "Inge"    | 2
 //!   ...      | ...
 //! ```
-pub mod blo;
 pub mod idx;
 pub mod map;
 pub mod uint;
@@ -147,7 +146,6 @@ mod tests {
         },
         Key,
     };
-    use std::collections::HashSet;
 
     #[derive(Debug, Clone, Copy)]
     enum Gender {
@@ -198,40 +196,29 @@ mod tests {
         indices.insert(&persons[1], 1).unwrap();
         indices.insert(&persons[2], 2).unwrap();
 
-        let b = indices.query_builder::<HashSet<Idx>>();
+        let b = indices.query_builder();
 
-        assert_eq!(Some(1), b.query(eq("pk", 41)).exec().next());
-        assert_eq!(Some(0), b.query(eq("pk", 3)).exec().next());
-        assert_eq!(None, b.query(eq("pk", 101)).exec().next());
+        assert_eq!([1], *b.query(eq("pk", 41)).exec());
+        assert_eq!([0], *b.query(eq("pk", 3)).exec());
+        assert!(b.query(eq("pk", 101)).exec().is_empty());
 
-        let r: Vec<Idx> = b.query(eq("second", 7)).exec().collect();
-        assert!(r.contains(&0));
-        assert!(r.contains(&1));
+        let r = b.query(eq("second", 7)).exec();
+        assert_eq!(*r, [0, 1]);
 
-        let r: Vec<Idx> = b
-            .query(eq("second", 3))
-            .or(eq("second", 7))
-            .exec()
-            .collect();
-        assert!(r.contains(&0));
-        assert!(r.contains(&1));
+        let r = b.query(eq("second", 3)).or(eq("second", 7)).exec();
+        assert_eq!(*r, [0, 1]);
 
-        let r = b.query(eq("name", "Jasmin")).exec().next();
-        assert_eq!(Some(0), r);
+        let r = b.query(eq("name", "Jasmin")).exec();
+        assert_eq!(*r, [0]);
 
-        let r: Vec<Idx> = b
-            .query(eq("name", "Jasmin"))
-            .or(eq("name", "Mario"))
-            .exec()
-            .collect();
-        assert!(r.contains(&0));
-        assert!(r.contains(&1));
+        let r = b.query(eq("name", "Jasmin")).or(eq("name", "Mario")).exec();
+        assert_eq!(*r, [0, 1]);
 
-        let r: Vec<Idx> = b.query(eq("gender", Gender::Male)).exec().collect();
-        assert!(r.contains(&2));
-        assert!(r.contains(&1));
-        let r = b.query(eq("gender", Gender::Female)).exec().next();
-        assert_eq!(r, Some(0));
+        let r = b.query(eq("gender", Gender::Male)).exec();
+        assert_eq!(*r, [1, 2]);
+
+        let r = b.query(eq("gender", Gender::Female)).exec();
+        assert_eq!(*r, [0]);
     }
 
     struct Idxs<'k, 's>(
@@ -263,14 +250,13 @@ mod tests {
 
         let idxs = Idxs(Box::new(idx_u), Box::new(idx_s));
 
-        let b = idxs.query_builder::<HashSet<Idx>>();
-        let mut r = b.query(1).and("a").exec();
-        assert_eq!(1, r.next().unwrap());
+        let b = idxs.query_builder();
+        let r = b.query(1).and("a").exec();
+        assert_eq!(*r, [1]);
 
-        let r: Vec<Idx> = b.query("z").or(1).and("a").exec().collect();
+        let r = b.query("z").or(1).and("a").exec();
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
-        assert!(r.contains(&1));
-        assert!(r.contains(&0));
+        assert_eq!(*r, [0, 1]);
 
         Ok(())
     }
