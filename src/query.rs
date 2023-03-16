@@ -5,6 +5,8 @@ use std::{
     cmp::{min, Ordering::*},
 };
 
+pub const EMPTY: &[Idx] = &[];
+
 pub trait Queryable<'k> {
     /// `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
     fn filter<P>(&self, p: P) -> Cow<[usize]>
@@ -45,7 +47,8 @@ where
         let idxs = self.0.filter(p.into());
         Query {
             q: self.0,
-            ors: Ors::new(idxs),
+            first: idxs,
+            ors: vec![],
         }
     }
 }
@@ -53,7 +56,8 @@ where
 /// Query combines different filter. Filters can be linked using `and` and `or`.
 pub struct Query<'q, Q> {
     q: &'q Q,
-    ors: Ors<'q>,
+    first: Cow<'q, [usize]>,
+    ors: Vec<Cow<'q, [usize]>>,
 }
 
 impl<'k, 'q, Q> Query<'q, Q>
@@ -65,7 +69,7 @@ where
         P: Into<Predicate<'k>>,
     {
         let idxs = self.q.filter(p.into());
-        self.ors.or(idxs);
+        self.ors.push(idxs);
         self
     }
 
@@ -74,53 +78,24 @@ where
         P: Into<Predicate<'k>>,
     {
         let idxs = self.q.filter(p.into());
-        self.ors.and(idxs);
-        self
-    }
 
-    pub fn exec(self) -> Cow<'q, [usize]> {
-        self.ors.exec()
-    }
-}
-
-struct Ors<'s> {
-    first: Cow<'s, [usize]>,
-    ors: Vec<Cow<'s, [usize]>>,
-}
-
-impl<'s> Ors<'s> {
-    const fn new(idxs: Cow<'s, [usize]>) -> Self {
-        Self {
-            first: idxs,
-            ors: vec![],
-        }
-    }
-
-    #[inline]
-    fn or(&mut self, idxs: Cow<'s, [usize]>) {
-        self.ors.push(idxs);
-    }
-
-    #[inline]
-    fn and(&mut self, idxs: Cow<'s, [usize]>) {
         if self.ors.is_empty() {
             self.first = and(&self.first, &idxs);
         } else {
             let i = self.ors.len() - 1;
             self.ors[i] = and(&self.ors[i], &idxs);
         }
+
+        self
     }
 
-    #[inline]
-    fn exec(mut self) -> Cow<'s, [usize]> {
+    pub fn exec(mut self) -> Cow<'q, [usize]> {
         for next in self.ors {
             self.first = or(self.first, next);
         }
         self.first
     }
 }
-
-pub const EMPTY: &[Idx] = &[];
 
 // pub fn or<'a>(lhs: &'a [Idx], rhs: &'a [Idx]) -> Cow<'a, [Idx]> {
 pub fn or<'a>(lhs: Cow<'a, [Idx]>, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
