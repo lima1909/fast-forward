@@ -5,7 +5,7 @@ use std::{
     cmp::{min, Ordering::*},
 };
 
-pub const EMPTY: &[Idx] = &[];
+pub const EMPTY_IDXS: &[Idx] = &[];
 
 pub trait Queryable<'k>: Sized {
     /// Filter is the fastes way to ask with one [`Predicate`].
@@ -73,6 +73,7 @@ where
         self
     }
 
+    #[must_use = "query do nothing, before execute"]
     pub fn exec(mut self) -> Cow<'q, [usize]> {
         for next in self.ors {
             self.first = or(self.first, next);
@@ -81,7 +82,6 @@ where
     }
 }
 
-// pub fn or<'a>(lhs: &'a [Idx], rhs: &'a [Idx]) -> Cow<'a, [Idx]> {
 pub fn or<'a>(lhs: Cow<'a, [Idx]>, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
     match (lhs.is_empty(), rhs.is_empty()) {
         (false, false) => {
@@ -123,13 +123,13 @@ pub fn or<'a>(lhs: Cow<'a, [Idx]>, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
         }
         (true, false) => rhs,
         (false, true) => lhs,
-        (true, true) => Cow::Borrowed(EMPTY),
+        (true, true) => Cow::Borrowed(EMPTY_IDXS),
     }
 }
 
 pub fn and<'a>(lhs: &[Idx], rhs: &[Idx]) -> Cow<'a, [Idx]> {
     if lhs.is_empty() || rhs.is_empty() {
-        return Cow::Borrowed(EMPTY);
+        return Cow::Borrowed(EMPTY_IDXS);
     }
 
     let ll = lhs.len();
@@ -162,76 +162,81 @@ pub fn and<'a>(lhs: &[Idx], rhs: &[Idx]) -> Cow<'a, [Idx]> {
 mod tests {
     use super::*;
 
-    //     mod or {
-    //         use super::*;
+    mod or {
+        use crate::{query::EMPTY_IDXS, Idx};
+        use std::borrow::Cow;
 
-    //         #[test]
-    //         fn both_empty() {
-    //             assert_eq!(EMPTY, &*or(EMPTY, EMPTY));
-    //         }
+        pub fn or<'a>(lhs: &'a [Idx], rhs: &'a [Idx]) -> Cow<'a, [Idx]> {
+            super::or(Cow::Borrowed(lhs), Cow::Borrowed(rhs))
+        }
 
-    //         #[test]
-    //         fn only_left() {
-    //             assert_eq!([1, 2], *or(&[1, 2], EMPTY));
-    //         }
+        #[test]
+        fn both_empty() {
+            assert_eq!(EMPTY_IDXS, &*or(EMPTY_IDXS, EMPTY_IDXS));
+        }
 
-    //         #[test]
-    //         fn only_right() {
-    //             assert_eq!([1, 2], *or(EMPTY, &[1, 2]));
-    //         }
+        #[test]
+        fn only_left() {
+            assert_eq!([1, 2], *or(&[1, 2], EMPTY_IDXS));
+        }
 
-    //         #[test]
-    //         fn diff_len() {
-    //             assert_eq!([1, 2, 3], *or(&[1], &[2, 3]),);
-    //             assert_eq!([1, 2, 3], *or(&[2, 3], &[1]),);
-    //         }
+        #[test]
+        fn only_right() {
+            assert_eq!([1, 2], *or(EMPTY_IDXS, &[1, 2]));
+        }
 
-    //         #[test]
-    //         fn overlapping_simple() {
-    //             assert_eq!([1, 2, 3], *or(&[1, 2], &[2, 3]),);
-    //             assert_eq!([1, 2, 3], *or(&[2, 3], &[1, 2]),);
-    //         }
+        #[test]
+        fn diff_len() {
+            assert_eq!([1, 2, 3], *or(&[1], &[2, 3]));
+            assert_eq!([1, 2, 3], *or(&[2, 3], &[1]));
+        }
 
-    //         #[test]
-    //         fn overlapping_diff_len() {
-    //             // 1, 2, 8, 9, 12
-    //             // 2, 5, 6, 10
-    //             assert_eq!(
-    //                 *or(&[1, 2, 8, 9, 12], &[2, 5, 6, 10]),
-    //                 [1, 2, 5, 6, 8, 9, 10, 12]
-    //             );
+        #[test]
+        fn overlapping_simple() {
+            assert_eq!([1, 2, 3], *or(&[1, 2], &[2, 3]));
+            assert_eq!([1, 2, 3], *or(&[2, 3], &[1, 2]));
+        }
 
-    //             // 2, 5, 6, 10
-    //             // 1, 2, 8, 9, 12
-    //             assert_eq!(
-    //                 *or(&[2, 5, 6, 10], &[1, 2, 8, 9, 12]),
-    //                 [1, 2, 5, 6, 8, 9, 10, 12]
-    //             );
-    //         }
-    //     }
+        #[test]
+        fn overlapping_diff_len() {
+            // 1, 2, 8, 9, 12
+            // 2, 5, 6, 10
+            assert_eq!(
+                *or(&[1, 2, 8, 9, 12], &[2, 5, 6, 10]),
+                [1, 2, 5, 6, 8, 9, 10, 12]
+            );
+
+            // 2, 5, 6, 10
+            // 1, 2, 8, 9, 12
+            assert_eq!(
+                *or(&[2, 5, 6, 10], &[1, 2, 8, 9, 12]),
+                [1, 2, 5, 6, 8, 9, 10, 12]
+            );
+        }
+    }
 
     mod and {
         use super::*;
 
         #[test]
         fn both_empty() {
-            assert_eq!(EMPTY, &*and(EMPTY, EMPTY));
+            assert_eq!(EMPTY_IDXS, &*and(EMPTY_IDXS, EMPTY_IDXS));
         }
 
         #[test]
         fn only_left() {
-            assert_eq!(EMPTY, &*and(&[1, 2], EMPTY));
+            assert_eq!(EMPTY_IDXS, &*and(&[1, 2], EMPTY_IDXS));
         }
 
         #[test]
         fn only_right() {
-            assert_eq!(EMPTY, &*and(EMPTY, &[1, 2]));
+            assert_eq!(EMPTY_IDXS, &*and(EMPTY_IDXS, &[1, 2]));
         }
 
         #[test]
         fn diff_len() {
-            assert_eq!(EMPTY, &*and(&[1], &[2, 3]));
-            assert_eq!(EMPTY, &*and(&[2, 3], &[1]));
+            assert_eq!(EMPTY_IDXS, &*and(&[1], &[2, 3]));
+            assert_eq!(EMPTY_IDXS, &*and(&[2, 3], &[1]));
 
             assert_eq!([2], *and(&[2], &[2, 5]));
             assert_eq!([2], *and(&[2], &[1, 2, 3]));
