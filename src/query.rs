@@ -267,4 +267,136 @@ mod tests {
             assert_eq!([2, 12], *and(&[2, 5, 6, 10, 12, 13, 15], &[1, 2, 8, 9, 12]));
         }
     }
+
+    mod query {
+        use crate::eq;
+
+        use super::*;
+
+        impl<'k> Queryable<'k> for Vec<i32> {
+            fn filter<P>(&self, p: P) -> Cow<[usize]>
+            where
+                P: Into<Predicate<'k>>,
+            {
+                let p = p.into();
+                let pos: usize = p.2.into();
+
+                match self.get(pos) {
+                    Some(_) => Cow::Owned(vec![pos]),
+                    None => Cow::Borrowed(EMPTY_IDXS),
+                }
+            }
+        }
+
+        fn values() -> Vec<i32> {
+            vec![0, 1, 2, 3]
+        }
+
+        #[test]
+        fn filter() {
+            assert_eq!(1, values().filter(eq("", 1))[0]);
+            assert_eq!(EMPTY_IDXS, &*values().filter(eq("", 99)));
+        }
+
+        #[test]
+        fn and() {
+            assert_eq!(1, values().query(eq("", 1)).and(eq("", 1)).exec()[0]);
+            assert_eq!(
+                EMPTY_IDXS,
+                &*values().query(eq("", 1)).and(eq("", 2)).exec()
+            );
+        }
+
+        #[test]
+        fn or() {
+            assert_eq!([1, 2], *values().query(eq("", 1)).or(eq("", 2)).exec());
+            assert_eq!([1], &*values().query(eq("", 1)).or(eq("", 99)).exec());
+            assert_eq!([1], &*values().query(eq("", 99)).or(eq("", 1)).exec());
+        }
+
+        #[test]
+        fn and_or() {
+            // (1 and 1) or 2 => [1, 2]
+            assert_eq!(
+                [1, 2],
+                *values()
+                    .query(eq("", 1))
+                    .and(eq("", 1))
+                    .or(eq("", 2))
+                    .exec()
+            );
+            // (1 and 2) or 3 => [3]
+            assert_eq!(
+                [3],
+                *values()
+                    .query(eq("", 1))
+                    .and(eq("", 2))
+                    .or(eq("", 3))
+                    .exec()
+            );
+        }
+
+        #[test]
+        fn or_and_12() {
+            // 1 or (2 and 2) => [1, 2]
+            assert_eq!(
+                [1, 2],
+                *values()
+                    .query(eq("", 1))
+                    .or(eq("", 2))
+                    .and(eq("", 2))
+                    .exec()
+            );
+            // 1 or (3 and 2) => [1]
+            assert_eq!(
+                [1],
+                *values()
+                    .query(eq("", 1))
+                    .or(eq("", 3))
+                    .and(eq("", 2))
+                    .exec()
+            );
+        }
+
+        #[test]
+        fn or_and_3() {
+            // 3 or (2 and 1) => [3]
+            assert_eq!(
+                [3],
+                *values()
+                    .query(eq("", 3))
+                    .or(eq("", 2))
+                    .and(eq("", 1))
+                    .exec()
+            );
+        }
+
+        #[test]
+        fn and_or_and_2() {
+            // (2 and 2) or (2 and 1) => [2]
+            assert_eq!(
+                [2],
+                *values()
+                    .query(eq("", 2))
+                    .and(eq("", 2))
+                    .or(eq("", 2))
+                    .and(eq("", 1))
+                    .exec()
+            );
+        }
+
+        #[test]
+        fn and_or_and_03() {
+            // 0 or (1 and 2) or 3) => [0, 3]
+            assert_eq!(
+                [0, 3],
+                *values()
+                    .query(eq("", 0))
+                    .or(eq("", 1))
+                    .and(eq("", 2))
+                    .or(eq("", 3))
+                    .exec()
+            );
+        }
+    }
 }
