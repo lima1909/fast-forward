@@ -226,6 +226,14 @@ mod tests {
             let err = i.insert(Key::Str("false"), 4);
             assert!(err.is_err());
         }
+
+        #[test]
+        fn with_capacity() {
+            let mut i = PkUintIdx::with_capacity(5);
+            i.insert_idx(1, 4).unwrap();
+            assert_eq!(2, i.len());
+            assert_eq!(5, i.capacity());
+        }
     }
 
     mod multi {

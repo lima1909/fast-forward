@@ -8,13 +8,12 @@ use std::{
 pub const EMPTY_IDXS: &[Idx] = &[];
 
 pub trait Queryable<'k>: Sized {
-    /// Filter is the fastes way to ask with one [`Predicate`].
-    /// For example: `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
+    /// Filter is the fastest way to ask with one [`Predicate`].
     fn filter<P>(&self, p: P) -> Result<Cow<[usize]>>
     where
         P: Into<Predicate<'k>>;
 
-    /// Query combined different `filter` with an logical `or` or `and`.
+    /// Query combined different `filter` with an logical `or` | `and`.
     fn query<P>(&self, p: P) -> Query<Self>
     where
         P: Into<Predicate<'k>>,
@@ -117,6 +116,7 @@ where
     }
 }
 
+// Logical `Or`, the union of two Inices.
 pub fn or<'a>(lhs: Cow<'a, [Idx]>, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
     match (lhs.is_empty(), rhs.is_empty()) {
         (false, false) => {
@@ -162,6 +162,7 @@ pub fn or<'a>(lhs: Cow<'a, [Idx]>, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
     }
 }
 
+// Logical `And`, the intersection of two Inices.
 pub fn and<'a>(lhs: &[Idx], rhs: &[Idx]) -> Cow<'a, [Idx]> {
     if lhs.is_empty() || rhs.is_empty() {
         return Cow::Borrowed(EMPTY_IDXS);

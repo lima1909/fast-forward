@@ -30,7 +30,7 @@ pub mod uint;
 
 use std::borrow::Cow;
 
-pub use idx::{And, Index, Multi, Or, Positions, Unique};
+pub use idx::{Index, Multi, Positions, Unique};
 
 use crate::{query::Queryable, Idx, Key, Op, Predicate, Result};
 
