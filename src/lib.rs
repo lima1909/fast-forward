@@ -40,20 +40,30 @@ pub enum Key<'a> {
     Str(&'a str),
 }
 
-impl<'a> From<Key<'a>> for usize {
-    fn from(key: Key<'a>) -> Self {
+impl<'a> TryFrom<Key<'a>> for usize {
+    type Error = error::Error;
+
+    fn try_from(key: Key<'a>) -> std::result::Result<Self, Self::Error> {
         match key {
-            Key::Usize(u) => u,
-            _ => todo!(),
+            Key::Usize(u) => Ok(u),
+            Key::Str(s) => Err(error::Error::InvalidKeyType {
+                expected: "usize",
+                got: format!("str: {s}"),
+            }),
         }
     }
 }
 
-impl<'a> From<Key<'a>> for &'a str {
-    fn from(key: Key<'a>) -> Self {
+impl<'a> TryFrom<Key<'a>> for &'a str {
+    type Error = error::Error;
+
+    fn try_from(key: Key<'a>) -> std::result::Result<Self, Self::Error> {
         match key {
-            Key::Str(s) => s,
-            _ => todo!(),
+            Key::Usize(u) => Err(error::Error::InvalidKeyType {
+                expected: "str",
+                got: format!("usize: {u}"),
+            }),
+            Key::Str(s) => Ok(s),
         }
     }
 }

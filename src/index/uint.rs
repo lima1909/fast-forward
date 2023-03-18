@@ -33,6 +33,7 @@
 //! ```
 use crate::{
     index::{Filterable, Idx, Index, Multi, Predicate, Result, Store, Unique},
+    query::EMPTY_IDXS,
     Key,
 };
 use std::{borrow::Cow, ops::Deref};
@@ -49,7 +50,7 @@ pub struct UIntVecIndex<I: Index>(Vec<Option<I>>);
 
 impl<'s, I: Index + Clone> Store<'s> for UIntVecIndex<I> {
     fn insert(&mut self, key: Key<'s>, i: Idx) -> Result {
-        let k = key.into();
+        let k = key.try_into()?;
         if self.0.len() <= k {
             self.0.resize(k + 1, None);
         }
@@ -64,12 +65,15 @@ impl<'s, I: Index + Clone> Store<'s> for UIntVecIndex<I> {
 }
 
 impl<'k, I: Index> Filterable<'k> for UIntVecIndex<I> {
-    fn filter(&self, p: Predicate<'k>) -> Cow<[usize]> {
-        let i: Idx = p.2.into();
-        match &self.0.get(i) {
+    fn filter(&self, p: Predicate<'k>) -> Result<Cow<[usize]>> {
+        let i: Idx = p.2.try_into()?;
+
+        let idxs = match &self.0.get(i) {
             Some(Some(idx)) => Cow::Borrowed(idx.get()),
-            _ => Cow::Borrowed(&[]),
-        }
+            _ => Cow::Borrowed(EMPTY_IDXS),
+        };
+
+        Ok(idxs)
     }
 }
 impl<I: Index + Clone> UIntVecIndex<I> {
@@ -104,7 +108,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = PkUintIdx::default();
-            assert_eq!(0, i.eq(2).len());
+            assert_eq!(0, i.eq(2).unwrap().len());
             assert!(i.0.is_empty());
         }
 
@@ -113,54 +117,56 @@ mod tests {
             let mut i = PkUintIdx::default();
             i.insert_idx(2, 4).unwrap();
 
-            assert_eq!(*i.eq(2), [4]);
+            assert_eq!(*i.eq(2).unwrap(), [4]);
             // assert_eq!(i.ne(3), &[]);  TODO: `ne` do not work now
             assert_eq!(3, i.0.len());
         }
 
         #[test]
-        fn or_find_idx_3_4() {
+        fn or_find_idx_3_4() -> Result {
             let mut idx = PkUintIdx::default();
             idx.insert_idx(2, 4).unwrap();
             idx.insert_idx(4, 8).unwrap();
             idx.insert_idx(3, 6).unwrap();
 
             {
-                let r = idx.query(3).or(4).exec();
+                let r = idx.query(3).or(4).exec()?;
                 assert_eq!(*r, [6, 8]);
 
                 // reuse the query without `new`
                 let q = idx.query(3);
-                let r = q.and(3).exec();
+                let r = q.and(3).exec()?;
                 assert_eq!(*r, [6]);
 
-                let r = idx.query(3).or(99).exec();
+                let r = idx.query(3).or(99).exec()?;
                 assert_eq!(*r, [6]);
 
-                let r = idx.query(99).or(4).exec();
+                let r = idx.query(99).or(4).exec()?;
                 assert_eq!(*r, [8]);
 
-                let r = idx.query(3).and(4).exec();
+                let r = idx.query(3).and(4).exec()?;
                 assert_eq!(*r, []);
             }
 
             // add a new index after creating a QueryBuilder
             idx.insert_idx(99, 0).unwrap();
-            let r = idx.query(99).exec();
+            let r = idx.query(99).exec()?;
             assert_eq!(*r, [0]);
+
+            Ok(())
         }
 
         #[test]
-        fn query_and_or() {
+        fn query_and_or() -> Result {
             let mut idx = PkUintIdx::default();
             idx.insert_idx(2, 4).unwrap();
             idx.insert_idx(4, 8).unwrap();
             idx.insert_idx(3, 6).unwrap();
 
-            let r = idx.query(3).and(2).exec();
+            let r = idx.query(3).and(2).exec()?;
             assert_eq!(*r, []);
 
-            let r = idx.query(3).or(4).and(2).exec();
+            let r = idx.query(3).or(4).and(2).exec()?;
             // =3 or =4 and =2 =>
             // (
             // (4 and 2 = false) // `and` has higher prio than `or`
@@ -168,6 +174,8 @@ mod tests {
             // )
             // => 3 -> 6
             assert_eq!(*r, [6]);
+
+            Ok(())
         }
 
         #[test]
@@ -181,7 +189,42 @@ mod tests {
         #[test]
         fn out_of_bound() {
             let i = PkUintIdx::default();
-            assert_eq!(0, i.eq(2).len());
+            assert_eq!(0, i.eq(2).unwrap().len());
+        }
+
+        #[test]
+        fn filter_ivalid_key_type() {
+            let i = PkUintIdx::default();
+            let err = i.eq("2");
+            assert!(err.is_err());
+            assert_eq!(
+                Error::InvalidKeyType {
+                    expected: "usize",
+                    got: "str: 2".to_string()
+                },
+                err.err().unwrap()
+            );
+        }
+
+        #[test]
+        fn query_ivalid_key_type() {
+            let i = PkUintIdx::default();
+            let err = i.query("2").or(2).exec();
+            assert!(err.is_err());
+            assert_eq!(
+                Error::InvalidKeyType {
+                    expected: "usize",
+                    got: "str: 2".to_string()
+                },
+                err.err().unwrap()
+            );
+        }
+
+        #[test]
+        fn insert_invalid_key_type() {
+            let mut i = PkUintIdx::default();
+            let err = i.insert(Key::Str("false"), 4);
+            assert!(err.is_err());
         }
     }
 
@@ -191,7 +234,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = MultiUintIdx::default();
-            assert_eq!(0, i.eq(2).len());
+            assert_eq!(0, i.eq(2).unwrap().len());
             assert!(i.0.is_empty());
         }
 
@@ -200,7 +243,7 @@ mod tests {
             let mut i = MultiUintIdx::default();
             i.insert_idx(2, 2).unwrap();
 
-            assert_eq!(*i.eq(2), [2]);
+            assert_eq!(*i.eq(2).unwrap(), [2]);
             assert_eq!(3, i.0.len());
         }
 
@@ -210,7 +253,7 @@ mod tests {
             i.insert_idx(2, 2).unwrap();
             i.insert_idx(2, 1).unwrap();
 
-            assert_eq!(*i.eq(2), [1, 2]);
+            assert_eq!(*i.eq(2).unwrap(), [1, 2]);
         }
     }
 }

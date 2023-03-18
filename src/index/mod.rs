@@ -43,7 +43,7 @@ pub trait Store<'s> {
 /// Filtering the [`Store`] with a given [`Predicate`]
 pub trait Filterable<'k> {
     /// find for the given `Key` all indices.
-    fn filter(&self, p: Predicate<'k>) -> Cow<[usize]>;
+    fn filter(&self, p: Predicate<'k>) -> Result<Cow<[usize]>>;
 }
 
 pub trait FilterableStore<'k, 's>: Store<'s> + Filterable<'k> {}
@@ -52,11 +52,11 @@ impl<'k, 's, F: Store<'s> + Filterable<'k>> FilterableStore<'k, 's> for F {}
 
 /// Find all [`Idx`] for an given [`Predicate`] ([`crate::Op`]) and [`crate::Key`].
 pub trait OpsFilter<'k>: Filterable<'k> {
-    fn eq<K: Into<Key<'k>>>(&self, k: K) -> Cow<[usize]> {
+    fn eq<K: Into<Key<'k>>>(&self, k: K) -> Result<Cow<[usize]>> {
         self.filter(Predicate::new_eq(k.into()))
     }
 
-    fn ne<K: Into<Key<'k>>>(&self, k: K) -> Cow<[usize]> {
+    fn ne<K: Into<Key<'k>>>(&self, k: K) -> Result<Cow<[usize]>> {
         self.filter(Predicate::new(Op::NE, k.into()))
     }
 }
@@ -91,7 +91,7 @@ impl<'k, 's, T> FieldStore<'k, 's, T> {
 pub struct Indices<'k, 'i, T>(Vec<FieldStore<'k, 'i, T>>);
 
 impl<'k, 'i, T> Queryable<'k> for Indices<'k, 'i, T> {
-    fn filter<P>(&self, p: P) -> Cow<[usize]>
+    fn filter<P>(&self, p: P) -> Result<Cow<[usize]>>
     where
         P: Into<Predicate<'k>>,
     {
@@ -168,7 +168,7 @@ mod tests {
     struct Person(usize, usize, String, Gender);
 
     #[test]
-    fn person_indices() {
+    fn person_indices() -> Result {
         let persons = vec![
             Person(3, 7, "Jasmin".to_string(), Gender::Female),
             Person(41, 7, "Mario".to_string(), Gender::Male),
@@ -196,30 +196,32 @@ mod tests {
         indices.insert(&persons[1], 1).unwrap();
         indices.insert(&persons[2], 2).unwrap();
 
-        assert_eq!([1], *indices.query(eq("pk", 41)).exec());
-        assert_eq!([0], *indices.query(eq("pk", 3)).exec());
-        assert!(indices.query(eq("pk", 101)).exec().is_empty());
+        assert_eq!([1], *indices.query(eq("pk", 41)).exec()?);
+        assert_eq!([0], *indices.query(eq("pk", 3)).exec()?);
+        assert!(indices.query(eq("pk", 101)).exec()?.is_empty());
 
-        let r = indices.query(eq("second", 7)).exec();
+        let r = indices.query(eq("second", 7)).exec()?;
         assert_eq!(*r, [0, 1]);
 
-        let r = indices.query(eq("second", 3)).or(eq("second", 7)).exec();
+        let r = indices.query(eq("second", 3)).or(eq("second", 7)).exec()?;
         assert_eq!(*r, [0, 1]);
 
-        let r = indices.query(eq("name", "Jasmin")).exec();
+        let r = indices.query(eq("name", "Jasmin")).exec()?;
         assert_eq!(*r, [0]);
 
         let r = indices
             .query(eq("name", "Jasmin"))
             .or(eq("name", "Mario"))
-            .exec();
+            .exec()?;
         assert_eq!(*r, [0, 1]);
 
-        let r = indices.query(eq("gender", Gender::Male)).exec();
+        let r = indices.query(eq("gender", Gender::Male)).exec()?;
         assert_eq!(*r, [1, 2]);
 
-        let r = indices.query(eq("gender", Gender::Female)).exec();
+        let r = indices.query(eq("gender", Gender::Female)).exec()?;
         assert_eq!(*r, [0]);
+
+        Ok(())
     }
 
     struct Idxs<'k, 's>(
@@ -228,7 +230,7 @@ mod tests {
     );
 
     impl<'k, 's> Filterable<'k> for Idxs<'k, 's> {
-        fn filter(&self, p: Predicate<'k>) -> Cow<[usize]> {
+        fn filter(&self, p: Predicate<'k>) -> Result<Cow<[usize]>> {
             match &p.2 {
                 Key::Usize(_u) => self.0.filter(p),
                 Key::Str(_s) => self.1.filter(p),
@@ -251,10 +253,10 @@ mod tests {
 
         let idxs = Idxs(Box::new(idx_u), Box::new(idx_s));
 
-        let r = idxs.query(1).and("a").exec();
+        let r = idxs.query(1).and("a").exec()?;
         assert_eq!(*r, [1]);
 
-        let r = idxs.query("z").or(1).and("a").exec();
+        let r = idxs.query("z").or(1).and("a").exec()?;
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
         assert_eq!(*r, [0, 1]);
 

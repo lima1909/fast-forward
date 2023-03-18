@@ -36,13 +36,13 @@ fn list_index(c: &mut Criterion) {
     let mut group = c.benchmark_group("index");
     group.bench_function("ff: query pk", |b| {
         b.iter(|| {
-            let i = idx.query(eq("pk", FIND_ID)).exec()[0];
+            let i = idx.query(eq("pk", FIND_ID)).exec().unwrap()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
     group.bench_function("ff: filter pk", |b| {
         b.iter(|| {
-            let i = idx.filter(eq("pk", FIND_ID))[0];
+            let i = idx.filter(eq("pk", FIND_ID)).unwrap()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
@@ -59,7 +59,8 @@ fn list_index(c: &mut Criterion) {
             let i = idx
                 .query(eq("pk", FIND_ID))
                 .and(eq("name", &FIND_PERSON.1))
-                .exec()[0];
+                .exec()
+                .unwrap()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });

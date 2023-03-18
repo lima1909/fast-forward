@@ -1,5 +1,5 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
-use crate::{index::Filterable, Idx, Predicate};
+use crate::{error, index::Filterable, Idx, Predicate, Result};
 use std::{
     borrow::Cow,
     cmp::{min, Ordering::*},
@@ -10,7 +10,7 @@ pub const EMPTY_IDXS: &[Idx] = &[];
 pub trait Queryable<'k>: Sized {
     /// Filter is the fastes way to ask with one [`Predicate`].
     /// For example: `pk` (name) `=` (ops::EQ) `6` (Key::Usize(6))
-    fn filter<P>(&self, p: P) -> Cow<[usize]>
+    fn filter<P>(&self, p: P) -> Result<Cow<[usize]>>
     where
         P: Into<Predicate<'k>>;
 
@@ -19,17 +19,15 @@ pub trait Queryable<'k>: Sized {
     where
         P: Into<Predicate<'k>>,
     {
-        let idxs = self.filter(p.into());
-        Query {
-            q: self,
-            first: idxs,
-            ors: vec![],
+        match self.filter(p.into()) {
+            Ok(idxs) => Query::new(self, idxs),
+            Err(err) => Query::new_err(self, err),
         }
     }
 }
 
 impl<'k, F: Filterable<'k>> Queryable<'k> for F {
-    fn filter<P>(&self, p: P) -> Cow<[usize]>
+    fn filter<P>(&self, p: P) -> Result<Cow<[usize]>>
     where
         P: Into<Predicate<'k>>,
     {
@@ -42,6 +40,27 @@ pub struct Query<'q, Q> {
     q: &'q Q,
     first: Cow<'q, [usize]>,
     ors: Vec<Cow<'q, [usize]>>,
+    err: Option<error::Error>,
+}
+
+impl<'q, Q> Query<'q, Q> {
+    fn new(q: &'q Q, first: Cow<'q, [usize]>) -> Self {
+        Self {
+            q,
+            first,
+            ors: vec![],
+            err: None,
+        }
+    }
+
+    fn new_err(q: &'q Q, err: error::Error) -> Self {
+        Self {
+            q,
+            first: Cow::Borrowed(EMPTY_IDXS),
+            ors: vec![],
+            err: Some(err),
+        }
+    }
 }
 
 impl<'k, 'q, Q> Query<'q, Q>
@@ -52,8 +71,14 @@ where
     where
         P: Into<Predicate<'k>>,
     {
-        let idxs = self.q.filter(p.into());
-        self.ors.push(idxs);
+        if let Some(_err) = &self.err {
+            return self;
+        }
+
+        match self.q.filter(p.into()) {
+            Ok(idxs) => self.ors.push(idxs),
+            Err(err) => self.err = Some(err),
+        }
         self
     }
 
@@ -61,24 +86,34 @@ where
     where
         P: Into<Predicate<'k>>,
     {
-        let idxs = self.q.filter(p.into());
-
-        if self.ors.is_empty() {
-            self.first = and(&self.first, &idxs);
-        } else {
-            let i = self.ors.len() - 1;
-            self.ors[i] = and(&self.ors[i], &idxs);
+        if let Some(_err) = &self.err {
+            return self;
         }
 
+        match self.q.filter(p.into()) {
+            Ok(idxs) => {
+                if self.ors.is_empty() {
+                    self.first = and(&self.first, &idxs);
+                } else {
+                    let i = self.ors.len() - 1;
+                    self.ors[i] = and(&self.ors[i], &idxs);
+                }
+            }
+            Err(err) => self.err = Some(err),
+        }
         self
     }
 
     #[must_use = "query do nothing, before execute"]
-    pub fn exec(mut self) -> Cow<'q, [usize]> {
+    pub fn exec(mut self) -> Result<Cow<'q, [usize]>> {
+        if let Some(err) = self.err {
+            return Err(err);
+        }
+
         for next in self.ors {
             self.first = or(self.first, next);
         }
-        self.first
+        Ok(self.first)
     }
 }
 
@@ -274,17 +309,19 @@ mod tests {
         use super::*;
 
         impl<'k> Queryable<'k> for Vec<i32> {
-            fn filter<P>(&self, p: P) -> Cow<[usize]>
+            fn filter<P>(&self, p: P) -> Result<Cow<[usize]>>
             where
                 P: Into<Predicate<'k>>,
             {
                 let p = p.into();
-                let pos: usize = p.2.into();
+                let pos: usize = p.2.try_into()?;
 
-                match self.get(pos) {
+                let idxs = match self.get(pos) {
                     Some(_) => Cow::Owned(vec![pos]),
                     None => Cow::Borrowed(EMPTY_IDXS),
-                }
+                };
+
+                Ok(idxs)
             }
         }
 
@@ -293,29 +330,35 @@ mod tests {
         }
 
         #[test]
-        fn filter() {
-            assert_eq!(1, values().filter(eq("", 1))[0]);
-            assert_eq!(EMPTY_IDXS, &*values().filter(eq("", 99)));
+        fn filter() -> Result {
+            assert_eq!(1, values().filter(eq("", 1))?[0]);
+            assert_eq!(EMPTY_IDXS, &*values().filter(eq("", 99))?);
+
+            Ok(())
         }
 
         #[test]
-        fn and() {
-            assert_eq!(1, values().query(eq("", 1)).and(eq("", 1)).exec()[0]);
+        fn and() -> Result {
+            assert_eq!(1, values().query(eq("", 1)).and(eq("", 1)).exec()?[0]);
             assert_eq!(
                 EMPTY_IDXS,
-                &*values().query(eq("", 1)).and(eq("", 2)).exec()
+                &*values().query(eq("", 1)).and(eq("", 2)).exec()?
             );
+
+            Ok(())
         }
 
         #[test]
-        fn or() {
-            assert_eq!([1, 2], *values().query(eq("", 1)).or(eq("", 2)).exec());
-            assert_eq!([1], &*values().query(eq("", 1)).or(eq("", 99)).exec());
-            assert_eq!([1], &*values().query(eq("", 99)).or(eq("", 1)).exec());
+        fn or() -> Result {
+            assert_eq!([1, 2], *values().query(eq("", 1)).or(eq("", 2)).exec()?);
+            assert_eq!([1], &*values().query(eq("", 1)).or(eq("", 99)).exec()?);
+            assert_eq!([1], &*values().query(eq("", 99)).or(eq("", 1)).exec()?);
+
+            Ok(())
         }
 
         #[test]
-        fn and_or() {
+        fn and_or() -> Result {
             // (1 and 1) or 2 => [1, 2]
             assert_eq!(
                 [1, 2],
@@ -323,7 +366,7 @@ mod tests {
                     .query(eq("", 1))
                     .and(eq("", 1))
                     .or(eq("", 2))
-                    .exec()
+                    .exec()?
             );
             // (1 and 2) or 3 => [3]
             assert_eq!(
@@ -332,12 +375,14 @@ mod tests {
                     .query(eq("", 1))
                     .and(eq("", 2))
                     .or(eq("", 3))
-                    .exec()
+                    .exec()?
             );
+
+            Ok(())
         }
 
         #[test]
-        fn or_and_12() {
+        fn or_and_12() -> Result {
             // 1 or (2 and 2) => [1, 2]
             assert_eq!(
                 [1, 2],
@@ -345,7 +390,7 @@ mod tests {
                     .query(eq("", 1))
                     .or(eq("", 2))
                     .and(eq("", 2))
-                    .exec()
+                    .exec()?
             );
             // 1 or (3 and 2) => [1]
             assert_eq!(
@@ -354,12 +399,14 @@ mod tests {
                     .query(eq("", 1))
                     .or(eq("", 3))
                     .and(eq("", 2))
-                    .exec()
+                    .exec()?
             );
+
+            Ok(())
         }
 
         #[test]
-        fn or_and_3() {
+        fn or_and_3() -> Result {
             // 3 or (2 and 1) => [3]
             assert_eq!(
                 [3],
@@ -367,12 +414,14 @@ mod tests {
                     .query(eq("", 3))
                     .or(eq("", 2))
                     .and(eq("", 1))
-                    .exec()
+                    .exec()?
             );
+
+            Ok(())
         }
 
         #[test]
-        fn and_or_and_2() {
+        fn and_or_and_2() -> Result {
             // (2 and 2) or (2 and 1) => [2]
             assert_eq!(
                 [2],
@@ -381,12 +430,14 @@ mod tests {
                     .and(eq("", 2))
                     .or(eq("", 2))
                     .and(eq("", 1))
-                    .exec()
+                    .exec()?
             );
+
+            Ok(())
         }
 
         #[test]
-        fn and_or_and_03() {
+        fn and_or_and_03() -> Result {
             // 0 or (1 and 2) or 3) => [0, 3]
             assert_eq!(
                 [0, 3],
@@ -395,8 +446,23 @@ mod tests {
                     .or(eq("", 1))
                     .and(eq("", 2))
                     .or(eq("", 3))
-                    .exec()
+                    .exec()?
             );
+
+            Ok(())
+        }
+
+        #[test]
+        fn error() {
+            let v = values();
+            let err = v.query(eq("", "AA")).or(eq("", 1)).and(eq("", 2)).exec();
+            assert!(err.is_err());
+
+            let err = v.query(eq("", 0)).or(eq("", "AA")).and(eq("", 2)).exec();
+            assert!(err.is_err());
+
+            let err = v.query(eq("", 0)).or(eq("", 1)).and(eq("", "AA")).exec();
+            assert!(err.is_err());
         }
     }
 }
