@@ -61,7 +61,9 @@ impl<'s, I: Index> Store<'s> for StrMapIndex<'s, I> {
 
 impl<'k, 's, I: Index> Filterable<'k> for StrMapIndex<'s, I> {
     fn filter(&self, p: Predicate<'k>) -> Result<Cow<[usize]>> {
-        let idxs = match self.0.get(p.2.try_into()?) {
+        let s: &str = p.2.try_into()?;
+
+        let idxs = match self.0.get(s) {
             Some(i) => Cow::Borrowed(i.get()),
             None => Cow::Borrowed(EMPTY_IDXS),
         };
