@@ -32,11 +32,10 @@
 //! ...  | ...
 //! ```
 use crate::{
-    index::{Filterable, Idx, Index, Multi, Predicate, Result, Store, Unique},
+    index::{Idx, Index, Multi, Result, Store, Unique},
     query::EMPTY_IDXS,
-    Key,
 };
-use std::{borrow::Cow, ops::Deref};
+use std::borrow::Cow;
 
 /// Unique `Primary Key` from type [`usize`].
 pub type PkUintIdx = UIntVecIndex<Unique>;
@@ -48,9 +47,11 @@ pub type MultiUintIdx = UIntVecIndex<Multi>;
 #[derive(Debug, Default)]
 pub struct UIntVecIndex<I: Index>(Vec<Option<I>>);
 
-impl<'s, I: Index + Clone> Store<'s> for UIntVecIndex<I> {
-    fn insert(&mut self, key: Key<'s>, i: Idx) -> Result {
-        let k = key.try_into()?;
+impl<I> Store<Idx> for UIntVecIndex<I>
+where
+    I: Index + Clone,
+{
+    fn insert(&mut self, k: Idx, i: Idx) -> Result {
         if self.0.len() <= k {
             self.0.resize(k + 1, None);
         }
@@ -64,43 +65,32 @@ impl<'s, I: Index + Clone> Store<'s> for UIntVecIndex<I> {
     }
 }
 
-impl<'k, I: Index> Filterable<'k> for UIntVecIndex<I> {
-    fn filter(&self, p: Predicate<'k>) -> Result<Cow<[usize]>> {
-        let i: Idx = p.2.try_into()?;
-
-        let idxs = match &self.0.get(i) {
+impl<I> UIntVecIndex<I>
+where
+    I: Index,
+{
+    pub fn eq(&self, i: usize) -> Cow<[Idx]> {
+        match &self.0.get(i) {
             Some(Some(idx)) => Cow::Borrowed(idx.get()),
             _ => Cow::Borrowed(EMPTY_IDXS),
-        };
-
-        Ok(idxs)
-    }
-}
-impl<I: Index + Clone> UIntVecIndex<I> {
-    pub fn insert_idx(&mut self, idx: Idx, i: Idx) -> Result {
-        self.insert(idx.into(), i)
+        }
     }
 }
 
-impl<I: Index> UIntVecIndex<I> {
+impl<I> UIntVecIndex<I>
+where
+    I: Index + Clone,
+{
     pub fn with_capacity(capacity: usize) -> Self {
         UIntVecIndex(Vec::with_capacity(capacity))
-    }
-}
-
-impl<I: Index> Deref for UIntVecIndex<I> {
-    type Target = Vec<Option<I>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::Queryable;
-    use crate::{error::Error, index::OpsFilter};
+    use crate::error::Error;
+    use crate::query;
 
     mod unique {
         use super::*;
@@ -108,65 +98,61 @@ mod tests {
         #[test]
         fn empty() {
             let i = PkUintIdx::default();
-            assert_eq!(0, i.eq(2).unwrap().len());
+            assert_eq!(0, i.eq(2).len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
             let mut i = PkUintIdx::default();
-            i.insert_idx(2, 4).unwrap();
+            i.insert(2, 4).unwrap();
 
-            assert_eq!(*i.eq(2).unwrap(), [4]);
+            assert_eq!(*i.eq(2), [4]);
             // assert_eq!(i.ne(3), &[]);  TODO: `ne` do not work now
             assert_eq!(3, i.0.len());
         }
 
         #[test]
-        fn or_find_idx_3_4() -> Result {
+        fn or_find_idx_3_4() {
             let mut idx = PkUintIdx::default();
-            idx.insert_idx(2, 4).unwrap();
-            idx.insert_idx(4, 8).unwrap();
-            idx.insert_idx(3, 6).unwrap();
+            idx.insert(2, 4).unwrap();
+            idx.insert(4, 8).unwrap();
+            idx.insert(3, 6).unwrap();
 
-            {
-                let r = idx.query(3).or(4).exec()?;
-                assert_eq!(*r, [6, 8]);
+            let r = query(idx.eq(3)).or(idx.eq(4)).exec();
+            assert_eq!(*r, [6, 8]);
 
-                // reuse the query without `new`
-                let q = idx.query(3);
-                let r = q.and(3).exec()?;
-                assert_eq!(*r, [6]);
+            // reuse the query without `new`
+            let q = query(idx.eq(3));
+            let r = q.and(idx.eq(3)).exec();
+            assert_eq!(*r, [6]);
 
-                let r = idx.query(3).or(99).exec()?;
-                assert_eq!(*r, [6]);
+            let r = query(idx.eq(3)).or(idx.eq(99)).exec();
+            assert_eq!(*r, [6]);
 
-                let r = idx.query(99).or(4).exec()?;
-                assert_eq!(*r, [8]);
+            let r = query(idx.eq(99)).or(idx.eq(4)).exec();
+            assert_eq!(*r, [8]);
 
-                let r = idx.query(3).and(4).exec()?;
-                assert_eq!(*r, []);
-            }
+            let r = query(idx.eq(3)).and(idx.eq(4)).exec();
+            assert_eq!(&*r, EMPTY_IDXS);
 
             // add a new index after creating a QueryBuilder
-            idx.insert_idx(99, 0).unwrap();
-            let r = idx.query(99).exec()?;
+            idx.insert(99, 0).unwrap();
+            let r = query(idx.eq(99)).exec();
             assert_eq!(*r, [0]);
-
-            Ok(())
         }
 
         #[test]
-        fn query_and_or() -> Result {
+        fn query_and_or() {
             let mut idx = PkUintIdx::default();
-            idx.insert_idx(2, 4).unwrap();
-            idx.insert_idx(4, 8).unwrap();
-            idx.insert_idx(3, 6).unwrap();
+            idx.insert(2, 4).unwrap();
+            idx.insert(4, 8).unwrap();
+            idx.insert(3, 6).unwrap();
 
-            let r = idx.query(3).and(2).exec()?;
-            assert_eq!(*r, []);
+            let r = query(idx.eq(3)).and(idx.eq(2)).exec();
+            assert_eq!(&*r, EMPTY_IDXS);
 
-            let r = idx.query(3).or(4).and(2).exec()?;
+            let r = query(idx.eq(3)).or(idx.eq(4)).and(idx.eq(2)).exec();
             // =3 or =4 and =2 =>
             // (
             // (4 and 2 = false) // `and` has higher prio than `or`
@@ -174,65 +160,28 @@ mod tests {
             // )
             // => 3 -> 6
             assert_eq!(*r, [6]);
-
-            Ok(())
         }
 
         #[test]
         fn double_index() {
             let mut i = PkUintIdx::default();
-            i.insert_idx(2, 2).unwrap();
+            i.insert(2, 2).unwrap();
 
-            assert_eq!(Err(Error::NotUniqueIndexKey), i.insert_idx(2, 2));
+            assert_eq!(Err(Error::NotUniqueIndexKey), i.insert(2, 2));
         }
 
         #[test]
         fn out_of_bound() {
             let i = PkUintIdx::default();
-            assert_eq!(0, i.eq(2).unwrap().len());
-        }
-
-        #[test]
-        fn filter_ivalid_key_type() {
-            let i = PkUintIdx::default();
-            let err = i.eq("2");
-            assert!(err.is_err());
-            assert_eq!(
-                Error::InvalidKeyType {
-                    expected: "usize",
-                    got: "str: 2".to_string()
-                },
-                err.err().unwrap()
-            );
-        }
-
-        #[test]
-        fn query_ivalid_key_type() {
-            let i = PkUintIdx::default();
-            let err = i.query("2").or(2).exec();
-            assert!(err.is_err());
-            assert_eq!(
-                Error::InvalidKeyType {
-                    expected: "usize",
-                    got: "str: 2".to_string()
-                },
-                err.err().unwrap()
-            );
-        }
-
-        #[test]
-        fn insert_invalid_key_type() {
-            let mut i = PkUintIdx::default();
-            let err = i.insert(Key::Str("false"), 4);
-            assert!(err.is_err());
+            assert_eq!(0, i.eq(2).len());
         }
 
         #[test]
         fn with_capacity() {
             let mut i = PkUintIdx::with_capacity(5);
-            i.insert_idx(1, 4).unwrap();
-            assert_eq!(2, i.len());
-            assert_eq!(5, i.capacity());
+            i.insert(1, 4).unwrap();
+            assert_eq!(2, i.0.len());
+            assert_eq!(5, i.0.capacity());
         }
     }
 
@@ -242,26 +191,26 @@ mod tests {
         #[test]
         fn empty() {
             let i = MultiUintIdx::default();
-            assert_eq!(0, i.eq(2).unwrap().len());
+            assert_eq!(0, i.eq(2).len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
             let mut i = MultiUintIdx::default();
-            i.insert_idx(2, 2).unwrap();
+            i.insert(2, 2).unwrap();
 
-            assert_eq!(*i.eq(2).unwrap(), [2]);
+            assert_eq!(*i.eq(2), [2]);
             assert_eq!(3, i.0.len());
         }
 
         #[test]
         fn double_index() {
             let mut i = MultiUintIdx::default();
-            i.insert_idx(2, 2).unwrap();
-            i.insert_idx(2, 1).unwrap();
+            i.insert(2, 2).unwrap();
+            i.insert(2, 1).unwrap();
 
-            assert_eq!(*i.eq(2).unwrap(), [1, 2]);
+            assert_eq!(*i.eq(2), [1, 2]);
         }
     }
 }

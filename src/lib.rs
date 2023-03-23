@@ -2,7 +2,7 @@
 //!
 //! This _faster_ is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the list.
 //!
-//! An Index has two parts, a [`Key`] (item to searching for) and a position (the index in the list) [`Idx`].
+//! An Index has two parts, a `Key` (item to searching for) and a position (the index in the list) [`Idx`].
 //!
 //! ## A simple Example:
 //!
@@ -21,135 +21,95 @@
 //!   ...    | ...
 //! ```
 //!
-//! To Find the [`Key::Str("Jon")`] with the [`Op::EQ`] is only one step necessary.
+//! To Find the `Key`: "Jon" with the `operation = equals` is only one step necessary.
 //!
 pub mod error;
 pub mod index;
 pub mod query;
 
+pub use query::query;
+
 /// Default Result for index with the Ok(T) value or en [`error::Error`].
-type Result<T = ()> = std::result::Result<T, error::Error>;
+pub type Result<T = ()> = std::result::Result<T, error::Error>;
 
 /// `Idx` is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
 
-/// Supported types for quering/filtering [`Predicate`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Key<'a> {
-    Usize(usize),
-    Str(&'a str),
-}
-
-impl<'a> TryFrom<Key<'a>> for usize {
-    type Error = error::Error;
-
-    fn try_from(key: Key<'a>) -> std::result::Result<Self, Self::Error> {
-        match key {
-            Key::Usize(u) => Ok(u),
-            Key::Str(s) => Err(error::Error::InvalidKeyType {
-                expected: "usize",
-                got: format!("str: {s}"),
-            }),
+#[macro_export]
+macro_rules! fast {
+    ( $strukt:ident$(<$lt:lifetime>)?
+        {
+        $($field:ident: $typ:ty $(=> $amp:tt)?), + $(,)*
         }
-    }
-}
+    ) => { fast!($strukt$(<$lt>)? as Fast { $($field: $typ $(=> $amp)? ), + }) };
 
-impl<'a> TryFrom<Key<'a>> for &'a str {
-    type Error = error::Error;
-
-    fn try_from(key: Key<'a>) -> std::result::Result<Self, Self::Error> {
-        match key {
-            Key::Usize(u) => Err(error::Error::InvalidKeyType {
-                expected: "str",
-                got: format!("usize: {u}"),
-            }),
-            Key::Str(s) => Ok(s),
+    ( $strukt:ident$(<$lt:lifetime>)? as $fast:ident
+        {
+        $($fast_field:ident: $typ:ty $(=> $amp:tt)?), + $(,)*
         }
-    }
+
+    ) => {
+
+        {
+
+        /// Container-struct for all indices.
+        #[derive(Default)]
+        struct $fast$(<$lt>)? {
+            $(
+                $fast_field: $typ,
+            )+
+        }
+
+        /// Insert in all indices-stores the `Key` and the `Index`.
+        impl$(<$lt>)? $fast$(<$lt>)? {
+            fn insert(&mut self, s: &$($lt)? $strukt, idx: $crate::Idx) -> $crate::Result {
+                use $crate::index::Store;
+
+                $(
+                    self.$fast_field.insert($($amp)?s.$fast_field, idx)?;
+                )+
+
+
+                Ok(())
+            }
+        }
+
+        $fast::default()
+
+        }
+
+    };
 }
 
-impl From<usize> for Key<'_> {
-    fn from(u: usize) -> Self {
-        Key::Usize(u)
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl<'a> From<&'a str> for Key<'a> {
-    fn from(s: &'a str) -> Self {
-        Key::Str(s)
-    }
-}
-
-impl<'a> From<&'a String> for Key<'a> {
-    fn from(s: &'a String) -> Self {
-        Key::Str(s)
-    }
-}
-
-/// Operations are primarily compare functions, like equal, greater than and so on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Op {
-    /// equal `=`
-    EQ,
-    /// not equal `!=`
-    NE,
-    /// less than `<`
-    LT,
-    /// less equal `<=`
-    LE,
-    /// greater than `>`
-    GT,
-    /// greater equal `>=`
-    GE,
-    /// define your own Op
-    Other(u8),
-}
-
-/// A Predicate is a filter definition.
-/// This means, a filter consist of an optional field-name, a operation [`Op`] and a [`Key`] (`name = "Jasmin"`).
-/// A [`Key`] is a unique value under which all occurring indices are stored.
-///
-/// For example:
-/// ```text
-/// name =  "Jasmin"
-/// ```
-///  - field-name: `name`
-///  - Op: `=`
-///  - Key: `"Jasmin"`
-///
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Predicate<'k>(&'k str, Op, Key<'k>);
-
-impl<'k> Predicate<'k> {
-    pub const fn new(op: Op, key: Key<'k>) -> Self {
-        Self("", op, key)
+    struct Person {
+        id: usize,
+        _multi: usize,
+        name: String,
     }
 
-    pub const fn new_eq(key: Key<'k>) -> Self {
-        Self("", Op::EQ, key)
+    #[test]
+    fn fast() {
+        use crate::index::{map::UniqueStrIdx, uint::UIntVecIndex, Unique};
+        use crate::query;
+
+        let mut p = fast!(
+                Person<'p> {
+                    id: UIntVecIndex<Unique>,
+                    name: UniqueStrIdx<'p> => &,
+                }
+        );
+
+        let p1 = Person {
+            id: 4,
+            _multi: 8,
+            name: "Foo".into(),
+        };
+        p.insert(&p1, 1).unwrap();
+
+        assert_eq!([1], *query(p.id.eq(4)).or(p.name.eq("Foo")).exec());
     }
-}
-
-/// Shortcut for: `= (usize)`
-impl<'k> From<usize> for Predicate<'k> {
-    fn from(u: usize) -> Self {
-        Predicate::new_eq(Key::Usize(u))
-    }
-}
-
-/// Shortcut for: `= (&str)`
-impl<'k> From<&'k str> for Predicate<'k> {
-    fn from(s: &'k str) -> Self {
-        Predicate::new_eq(Key::Str(s))
-    }
-}
-
-/// Shortcut: `field = Key`
-pub fn eq<'k, K: Into<Key<'k>>>(field: &'k str, key: K) -> Predicate<'k> {
-    Predicate(field, Op::EQ, key.into())
-}
-
-/// Shortcut: `field != Key`
-pub fn ne<'k, K: Into<Key<'k>>>(field: &'k str, key: K) -> Predicate<'k> {
-    Predicate(field, Op::NE, key.into())
 }

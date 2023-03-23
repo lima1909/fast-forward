@@ -27,9 +27,9 @@
 //!
 //! ```
 use crate::{
-    index::{Filterable, Index, Multi, Predicate, Store, Unique},
+    index::{Index, Multi, Store, Unique},
     query::EMPTY_IDXS,
-    Idx, Key, Result,
+    Idx,
 };
 use std::{
     borrow::Cow,
@@ -47,9 +47,9 @@ pub type MultiStrIdx<'a> = StrMapIndex<'a, Multi>;
 #[derive(Debug, Default)]
 pub struct StrMapIndex<'s, I: Index>(BTreeMap<&'s str, I>);
 
-impl<'s, I: Index> Store<'s> for StrMapIndex<'s, I> {
-    fn insert(&mut self, k: Key<'s>, i: Idx) -> super::Result {
-        match self.0.entry(k.try_into()?) {
+impl<'s, I: Index> Store<&'s str> for StrMapIndex<'s, I> {
+    fn insert(&mut self, k: &'s str, i: Idx) -> super::Result {
+        match self.0.entry(k) {
             Entry::Vacant(e) => {
                 e.insert(I::new(i));
                 Ok(())
@@ -59,30 +59,20 @@ impl<'s, I: Index> Store<'s> for StrMapIndex<'s, I> {
     }
 }
 
-impl<'k, 's, I: Index> Filterable<'k> for StrMapIndex<'s, I> {
-    fn filter(&self, p: Predicate<'k>) -> Result<Cow<[usize]>> {
-        let s: &str = p.2.try_into()?;
-
-        let idxs = match self.0.get(s) {
+impl<'s, I: Index> StrMapIndex<'s, I> {
+    pub fn eq(&self, s: &'s str) -> Cow<[Idx]> {
+        match self.0.get(s) {
             Some(i) => Cow::Borrowed(i.get()),
             None => Cow::Borrowed(EMPTY_IDXS),
-        };
-
-        Ok(idxs)
-    }
-}
-
-impl<'s, I: Index> StrMapIndex<'s, I> {
-    pub fn insert_str(&mut self, k: &'s str, i: Idx) -> super::Result {
-        self.insert(k.into(), i)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::Queryable;
-    use crate::{error::Error, index::OpsFilter};
+    use crate::error::Error;
+    use crate::query;
 
     mod unique {
         use super::*;
@@ -90,57 +80,48 @@ mod tests {
         #[test]
         fn empty() {
             let i = UniqueStrIdx::default();
-            assert_eq!(0, i.eq("Jasmin").unwrap().len());
+            assert_eq!(0, i.eq("Jasmin").len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
             let mut i = UniqueStrIdx::default();
-            i.insert_str("Jasmin", 4).unwrap();
+            i.insert("Jasmin", 4).unwrap();
 
-            assert_eq!(*i.eq("Jasmin").unwrap(), [4]);
+            assert_eq!(*i.eq("Jasmin"), [4]);
             assert_eq!(1, i.0.len());
         }
 
         #[test]
-        fn or_find_idx_3_4() -> Result {
+        fn or_find_idx_3_4() {
             let mut idx = UniqueStrIdx::default();
-            idx.insert_str("Jasmin", 4).unwrap();
-            idx.insert_str("Mario", 8).unwrap();
-            idx.insert_str("Paul", 6).unwrap();
+            idx.insert("Jasmin", 4).unwrap();
+            idx.insert("Mario", 8).unwrap();
+            idx.insert("Paul", 6).unwrap();
 
-            let r = idx.query("Mario").or("Paul").exec()?;
+            let r = query(idx.eq("Mario")).or(idx.eq("Paul")).exec();
             assert_eq!(*r, [6, 8]);
 
-            let r = idx.query("Paul").or("Blub").exec()?;
+            let r = query(idx.eq("Paul")).or(idx.eq("Blub")).exec();
             assert_eq!(*r, [6]);
 
-            let r = idx.query("Blub").or("Mario").exec()?;
+            let r = query(idx.eq("Blub")).or(idx.eq("Mario")).exec();
             assert_eq!(*r, [8]);
-
-            Ok(())
         }
 
         #[test]
         fn double_index() {
             let mut i = UniqueStrIdx::default();
-            i.insert_str("Jasmin", 2).unwrap();
+            i.insert("Jasmin", 2).unwrap();
 
-            assert_eq!(Err(Error::NotUniqueIndexKey), i.insert_str("Jasmin", 2));
+            assert_eq!(Err(Error::NotUniqueIndexKey), i.insert("Jasmin", 2));
         }
 
         #[test]
         fn out_of_bound() {
             let i = UniqueStrIdx::default();
-            assert_eq!(0, i.eq("Jasmin").unwrap().len());
-        }
-
-        #[test]
-        fn insert_invalid_key_type() {
-            let mut i = UniqueStrIdx::default();
-            let err = i.insert(Key::Usize(42), 4);
-            assert!(err.is_err());
+            assert_eq!(0, i.eq("Jasmin").len());
         }
     }
 
@@ -150,26 +131,26 @@ mod tests {
         #[test]
         fn empty() {
             let i = MultiStrIdx::default();
-            assert_eq!(0, i.eq("Jasmin").unwrap().len());
+            assert_eq!(0, i.eq("Jasmin").len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
             let mut i = MultiStrIdx::default();
-            i.insert_str("Jasmin", 2).unwrap();
+            i.insert("Jasmin", 2).unwrap();
 
-            assert_eq!(*i.eq("Jasmin").unwrap(), [2]);
+            assert_eq!(*i.eq("Jasmin"), [2]);
             assert_eq!(1, i.0.len());
         }
 
         #[test]
         fn double_index() {
             let mut i = MultiStrIdx::default();
-            i.insert_str("Jasmin", 2).unwrap();
-            i.insert_str("Jasmin", 1).unwrap();
+            i.insert("Jasmin", 2).unwrap();
+            i.insert("Jasmin", 1).unwrap();
 
-            assert_eq!(*i.eq("Jasmin").unwrap(), [1, 2]);
+            assert_eq!(*i.eq("Jasmin"), [1, 2]);
         }
     }
 }

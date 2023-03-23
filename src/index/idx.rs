@@ -58,7 +58,7 @@ impl Index for Multi {
 }
 
 /// Container is for gathering different `Indices` (&[Idx]).
-/// It is usefull for operations like greater then ([`crate::Op::GT`]),
+/// It is usefull for operations like greater then (`greater than`),
 /// where the result consists one or many [`Index`]s.
 pub struct Container<I>(Vec<Idx>, PhantomData<I>);
 

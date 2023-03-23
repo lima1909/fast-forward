@@ -4,15 +4,28 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 use fast_forward::index::map::UniqueStrIdx;
 use fast_forward::index::uint::UIntVecIndex;
-use fast_forward::index::{Indices, Unique};
-use fast_forward::query::{and, or, Queryable};
-use fast_forward::{eq, Key};
+use fast_forward::index::{Store, Unique};
+use fast_forward::query::{and, or, query};
+use fast_forward::{Idx, Result};
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Person(usize, String);
+
+struct Indices<'s> {
+    pk: UIntVecIndex<Unique>,
+    name: UniqueStrIdx<'s>,
+}
+
+impl<'s> Indices<'s> {
+    fn insert(&mut self, p: &'s Person, idx: Idx) -> Result {
+        self.pk.insert(p.0, idx)?;
+        self.name.insert(&p.1, idx)?;
+        Ok(())
+    }
+}
 
 fn list_index(c: &mut Criterion) {
     // create search vector
@@ -22,12 +35,11 @@ fn list_index(c: &mut Criterion) {
     let FIND_PERSON: Person = Person(FIND_ID, format!("Jasmin {FIND_ID}"));
 
     // create search index
-    let mut idx = Indices::new(
-        "pk",
-        |p: &Person| Key::Usize(p.0),
-        UIntVecIndex::<Unique>::with_capacity(HOW_MUCH_PERSON),
-    );
-    idx.add_idx("name", |p: &Person| Key::Str(&p.1), UniqueStrIdx::default());
+    let mut idx = Indices {
+        pk: UIntVecIndex::<Unique>::with_capacity(HOW_MUCH_PERSON),
+        name: UniqueStrIdx::default(),
+    };
+
     for (i, p) in v.iter().enumerate() {
         idx.insert(p, i).unwrap();
     }
@@ -36,13 +48,13 @@ fn list_index(c: &mut Criterion) {
     let mut group = c.benchmark_group("index");
     group.bench_function("ff: query pk", |b| {
         b.iter(|| {
-            let i = idx.query(eq("pk", FIND_ID)).exec().unwrap()[0];
+            let i = query(idx.pk.eq(FIND_ID)).exec()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
     group.bench_function("ff: filter pk", |b| {
         b.iter(|| {
-            let i = idx.filter(eq("pk", FIND_ID)).unwrap()[0];
+            let i = idx.pk.eq(FIND_ID)[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
@@ -56,11 +68,9 @@ fn list_index(c: &mut Criterion) {
 
     group.bench_function("ff: pk and name", |b| {
         b.iter(|| {
-            let i = idx
-                .query(eq("pk", FIND_ID))
-                .and(eq("name", &FIND_PERSON.1))
-                .exec()
-                .unwrap()[0];
+            let i = query(idx.pk.eq(FIND_ID))
+                .and(idx.name.eq(&FIND_PERSON.1))
+                .exec()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
