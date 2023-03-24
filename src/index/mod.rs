@@ -72,40 +72,41 @@ mod tests {
         pk: usize,
         multi: usize,
         name: String,
-        // gender: Gender,
+        gender: Gender,
     }
 
     impl Person {
-        fn new(pk: usize, multi: usize, name: &str, _gender: Gender) -> Self {
+        fn new(pk: usize, multi: usize, name: &str, gender: Gender) -> Self {
             Self {
                 pk,
                 multi,
                 name: name.to_string(),
-                // gender,
+                gender,
             }
         }
     }
 
     #[test]
     fn person_indices() {
+        let mut p = fast!(
+                Person<'p> as FastPerson {
+                    pk: PkUintIdx,
+                    multi: MultiUintIdx,
+                    name.as_ref: UniqueStrIdx<'p>,
+                    gender.into: MultiUintIdx,
+                }
+        );
+
         let persons = vec![
             Person::new(3, 7, "Jasmin", Gender::Female),
             Person::new(41, 7, "Mario", Gender::Male),
             Person::new(111, 234, "Paul", Gender::Male),
         ];
 
-        let mut p = fast!(
-                Person<'p> as FastPerson {
-                    pk: PkUintIdx,
-                    multi: MultiUintIdx,
-                    name: UniqueStrIdx<'p> => &,
-                    // gender: UIntVecIndex<Multi>,
-                }
-        );
-
-        p.insert(&persons[0], 0).unwrap();
-        p.insert(&persons[1], 1).unwrap();
-        p.insert(&persons[2], 2).unwrap();
+        persons
+            .iter()
+            .enumerate()
+            .for_each(|(i, person)| p.insert(person, i).unwrap());
 
         assert_eq!([1], *query(p.pk.eq(41)).exec());
         assert_eq!([0], *query(p.pk.eq(3)).exec());
@@ -123,11 +124,11 @@ mod tests {
         let r = query(p.name.eq("Jasmin")).or(p.name.eq("Mario")).exec();
         assert_eq!(*r, [0, 1]);
 
-        // let r = query(p.gender.eq(Gender::Male.into())).exec();
-        // assert_eq!(*r, [1, 2]);
+        let r = query(p.gender.eq(Gender::Male.into())).exec();
+        assert_eq!(*r, [1, 2]);
 
-        // let r = query(p.gender.eq(Gender::Female.into())).exec();
-        // assert_eq!(*r, [0]);
+        let r = query(p.gender.eq(Gender::Female.into())).exec();
+        assert_eq!(*r, [0]);
     }
 
     #[test]

@@ -37,15 +37,17 @@ pub type Idx = usize;
 
 #[macro_export]
 macro_rules! fast {
-    ( $strukt:ident$(<$lt:lifetime>)?
+    (   $strukt:ident$(<$lt:lifetime>)?
         {
-        $($field:ident: $typ:ty $(=> $amp:tt)?), + $(,)*
+            $( $fast_field:ident $(.$func:ident)?: $typ:ty ), + $(,)*
         }
-    ) => { fast!($strukt$(<$lt>)? as Fast { $($field: $typ $(=> $amp)? ), + }) };
+    ) => {
+        fast!($strukt$(<$lt>)? as Fast { $( $fast_field $(.$func)?: $typ ), + })
+    };
 
-    ( $strukt:ident$(<$lt:lifetime>)? as $fast:ident
+    (   $strukt:ident$(<$lt:lifetime>)? as $fast:ident
         {
-        $($fast_field:ident: $typ:ty $(=> $amp:tt)?), + $(,)*
+            $( $fast_field:ident $(.$func:ident)?: $typ:ty ), + $(,)*
         }
 
     ) => {
@@ -66,7 +68,7 @@ macro_rules! fast {
                 use $crate::index::Store;
 
                 $(
-                    self.$fast_field.insert($($amp)?s.$fast_field, idx)?;
+                    self.$fast_field.insert(s.$fast_field$(.$func())?, idx)?;
                 )+
 
 
@@ -93,13 +95,13 @@ mod tests {
 
     #[test]
     fn fast() {
-        use crate::index::{map::UniqueStrIdx, uint::UIntVecIndex, Unique};
+        use crate::index::{map::UniqueStrIdx, uint::PkUintIdx};
         use crate::query;
 
         let mut p = fast!(
                 Person<'p> {
-                    id: UIntVecIndex<Unique>,
-                    name: UniqueStrIdx<'p> => &,
+                    id: PkUintIdx,
+                    name.as_ref: UniqueStrIdx<'p>,
                 }
         );
 
