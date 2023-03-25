@@ -27,7 +27,7 @@
 //!
 //! ```
 use crate::{
-    index::{Index, Multi, Store, Unique},
+    index::{Index, Store},
     query::EMPTY_IDXS,
     Idx,
 };
@@ -37,32 +37,25 @@ use std::{
     fmt::Debug,
 };
 
-/// Unique Key from type [`str`].
-pub type UniqueStrIdx<'a> = StrMapIndex<'a, Unique>;
-
-/// An not unique [`str`] Key, which can occur multiple times.
-pub type MultiStrIdx<'a> = StrMapIndex<'a, Multi>;
-
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
-pub struct StrMapIndex<'s, I: Index>(BTreeMap<&'s str, I>);
+pub struct StrMapIndex<'s>(BTreeMap<&'s str, Index>);
 
-impl<'s, I: Index> Store<&'s str> for StrMapIndex<'s, I> {
-    fn insert(&mut self, k: &'s str, i: Idx) -> super::Result {
+impl<'s> Store<&'s str> for StrMapIndex<'s> {
+    fn insert(&mut self, k: &'s str, i: Idx) {
         match self.0.entry(k) {
             Entry::Vacant(e) => {
-                e.insert(I::new(i));
-                Ok(())
+                e.insert(Index::new(i));
             }
             Entry::Occupied(mut e) => e.get_mut().add(i),
         }
     }
 }
 
-impl<'s, I: Index> StrMapIndex<'s, I> {
+impl<'s> StrMapIndex<'s> {
     pub fn eq(&self, key: &'s str) -> Cow<[Idx]> {
         match self.0.get(key) {
-            Some(i) => Cow::Borrowed(i.get()),
+            Some(i) => i.get(),
             None => Cow::Borrowed(EMPTY_IDXS),
         }
     }
@@ -71,7 +64,6 @@ impl<'s, I: Index> StrMapIndex<'s, I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::Error;
     use crate::query;
 
     mod unique {
@@ -79,15 +71,15 @@ mod tests {
 
         #[test]
         fn empty() {
-            let i = UniqueStrIdx::default();
+            let i = StrMapIndex::default();
             assert_eq!(0, i.eq("Jasmin").len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut i = UniqueStrIdx::default();
-            i.insert("Jasmin", 4).unwrap();
+            let mut i = StrMapIndex::default();
+            i.insert("Jasmin", 4);
 
             assert_eq!(*i.eq("Jasmin"), [4]);
             assert_eq!(1, i.0.len());
@@ -95,10 +87,10 @@ mod tests {
 
         #[test]
         fn or_find_idx_3_4() {
-            let mut idx = UniqueStrIdx::default();
-            idx.insert("Jasmin", 4).unwrap();
-            idx.insert("Mario", 8).unwrap();
-            idx.insert("Paul", 6).unwrap();
+            let mut idx = StrMapIndex::default();
+            idx.insert("Jasmin", 4);
+            idx.insert("Mario", 8);
+            idx.insert("Paul", 6);
 
             let r = query(idx.eq("Mario")).or(idx.eq("Paul")).exec();
             assert_eq!(*r, [6, 8]);
@@ -111,16 +103,8 @@ mod tests {
         }
 
         #[test]
-        fn double_index() {
-            let mut i = UniqueStrIdx::default();
-            i.insert("Jasmin", 2).unwrap();
-
-            assert_eq!(Err(Error::NotUniqueIndexKey), i.insert("Jasmin", 2));
-        }
-
-        #[test]
         fn out_of_bound() {
-            let i = UniqueStrIdx::default();
+            let i = StrMapIndex::default();
             assert_eq!(0, i.eq("Jasmin").len());
         }
     }
@@ -130,15 +114,15 @@ mod tests {
 
         #[test]
         fn empty() {
-            let i = MultiStrIdx::default();
+            let i = StrMapIndex::default();
             assert_eq!(0, i.eq("Jasmin").len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut i = MultiStrIdx::default();
-            i.insert("Jasmin", 2).unwrap();
+            let mut i = StrMapIndex::default();
+            i.insert("Jasmin", 2);
 
             assert_eq!(*i.eq("Jasmin"), [2]);
             assert_eq!(1, i.0.len());
@@ -146,9 +130,9 @@ mod tests {
 
         #[test]
         fn double_index() {
-            let mut i = MultiStrIdx::default();
-            i.insert("Jasmin", 2).unwrap();
-            i.insert("Jasmin", 1).unwrap();
+            let mut i = StrMapIndex::default();
+            i.insert("Jasmin", 2);
+            i.insert("Jasmin", 1);
 
             assert_eq!(*i.eq("Jasmin"), [1, 2]);
         }

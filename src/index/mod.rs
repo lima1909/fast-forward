@@ -24,13 +24,12 @@
 //!  "Inge"    | 2
 //!   ...      | ...
 //! ```
-pub mod idx;
 pub mod map;
 pub mod uint;
 
-pub use idx::{Index, Multi, Unique};
+use std::borrow::Cow;
 
-use crate::{Idx, Result};
+use crate::Idx;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store<K> {
@@ -51,7 +50,7 @@ pub trait Store<K> {
     /// After:
     ///     Female | 2,3,4
     ///
-    fn insert(&mut self, key: K, idx: Idx) -> Result;
+    fn insert(&mut self, key: K, idx: Idx);
 
     /// Update means: `Key` changed, but `Index` stays the same
     ///
@@ -71,9 +70,7 @@ pub trait Store<K> {
     /// After:
     ///     Female | 2,3,4
 
-    fn update(&mut self, _old_key: K, _idx: Idx, _new_key: K) -> Result {
-        Ok(())
-    }
+    fn update(&mut self, _old_key: K, _idx: Idx, _new_key: K) {}
 
     /// Delete means: if an `Key` has more than one `Index`, then remove only this `Index`:
     ///
@@ -102,122 +99,108 @@ pub trait Store<K> {
     /// After:
     ///     Female | 3,4
     ///
-    fn delete(&mut self, _key: K, _idx: Idx) -> Result {
-        Ok(())
+    fn delete(&mut self, _key: K, _idx: Idx) {}
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Index {
+    one: [Idx; 1],
+    many: Vec<Idx>,
+}
+
+impl Index {
+    pub fn new(idx: Idx) -> Self {
+        Self {
+            one: [idx],
+            many: vec![],
+        }
+    }
+
+    pub fn add(&mut self, idx: Idx) {
+        if self.many.is_empty() {
+            self.many.push(self.one[0]);
+        }
+
+        if let Err(pos) = self.many.binary_search(&idx) {
+            self.many.insert(pos, idx);
+        }
+    }
+
+    pub fn get(&self) -> Cow<[Idx]> {
+        match self.many.is_empty() {
+            true => Cow::Borrowed(&self.one),
+            false => Cow::Borrowed(&self.many),
+        }
+    }
+
+    pub fn or<'a>(&'a self, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
+        crate::query::or(self.get(), rhs)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        fast,
-        index::{
-            map::UniqueStrIdx,
-            uint::{MultiUintIdx, PkUintIdx},
-            Store,
-        },
-        query,
-    };
+    use super::*;
 
-    #[derive(Debug, Clone, Copy)]
-    enum Gender {
-        Male,
-        Female,
-        None,
-    }
-
-    impl From<Gender> for usize {
-        fn from(g: Gender) -> Self {
-            match g {
-                Gender::None => 0,
-                Gender::Male => 1,
-                Gender::Female => 2,
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    struct Person {
-        pk: usize,
-        multi: usize,
-        name: String,
-        gender: Gender,
-    }
-
-    impl Person {
-        fn new(pk: usize, multi: usize, name: &str, gender: Gender) -> Self {
-            Self {
-                pk,
-                multi,
-                name: name.to_string(),
-                gender,
-            }
-        }
+    #[test]
+    fn unique() {
+        let u = Index::new(0);
+        assert_eq!([0], *u.get());
     }
 
     #[test]
-    fn person_indices() {
-        let mut p = fast!(
-                Person<'p> as FastPerson {
-                    pk: PkUintIdx,
-                    multi: MultiUintIdx,
-                    name.as_ref: UniqueStrIdx<'p>,
-                    gender.into: MultiUintIdx,
-                }
-        );
+    fn multi() {
+        let mut m = Index::new(2);
+        assert_eq!([2], *m.get());
 
-        let persons = vec![
-            Person::new(3, 7, "Jasmin", Gender::Female),
-            Person::new(41, 7, "Mario", Gender::Male),
-            Person::new(111, 234, "Paul", Gender::Male),
-        ];
-
-        persons
-            .iter()
-            .enumerate()
-            .for_each(|(i, person)| p.insert(person, i).unwrap());
-
-        assert_eq!([1], *query(p.pk.eq(41)).exec());
-        assert_eq!([0], *query(p.pk.eq(3)).exec());
-        assert!(query(p.pk.eq(101)).exec().is_empty());
-
-        let r = query(p.multi.eq(7)).exec();
-        assert_eq!(*r, [0, 1]);
-
-        let r = query(p.multi.eq(3)).or(p.multi.eq(7)).exec();
-        assert_eq!(*r, [0, 1]);
-
-        let r = query(p.name.eq("Jasmin")).exec();
-        assert_eq!(*r, [0]);
-
-        let r = query(p.name.eq("Jasmin")).or(p.name.eq("Mario")).exec();
-        assert_eq!(*r, [0, 1]);
-
-        let r = query(p.gender.eq(Gender::Male.into())).exec();
-        assert_eq!(*r, [1, 2]);
-
-        let r = query(p.gender.eq(Gender::Female.into())).exec();
-        assert_eq!(*r, [0]);
+        m.add(1);
+        assert_eq!([1, 2], *m.get());
     }
 
     #[test]
-    fn different_idxs() {
-        let mut pk = PkUintIdx::default();
-        pk.insert(1, 1).unwrap();
-        pk.insert(2, 2).unwrap();
-        pk.insert(99, 0).unwrap();
+    fn multi_duplicate() {
+        let mut m = Index::new(1);
+        assert_eq!([1], *m.get());
 
-        let p = Person::new(3, 7, "a", Gender::None);
-        let mut name = UniqueStrIdx::default();
-        name.insert(&p.name, 1).unwrap();
-        name.insert("b", 2).unwrap();
-        name.insert("z", 0).unwrap();
+        // ignore add: 1, 1 exists already
+        m.add(1);
+        assert_eq!([1], *m.get());
+    }
 
-        let r = query(pk.eq(1)).and(name.eq("a")).exec();
-        assert_eq!(*r, [1]);
+    #[test]
+    fn multi_ordered() {
+        let mut m = Index::new(5);
+        assert_eq!([5], *m.get());
 
-        let r = query(name.eq("z")).or(pk.eq(1)).and(name.eq("a")).exec();
-        // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
-        assert_eq!(*r, [0, 1]);
+        m.add(3);
+        m.add(1);
+        m.add(4);
+
+        assert_eq!([1, 3, 4, 5], *m.get());
+    }
+
+    #[test]
+    fn container_multi() {
+        let mut lhs = Index::new(5);
+        lhs.add(3);
+        lhs.add(2);
+        lhs.add(4);
+
+        let mut rhs = Index::new(5);
+        rhs.add(2);
+        rhs.add(9);
+
+        assert_eq!([2, 3, 4, 5, 9], *lhs.or(rhs.get()));
+    }
+
+    #[test]
+    fn container_unique() {
+        let mut lhs = Index::new(5);
+
+        let rhs = Index::new(5);
+        assert_eq!([5], *lhs.or(rhs.get()));
+
+        lhs.add(0);
+        assert_eq!([0, 5], *lhs.or(rhs.get()));
     }
 }
