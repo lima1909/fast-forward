@@ -32,10 +32,79 @@ pub use idx::{Index, Multi, Unique};
 
 use crate::{Idx, Result};
 
-/// A Store for a mapping from a given Key to one or many Indices.
+/// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store<K> {
-    /// Insert all indices for a given `Key`.
-    fn insert(&mut self, k: K, i: Idx) -> Result;
+    /// Insert an `Key` for a given `Index`.
+    ///
+    /// Before:
+    ///     Female | 3,4
+    /// `Insert: (Male, 2)`
+    /// After:
+    ///     Male   | 2
+    ///     Female | 3,4
+    ///
+    /// OR (if the `Key` already exist):
+    ///
+    /// Before:
+    ///     Female | 3,4
+    /// `Insert: (Female, 2)`
+    /// After:
+    ///     Female | 2,3,4
+    ///
+    fn insert(&mut self, key: K, idx: Idx) -> Result;
+
+    /// Update means: `Key` changed, but `Index` stays the same
+    ///
+    /// Before:
+    ///     Male   | 1,2,5  
+    ///     Female | 3,4
+    /// `Update: (Male, 2, Female)`
+    /// After:
+    ///     Male   | 1,5
+    ///     Female | 2,3,4
+    ///
+    /// If the old `Key` not exist, then is it a insert with the new `Key`:
+    ///
+    /// Before:
+    ///     Female | 3,4
+    /// `Update: (Male, 2, Female)`
+    /// After:
+    ///     Female | 2,3,4
+
+    fn update(&mut self, _old_key: K, _idx: Idx, _new_key: K) -> Result {
+        Ok(())
+    }
+
+    /// Delete means: if an `Key` has more than one `Index`, then remove only this `Index`:
+    ///
+    /// Before:
+    ///     Male   | 1,2,5  
+    ///     Female | 3,4
+    /// `Delete: Male: 2`
+    /// After:
+    ///     Male   | 1,5
+    ///     Female | 3,4
+    ///
+    /// otherwise (`Key` has exact one `Index`), then remove complete row (`Key` and `Index`).
+    ///
+    /// Before:
+    ///     Male   | 2
+    ///     Female | 3,4
+    /// `Delete: Male: 2`
+    /// After:
+    ///     Female | 3,4
+    ///
+    /// If the `Key` not exist, then is `delete`ignored:
+    ///
+    /// Before:
+    ///     Female | 3,4
+    /// `Delete: Male: 2`
+    /// After:
+    ///     Female | 3,4
+    ///
+    fn delete(&mut self, _key: K, _idx: Idx) -> Result {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

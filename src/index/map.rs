@@ -60,8 +60,8 @@ impl<'s, I: Index> Store<&'s str> for StrMapIndex<'s, I> {
 }
 
 impl<'s, I: Index> StrMapIndex<'s, I> {
-    pub fn eq(&self, s: &'s str) -> Cow<[Idx]> {
-        match self.0.get(s) {
+    pub fn eq(&self, key: &'s str) -> Cow<[Idx]> {
+        match self.0.get(key) {
             Some(i) => Cow::Borrowed(i.get()),
             None => Cow::Borrowed(EMPTY_IDXS),
         }

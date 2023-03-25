@@ -69,8 +69,8 @@ impl<I> UIntVecIndex<I>
 where
     I: Index,
 {
-    pub fn eq(&self, i: usize) -> Cow<[Idx]> {
-        match &self.0.get(i) {
+    pub fn eq(&self, key: usize) -> Cow<[Idx]> {
+        match &self.0.get(key) {
             Some(Some(idx)) => Cow::Borrowed(idx.get()),
             _ => Cow::Borrowed(EMPTY_IDXS),
         }
