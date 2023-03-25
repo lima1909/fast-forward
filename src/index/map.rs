@@ -31,23 +31,19 @@ use crate::{
     query::EMPTY_IDXS,
     Idx,
 };
-use std::{
-    borrow::Cow,
-    collections::{btree_map::Entry, BTreeMap},
-    fmt::Debug,
-};
+use std::{borrow::Cow, collections::HashMap, fmt::Debug};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
-pub struct StrMapIndex<'s>(BTreeMap<&'s str, Index>);
+pub struct StrMapIndex<'s>(HashMap<&'s str, Index>);
 
 impl<'s> Store<&'s str> for StrMapIndex<'s> {
-    fn insert(&mut self, k: &'s str, i: Idx) {
-        match self.0.entry(k) {
-            Entry::Vacant(e) => {
-                e.insert(Index::new(i));
+    fn insert(&mut self, key: &'s str, i: Idx) {
+        match self.0.get_mut(key) {
+            Some(v) => v.add(i),
+            None => {
+                self.0.insert(key, Index::new(i));
             }
-            Entry::Occupied(mut e) => e.get_mut().add(i),
         }
     }
 }
