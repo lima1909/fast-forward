@@ -75,7 +75,7 @@ impl UIntVecIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query;
+    use crate::query::query;
 
     mod unique {
         use super::*;

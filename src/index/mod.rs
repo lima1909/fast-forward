@@ -103,34 +103,24 @@ pub trait Store<K> {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct Index {
-    one: [Idx; 1],
-    many: Vec<Idx>,
-}
+pub struct Index(Vec<Idx>);
 
 impl Index {
+    #[inline]
     pub fn new(idx: Idx) -> Self {
-        Self {
-            one: [idx],
-            many: vec![],
-        }
+        Self(vec![idx])
     }
 
+    #[inline]
     pub fn add(&mut self, idx: Idx) {
-        if self.many.is_empty() {
-            self.many.push(self.one[0]);
-        }
-
-        if let Err(pos) = self.many.binary_search(&idx) {
-            self.many.insert(pos, idx);
+        if let Err(pos) = self.0.binary_search(&idx) {
+            self.0.insert(pos, idx);
         }
     }
 
+    #[inline]
     pub fn get(&self) -> Cow<[Idx]> {
-        match self.many.is_empty() {
-            true => Cow::Borrowed(&self.one),
-            false => Cow::Borrowed(&self.many),
-        }
+        Cow::Borrowed(&self.0)
     }
 
     pub fn or<'a>(&'a self, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {

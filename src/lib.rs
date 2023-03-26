@@ -27,10 +27,7 @@ pub mod error;
 pub mod index;
 pub mod query;
 
-pub use query::query;
-
-// Default Result for index with the Ok(T) value or en [`error::Error`].
-// pub type Result<T = ()> = std::result::Result<T, error::Error>;
+use crate::query::Query;
 
 /// `Idx` is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
@@ -81,20 +78,79 @@ macro_rules! fast {
     };
 }
 
+pub struct OneIndexList<T, F, S> {
+    inner: Vec<T>,
+    get_id_fn: F,
+    store: S,
+}
+
+impl<T, F, S> OneIndexList<T, F, S> {
+    pub fn new(f: F, store: S) -> Self {
+        Self {
+            inner: vec![],
+            get_id_fn: f,
+            store,
+        }
+    }
+
+    pub fn push<K>(&mut self, v: T)
+    where
+        S: crate::index::Store<K>,
+        F: Fn(&T) -> K,
+    {
+        self.store.insert((self.get_id_fn)(&v), self.inner.len());
+        self.inner.push(v);
+    }
+
+    pub fn filter(&self, q: Query) -> Vec<&T> {
+        q.filter(&self.inner)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::{
+        fast,
+        index::{map::StrMapIndex, uint::UIntIndex},
+        query::query,
+        OneIndexList,
+    };
 
+    #[derive(Debug, Eq, PartialEq)]
     struct Car {
         id: usize,
         _multi: usize,
         name: String,
     }
 
+    impl Car {
+        fn new(id: usize, name: &str) -> Self {
+            Self {
+                id,
+                _multi: 0,
+                name: name.into(),
+            }
+        }
+
+        fn id(&self) -> usize {
+            self.id
+        }
+    }
+
+    #[test]
+    fn idx_index_list() {
+        let mut l = OneIndexList::new(Car::id, UIntIndex::default());
+        l.push(Car::new(2, "BMW"));
+        l.push(Car::new(5, "Audi"));
+        l.push(Car::new(2, "VW"));
+        l.push(Car::new(99, "Porsche"));
+
+        let r = l.filter(query(l.store.eq(2)).or(l.store.eq(100)));
+        assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..])
+    }
+
     #[test]
     fn fast() {
-        use crate::index::{map::StrMapIndex, uint::UIntIndex};
-        use crate::query;
-
         let mut c = fast!(
                 Car<'p> {
                     id: UIntIndex,
@@ -111,12 +167,6 @@ mod tests {
 
         assert_eq!([1], *query(c.id.eq(4)).or(c.name.eq("Foo")).exec());
     }
-
-    use crate::{
-        fast,
-        index::{map::StrMapIndex, uint::UIntIndex},
-        query,
-    };
 
     #[derive(Debug, Clone, Copy)]
     enum Gender {

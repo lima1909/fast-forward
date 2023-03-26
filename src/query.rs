@@ -8,7 +8,7 @@ use std::{
 pub const EMPTY_IDXS: &[Idx] = &[];
 
 /// `query` factory for creating a `Query` with the first started filter result.
-pub fn query(idxs: Cow<[usize]>) -> Query<'_> {
+pub const fn query(idxs: Cow<[usize]>) -> Query<'_> {
     Query::new(idxs)
 }
 
@@ -19,17 +19,20 @@ pub struct Query<'q> {
 }
 
 impl<'q> Query<'q> {
-    fn new(first: Cow<'q, [usize]>) -> Self {
+    /// Create a new `Query` with initial `Indices`.
+    const fn new(first: Cow<'q, [usize]>) -> Self {
         Self { first, ors: vec![] }
     }
 }
 
 impl<'q> Query<'q> {
+    /// Combine two `Indices` with an logical `OR`.
     pub fn or(mut self, idxs: Cow<'q, [usize]>) -> Self {
         self.ors.push(idxs);
         self
     }
 
+    /// Combine two `Indices` with an logical `AND`.
     pub fn and(mut self, idxs: Cow<[usize]>) -> Self {
         if self.ors.is_empty() {
             self.first = and(&self.first, &idxs);
@@ -40,12 +43,22 @@ impl<'q> Query<'q> {
         self
     }
 
-    #[must_use = "query do nothing, before execute"]
+    /// Execute all logical `OR`s.
     pub fn exec(mut self) -> Cow<'q, [usize]> {
         for next in self.ors {
             self.first = or(self.first, next);
         }
         self.first
+    }
+
+    /// Execute all given filters and applay the filter to an given `Slice`.
+    pub fn filter<T>(self, list: &[T]) -> Vec<&T> {
+        let idxs = self.exec();
+        let mut r = vec![];
+        for i in idxs.iter() {
+            r.push(&list[*i]);
+        }
+        r
     }
 }
 
