@@ -14,15 +14,15 @@ const FIND_ID: usize = 1_001;
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Person(usize, String);
 
-struct Indices<'s> {
+struct Indices {
     pk: UIntIndex,
-    name: StrMapIndex<'s>,
+    name: StrMapIndex,
 }
 
-impl<'s> Indices<'s> {
-    fn insert(&mut self, p: &'s Person, idx: Idx) {
+impl Indices {
+    fn insert(&mut self, p: &Person, idx: Idx) {
         self.pk.insert(p.0, idx);
-        self.name.insert(&p.1, idx);
+        self.name.insert(p.1.clone(), idx);
     }
 }
 

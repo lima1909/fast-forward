@@ -44,6 +44,7 @@ impl<'q> Query<'q> {
     }
 
     /// Execute all logical `OR`s.
+    #[inline]
     pub fn exec(mut self) -> Cow<'q, [usize]> {
         for next in self.ors {
             self.first = or(self.first, next);
@@ -52,10 +53,10 @@ impl<'q> Query<'q> {
     }
 
     /// Execute all given filters and applay the filter to an given `Slice`.
+    #[inline]
     pub fn filter<T>(self, list: &[T]) -> Vec<&T> {
-        let idxs = self.exec();
         let mut r = vec![];
-        for i in idxs.iter() {
+        for i in self.exec().iter() {
             r.push(&list[*i]);
         }
         r

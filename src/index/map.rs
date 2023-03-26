@@ -35,11 +35,11 @@ use std::{borrow::Cow, collections::HashMap, fmt::Debug};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
-pub struct StrMapIndex<'s>(HashMap<&'s str, Index>);
+pub struct StrMapIndex(HashMap<String, Index>);
 
-impl<'s> Store<&'s str> for StrMapIndex<'s> {
-    fn insert(&mut self, key: &'s str, i: Idx) {
-        match self.0.get_mut(key) {
+impl Store<String> for StrMapIndex {
+    fn insert(&mut self, key: String, i: Idx) {
+        match self.0.get_mut(&key) {
             Some(v) => v.add(i),
             None => {
                 self.0.insert(key, Index::new(i));
@@ -48,8 +48,8 @@ impl<'s> Store<&'s str> for StrMapIndex<'s> {
     }
 }
 
-impl<'s> StrMapIndex<'s> {
-    pub fn eq(&self, key: &'s str) -> Cow<[Idx]> {
+impl StrMapIndex {
+    pub fn eq(&self, key: &str) -> Cow<[Idx]> {
         match self.0.get(key) {
             Some(i) => i.get(),
             None => Cow::Borrowed(EMPTY_IDXS),
@@ -75,7 +75,7 @@ mod tests {
         #[test]
         fn find_idx_2() {
             let mut i = StrMapIndex::default();
-            i.insert("Jasmin", 4);
+            i.insert("Jasmin".into(), 4);
 
             assert_eq!(*i.eq("Jasmin"), [4]);
             assert_eq!(1, i.0.len());
@@ -84,9 +84,9 @@ mod tests {
         #[test]
         fn or_find_idx_3_4() {
             let mut idx = StrMapIndex::default();
-            idx.insert("Jasmin", 4);
-            idx.insert("Mario", 8);
-            idx.insert("Paul", 6);
+            idx.insert("Jasmin".into(), 4);
+            idx.insert("Mario".into(), 8);
+            idx.insert("Paul".into(), 6);
 
             let r = query(idx.eq("Mario")).or(idx.eq("Paul")).exec();
             assert_eq!(*r, [6, 8]);
@@ -118,7 +118,7 @@ mod tests {
         #[test]
         fn find_idx_2() {
             let mut i = StrMapIndex::default();
-            i.insert("Jasmin", 2);
+            i.insert("Jasmin".into(), 2);
 
             assert_eq!(*i.eq("Jasmin"), [2]);
             assert_eq!(1, i.0.len());
@@ -127,8 +127,8 @@ mod tests {
         #[test]
         fn double_index() {
             let mut i = StrMapIndex::default();
-            i.insert("Jasmin", 2);
-            i.insert("Jasmin", 1);
+            i.insert("Jasmin".into(), 2);
+            i.insert("Jasmin".into(), 1);
 
             assert_eq!(*i.eq("Jasmin"), [1, 2]);
         }

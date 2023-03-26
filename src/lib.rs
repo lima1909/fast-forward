@@ -34,15 +34,15 @@ pub type Idx = usize;
 
 #[macro_export]
 macro_rules! fast {
-    (   $strukt:ident$(<$lt:lifetime>)?
+    (   $strukt:ident
         {
             $( $fast_field:ident $(.$func:ident)?: $typ:ty ), + $(,)*
         }
     ) => {
-        fast!($strukt$(<$lt>)? as Fast { $( $fast_field $(.$func)?: $typ ), + })
+        fast!($strukt as Fast { $( $fast_field $(.$func)?: $typ ), + })
     };
 
-    (   $strukt:ident$(<$lt:lifetime>)? as $fast:ident
+    (   $strukt:ident as $fast:ident
         {
             $( $fast_field:ident $(.$func:ident)?: $typ:ty ), + $(,)*
         }
@@ -53,15 +53,15 @@ macro_rules! fast {
 
         /// Container-struct for all indices.
         #[derive(Default)]
-        struct $fast$(<$lt>)? {
+        struct $fast {
             $(
                 $fast_field: $typ,
             )+
         }
 
         /// Insert in all indices-stores the `Key` and the `Index`.
-        impl$(<$lt>)? $fast$(<$lt>)? {
-            fn insert(&mut self, s: &$($lt)? $strukt, idx: $crate::Idx)  {
+        impl $fast {
+            fn insert(&mut self, s: &$strukt, idx: $crate::Idx)  {
                 use $crate::index::Store;
 
                 $(
@@ -119,7 +119,7 @@ mod tests {
     #[derive(Debug, Eq, PartialEq)]
     struct Car {
         id: usize,
-        _multi: usize,
+        _no_index: usize,
         name: String,
     }
 
@@ -127,7 +127,7 @@ mod tests {
         fn new(id: usize, name: &str) -> Self {
             Self {
                 id,
-                _multi: 0,
+                _no_index: 0,
                 name: name.into(),
             }
         }
@@ -138,7 +138,7 @@ mod tests {
     }
 
     #[test]
-    fn idx_index_list() {
+    fn one_index_list_idx() {
         let mut l = OneIndexList::new(Car::id, UIntIndex::default());
         l.push(Car::new(2, "BMW"));
         l.push(Car::new(5, "Audi"));
@@ -150,17 +150,27 @@ mod tests {
     }
 
     #[test]
+    fn one_index_list_string() {
+        let mut l = OneIndexList::new(|c: &Car| c.name.clone(), StrMapIndex::default());
+        l.push(Car::new(2, "BMW"));
+        l.push(Car::new(5, "Audi"));
+        l.push(Car::new(2, "VW"));
+        l.push(Car::new(99, "Porsche"));
+
+        let r = l.filter(query(l.store.eq("VW")).or(l.store.eq("Audi")));
+        assert_eq!(&[&Car::new(5, "Audi"), &Car::new(2, "VW")], &r[..])
+    }
+
+    #[test]
     fn fast() {
-        let mut c = fast!(
-                Car<'p> {
-                    id: UIntIndex,
-                    name.as_ref: StrMapIndex<'p>,
-                }
-        );
+        let mut c = fast!(Car {
+            id: UIntIndex,
+            name.clone: StrMapIndex,
+        });
 
         let c1 = Car {
             id: 4,
-            _multi: 8,
+            _no_index: 8,
             name: "Foo".into(),
         };
         c.insert(&c1, 1);
@@ -207,10 +217,10 @@ mod tests {
     #[test]
     fn person_indices() {
         let mut p = fast!(
-                Person<'p> as FastPerson {
+                Person as FastPerson {
                     pk: UIntIndex,
                     multi: UIntIndex,
-                    name.as_ref: StrMapIndex<'p>,
+                    name.clone: StrMapIndex,
                     gender.into: UIntIndex,
                 }
         );
@@ -260,9 +270,9 @@ mod tests {
 
         let p = Person::new(3, 7, "a", Gender::None);
         let mut name = StrMapIndex::default();
-        name.insert(&p.name, 1);
-        name.insert("b", 2);
-        name.insert("z", 0);
+        name.insert(p.name, 1);
+        name.insert("b".into(), 2);
+        name.insert("z".into(), 0);
 
         let r = query(pk.eq(1)).and(name.eq("a")).exec();
         assert_eq!(*r, [1]);
