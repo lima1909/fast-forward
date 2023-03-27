@@ -109,6 +109,10 @@ impl<T, F, S> OneIndexedList<T, F, S> {
         }
     }
 
+    pub fn store(&self) -> &S {
+        &self.store
+    }
+
     pub fn push<K>(&mut self, v: T)
     where
         S: crate::index::Store<K>,
