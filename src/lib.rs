@@ -27,6 +27,8 @@ pub mod error;
 pub mod index;
 pub mod query;
 
+use std::borrow::Cow;
+
 use crate::query::Query;
 
 /// `Idx` is the index/position in a List ([`std::vec::Vec`]).
@@ -78,13 +80,27 @@ macro_rules! fast {
     };
 }
 
-pub struct OneIndexList<T, F, S> {
+pub trait IndexedList<T> {
+    fn inner(&self) -> &[T];
+
+    /// **Importand:** if an `Idx` is not valid (inside the borders), then this mehtod panics (OutOfBound).
+    fn filter(&self, idxs: Cow<'_, [Idx]>) -> Vec<&T> {
+        idxs.iter().map(|i| &self.inner()[*i]).collect()
+    }
+
+    /// **Importand:** if an `Idx` is not valid (inside the borders), then this mehtod panics (OutOfBound).
+    fn query(&self, q: Query) -> Vec<&T> {
+        q.filter(self.inner())
+    }
+}
+
+pub struct OneIndexedList<T, F, S> {
     inner: Vec<T>,
     get_id_fn: F,
     store: S,
 }
 
-impl<T, F, S> OneIndexList<T, F, S> {
+impl<T, F, S> OneIndexedList<T, F, S> {
     pub fn new(f: F, store: S) -> Self {
         Self {
             inner: vec![],
@@ -101,9 +117,11 @@ impl<T, F, S> OneIndexList<T, F, S> {
         self.store.insert((self.get_id_fn)(&v), self.inner.len());
         self.inner.push(v);
     }
+}
 
-    pub fn filter(&self, q: Query) -> Vec<&T> {
-        q.filter(&self.inner)
+impl<T, F, S> IndexedList<T> for OneIndexedList<T, F, S> {
+    fn inner(&self) -> &[T] {
+        &self.inner
     }
 }
 
@@ -113,7 +131,7 @@ mod tests {
         fast,
         index::{map::StrMapIndex, uint::UIntIndex},
         query::query,
-        OneIndexList,
+        IndexedList, OneIndexedList,
     };
 
     #[derive(Debug, Eq, PartialEq)]
@@ -135,29 +153,39 @@ mod tests {
         fn id(&self) -> usize {
             self.id
         }
+
+        fn name(&self) -> String {
+            self.name.clone()
+        }
     }
 
     #[test]
-    fn one_index_list_idx() {
-        let mut l = OneIndexList::new(Car::id, UIntIndex::default());
+    fn one_indexed_list_idx() {
+        let mut l = OneIndexedList::new(Car::id, UIntIndex::default());
         l.push(Car::new(2, "BMW"));
         l.push(Car::new(5, "Audi"));
         l.push(Car::new(2, "VW"));
         l.push(Car::new(99, "Porsche"));
 
-        let r = l.filter(query(l.store.eq(2)).or(l.store.eq(100)));
-        assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..])
+        let r = l.filter(l.store.eq(2));
+        assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..]);
+
+        let r = l.query(query(l.store.eq(2)).or(l.store.eq(100)));
+        assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..]);
     }
 
     #[test]
-    fn one_index_list_string() {
-        let mut l = OneIndexList::new(|c: &Car| c.name.clone(), StrMapIndex::default());
+    fn one_indexed_list_string() {
+        let mut l = OneIndexedList::new(Car::name, StrMapIndex::default());
         l.push(Car::new(2, "BMW"));
         l.push(Car::new(5, "Audi"));
         l.push(Car::new(2, "VW"));
         l.push(Car::new(99, "Porsche"));
 
-        let r = l.filter(query(l.store.eq("VW")).or(l.store.eq("Audi")));
+        let r = l.filter(l.store.eq("VW"));
+        assert_eq!(&[&Car::new(2, "VW")], &r[..]);
+
+        let r = l.query(query(l.store.eq("VW")).or(l.store.eq("Audi")));
         assert_eq!(&[&Car::new(5, "Audi"), &Car::new(2, "VW")], &r[..])
     }
 

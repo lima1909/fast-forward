@@ -55,11 +55,7 @@ impl<'q> Query<'q> {
     /// Execute all given filters and applay the filter to an given `Slice`.
     #[inline]
     pub fn filter<T>(self, list: &[T]) -> Vec<&T> {
-        let mut r = vec![];
-        for i in self.exec().iter() {
-            r.push(&list[*i]);
-        }
-        r
+        self.exec().iter().map(|i| &list[*i]).collect()
     }
 }
 
