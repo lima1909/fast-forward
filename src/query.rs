@@ -1,11 +1,9 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
-use crate::Idx;
+use crate::{Idx, EMPTY_IDXS};
 use std::{
     borrow::Cow,
     cmp::{min, Ordering::*},
 };
-
-pub const EMPTY_IDXS: &[Idx] = &[];
 
 /// `query` factory for creating a `Query` with the first started filter result.
 pub const fn query(idxs: Cow<[usize]>) -> Query<'_> {
@@ -57,16 +55,13 @@ impl<'q> Query<'q> {
 pub fn or<'a>(lhs: Cow<'a, [Idx]>, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
     match (lhs.is_empty(), rhs.is_empty()) {
         (false, false) => {
-            let ll = lhs.len();
-            let lr = rhs.len();
+            let (ll, lr) = (lhs.len(), rhs.len());
             let mut v = Vec::with_capacity(ll + lr);
 
-            let mut li = 0;
-            let mut ri = 0;
+            let (mut li, mut ri) = (0, 0);
 
             loop {
-                let l = lhs[li];
-                let r = rhs[ri];
+                let (l, r) = (lhs[li], rhs[ri]);
 
                 match l.cmp(&r) {
                     Equal => {
@@ -105,12 +100,10 @@ pub fn and<'a>(lhs: &[Idx], rhs: &[Idx]) -> Cow<'a, [Idx]> {
         return Cow::Borrowed(EMPTY_IDXS);
     }
 
-    let ll = lhs.len();
-    let lr = rhs.len();
+    let (ll, lr) = (lhs.len(), rhs.len());
     let mut v = Vec::with_capacity(min(ll, lr));
 
-    let mut li = 0;
-    let mut ri = 0;
+    let (mut li, mut ri) = (0, 0);
 
     loop {
         let l = lhs[li];

@@ -1,5 +1,5 @@
 use fast_forward::{
-    index::{map::StrMapIndex, uint::UIntIndex},
+    index::{map::StrMapIndex, uint::UIntIndex, Equals},
     query::query,
     IndexedList, OneIndexedList,
 };

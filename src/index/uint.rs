@@ -32,10 +32,12 @@
 //! ...  | ...
 //! ```
 use crate::{
-    index::{Idx, Index, Store},
-    query::EMPTY_IDXS,
+    index::{Index, Store},
+    Idx, EMPTY_IDXS,
 };
 use std::borrow::Cow;
+
+use super::Equals;
 
 /// Short name for [`UIntVecIndex`].
 pub type UIntIndex = UIntVecIndex;
@@ -57,8 +59,9 @@ impl Store<Idx> for UIntVecIndex {
     }
 }
 
-impl UIntVecIndex {
-    pub fn eq(&self, key: usize) -> Cow<[Idx]> {
+impl Equals<usize> for UIntVecIndex {
+    #[inline]
+    fn eq(&self, key: usize) -> Cow<[Idx]> {
         match &self.0.get(key) {
             Some(Some(idx)) => idx.get(),
             _ => Cow::Borrowed(EMPTY_IDXS),
@@ -158,6 +161,24 @@ mod tests {
             assert_eq!(2, i.0.len());
             assert_eq!(5, i.0.capacity());
         }
+
+        #[test]
+        fn find_eq_many_unique() {
+            let mut i = UIntIndex::default();
+            i.insert(5, 5);
+            i.insert(2, 2);
+            i.insert(6, 6);
+
+            assert_eq!(0, i.eq_iter([]).iter().len());
+            assert_eq!(0, i.eq_iter([9]).iter().len());
+            assert_eq!([2], *i.eq_iter([2]));
+            assert_eq!([2, 6], *i.eq_iter([6, 2]));
+            assert_eq!([2, 6], *i.eq_iter([9, 6, 2]));
+            assert_eq!([2, 5, 6], *i.eq_iter([5, 9, 6, 2]));
+
+            assert_eq!([2, 5, 6], *i.eq_iter(2..=6));
+            assert_eq!([2, 5, 6], *i.eq_iter(2..9));
+        }
     }
 
     mod multi {
@@ -186,6 +207,22 @@ mod tests {
             i.insert(2, 1);
 
             assert_eq!(*i.eq(2), [1, 2]);
+        }
+
+        #[test]
+        fn find_eq_many_unique() {
+            let mut i = UIntIndex::default();
+            i.insert(5, 5);
+            i.insert(2, 2);
+            i.insert(2, 1);
+            i.insert(6, 6);
+
+            assert_eq!(0, i.eq_iter([]).iter().len());
+            assert_eq!(0, i.eq_iter([9]).iter().len());
+            assert_eq!([1, 2], *i.eq_iter([2]));
+            assert_eq!([1, 2, 6], *i.eq_iter([6, 2]));
+            assert_eq!([1, 2, 6], *i.eq_iter([9, 6, 2]));
+            assert_eq!([1, 2, 5, 6], *i.eq_iter([5, 9, 6, 2]));
         }
     }
 }

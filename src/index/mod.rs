@@ -27,12 +27,11 @@
 pub mod map;
 pub mod uint;
 
+use crate::{Idx, EMPTY_IDXS};
 use std::borrow::Cow;
 
-use crate::Idx;
-
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
-pub trait Store<K> {
+pub trait Store<K>: Default {
     /// Insert an `Key` for a given `Index`.
     ///
     /// Before:
@@ -100,6 +99,35 @@ pub trait Store<K> {
     ///     Female | 3,4
     ///
     fn delete(&mut self, _key: K, _idx: Idx) {}
+}
+
+pub trait Equals<K> {
+    /// Find all `Idx` with the given `Key`.
+    fn eq(&self, key: K) -> Cow<[Idx]>;
+
+    /// Combined all given `keys` with an logical `OR`.
+    ///
+    /// ## Example:
+    ///```text
+    /// eq_iter([2, 5, 6]) => eq(2) OR eq(5) OR eq(6)
+    /// eq_iter(2..6]) => eq(2) OR eq(3) OR eq(4) OR eq(5)
+    /// ```
+    fn eq_iter<I>(&self, keys: I) -> Cow<[Idx]>
+    where
+        I: IntoIterator<Item = K>,
+    {
+        let mut it = keys.into_iter();
+        match it.next() {
+            Some(key) => {
+                let mut c = self.eq(key);
+                for k in it {
+                    c = crate::query::or(c, self.eq(k))
+                }
+                c
+            }
+            None => Cow::Borrowed(EMPTY_IDXS),
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]

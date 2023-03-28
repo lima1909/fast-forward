@@ -27,11 +27,10 @@
 //!
 //! ```
 use crate::{
-    index::{Index, Store},
-    query::EMPTY_IDXS,
-    Idx,
+    index::{Equals, Index, Store},
+    Idx, EMPTY_IDXS,
 };
-use std::{borrow::Cow, collections::HashMap, fmt::Debug};
+use std::{borrow::Cow, collections::HashMap};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
@@ -48,8 +47,9 @@ impl Store<String> for StrMapIndex {
     }
 }
 
-impl StrMapIndex {
-    pub fn eq(&self, key: &str) -> Cow<[Idx]> {
+impl<'k> Equals<&'k str> for StrMapIndex {
+    #[inline]
+    fn eq(&self, key: &'k str) -> Cow<[Idx]> {
         match self.0.get(key) {
             Some(i) => i.get(),
             None => Cow::Borrowed(EMPTY_IDXS),
@@ -102,6 +102,24 @@ mod tests {
         fn out_of_bound() {
             let i = StrMapIndex::default();
             assert_eq!(0, i.eq("Jasmin").len());
+        }
+
+        #[test]
+        fn find_eq_many_unique() {
+            let mut idx = StrMapIndex::default();
+            idx.insert("Jasmin".into(), 5);
+            idx.insert("Mario".into(), 2);
+            idx.insert("Paul".into(), 6);
+
+            assert_eq!(0, idx.eq_iter([]).iter().len());
+            assert_eq!(0, idx.eq_iter(["NotFound"]).iter().len());
+            assert_eq!([2], *idx.eq_iter(["Mario"]));
+            assert_eq!([2, 6], *idx.eq_iter(["Paul", "Mario"]));
+            assert_eq!([2, 6], *idx.eq_iter(["NotFound", "Paul", "Mario"]));
+            assert_eq!(
+                [2, 5, 6],
+                *idx.eq_iter(["Jasmin", "NotFound", "Mario", "Paul"])
+            );
         }
     }
 

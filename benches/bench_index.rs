@@ -4,7 +4,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 use fast_forward::index::map::StrMapIndex;
 use fast_forward::index::uint::UIntIndex;
-use fast_forward::index::Store;
+use fast_forward::index::{Equals, Store};
 use fast_forward::query::{and, or, query};
 use fast_forward::Idx;
 

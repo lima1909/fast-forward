@@ -32,6 +32,9 @@ use std::{borrow::Cow, ops::Deref};
 /// `Idx` is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
 
+/// Empty array of `Idx`
+pub const EMPTY_IDXS: &[Idx] = &[];
+
 #[macro_export]
 macro_rules! fast {
     (   $strukt:ident
@@ -132,7 +135,7 @@ impl<T, F, S> Deref for OneIndexedList<T, F, S> {
 mod tests {
     use crate::{
         fast,
-        index::{map::StrMapIndex, uint::UIntIndex},
+        index::{map::StrMapIndex, uint::UIntIndex, Equals},
         query::query,
         IndexedList, OneIndexedList,
     };
