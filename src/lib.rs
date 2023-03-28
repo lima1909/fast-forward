@@ -80,17 +80,18 @@ macro_rules! fast {
     };
 }
 
-pub trait IndexedList<T> {
-    fn inner(&self) -> &[T];
-
+pub trait IndexedList<T>: AsRef<[T]> {
     /// **Importand:** if an `Idx` is not valid (inside the borders), then this mehtod panics (OutOfBound).
+    #[inline]
     fn filter(&self, idxs: Cow<'_, [Idx]>) -> Vec<&T> {
-        idxs.iter().map(|i| &self.inner()[*i]).collect()
+        let inner = self.as_ref();
+        idxs.iter().map(|i| &inner[*i]).collect()
     }
 
     /// **Importand:** if an `Idx` is not valid (inside the borders), then this mehtod panics (OutOfBound).
+    #[inline]
     fn query(&self, q: Query) -> Vec<&T> {
-        q.filter(self.inner())
+        self.filter(q.exec())
     }
 }
 
@@ -123,8 +124,10 @@ impl<T, F, S> OneIndexedList<T, F, S> {
     }
 }
 
-impl<T, F, S> IndexedList<T> for OneIndexedList<T, F, S> {
-    fn inner(&self) -> &[T] {
+impl<T, F, S> IndexedList<T> for OneIndexedList<T, F, S> {}
+
+impl<T, F, S> AsRef<[T]> for OneIndexedList<T, F, S> {
+    fn as_ref(&self) -> &[T] {
         &self.inner
     }
 }

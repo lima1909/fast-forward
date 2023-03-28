@@ -51,12 +51,6 @@ impl<'q> Query<'q> {
         }
         self.first
     }
-
-    /// Execute all given filters and applay the filter to an given `Slice`.
-    #[inline]
-    pub fn filter<T>(self, slice: &[T]) -> Vec<&T> {
-        self.exec().iter().map(|i| &slice[*i]).collect()
-    }
 }
 
 // Logical `Or`, the union of two Inices.
