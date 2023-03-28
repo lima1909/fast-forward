@@ -27,10 +27,10 @@ fn main() {
     l.push(Car(2, "VW".into()));
     l.push(Car(99, "Porsche".into()));
 
-    let r = l.filter(l.store().eq(2));
+    let r = l.filter(l.eq(2));
     assert_eq!(&[&Car(2, "BMW".into()), &Car(2, "VW".into())], &r[..]);
 
-    let r = l.query(query(l.store().eq(2)).or(l.store().eq(100)));
+    let r = l.filter(query(l.eq(2)).or(l.eq(100)).exec());
     assert_eq!(&[&Car(2, "BMW".into()), &Car(2, "VW".into())], &r[..]);
 
     // ------------------------------
@@ -42,9 +42,9 @@ fn main() {
     l.push(Car(2, "VW".into()));
     l.push(Car(99, "Porsche".into()));
 
-    let r = l.filter(l.store().eq("VW"));
+    let r = l.filter(l.eq("VW"));
     assert_eq!(&[&Car(2, "VW".into())], &r[..]);
 
-    let r = l.query(query(l.store().eq("VW")).or(l.store().eq("Audi")));
+    let r = l.filter(query(l.eq("VW")).or(l.eq("Audi")).exec());
     assert_eq!(&[&Car(5, "Audi".into()), &Car(2, "VW".into())], &r[..])
 }

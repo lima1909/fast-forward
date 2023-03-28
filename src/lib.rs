@@ -27,9 +27,7 @@ pub mod error;
 pub mod index;
 pub mod query;
 
-use std::borrow::Cow;
-
-use crate::query::Query;
+use std::{borrow::Cow, ops::Deref};
 
 /// `Idx` is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
@@ -87,12 +85,6 @@ pub trait IndexedList<T>: AsRef<[T]> {
         let inner = self.as_ref();
         idxs.iter().map(|i| &inner[*i]).collect()
     }
-
-    /// **Importand:** if an `Idx` is not valid (inside the borders), then this mehtod panics (OutOfBound).
-    #[inline]
-    fn query(&self, q: Query) -> Vec<&T> {
-        self.filter(q.exec())
-    }
 }
 
 pub struct OneIndexedList<T, F, S> {
@@ -110,10 +102,6 @@ impl<T, F, S> OneIndexedList<T, F, S> {
         }
     }
 
-    pub fn store(&self) -> &S {
-        &self.store
-    }
-
     pub fn push<K>(&mut self, v: T)
     where
         S: crate::index::Store<K>,
@@ -129,6 +117,14 @@ impl<T, F, S> IndexedList<T> for OneIndexedList<T, F, S> {}
 impl<T, F, S> AsRef<[T]> for OneIndexedList<T, F, S> {
     fn as_ref(&self) -> &[T] {
         &self.inner
+    }
+}
+
+impl<T, F, S> Deref for OneIndexedList<T, F, S> {
+    type Target = S;
+
+    fn deref(&self) -> &Self::Target {
+        &self.store
     }
 }
 
@@ -174,10 +170,10 @@ mod tests {
         l.push(Car::new(2, "VW"));
         l.push(Car::new(99, "Porsche"));
 
-        let r = l.filter(l.store.eq(2));
+        let r = l.filter(l.eq(2));
         assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..]);
 
-        let r = l.query(query(l.store.eq(2)).or(l.store.eq(100)));
+        let r = l.filter(query(l.eq(2)).or(l.eq(100)).exec());
         assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..]);
     }
 
@@ -189,10 +185,10 @@ mod tests {
         l.push(Car::new(2, "VW"));
         l.push(Car::new(99, "Porsche"));
 
-        let r = l.filter(l.store.eq("VW"));
+        let r = l.filter(l.eq("VW"));
         assert_eq!(&[&Car::new(2, "VW")], &r[..]);
 
-        let r = l.query(query(l.store.eq("VW")).or(l.store.eq("Audi")));
+        let r = l.filter(query(l.eq("VW")).or(l.eq("Audi")).exec());
         assert_eq!(&[&Car::new(5, "Audi"), &Car::new(2, "VW")], &r[..])
     }
 
