@@ -45,6 +45,10 @@ impl Store<String> for StrMapIndex {
             }
         }
     }
+
+    fn with_capacity(capacity: usize) -> Self {
+        StrMapIndex(HashMap::with_capacity(capacity))
+    }
 }
 
 impl<'k> Equals<&'k str> for StrMapIndex {

@@ -99,6 +99,9 @@ pub trait Store<K>: Default {
     ///     Female | 3,4
     ///
     fn delete(&mut self, _key: K, _idx: Idx) {}
+
+    /// To reduce memory allocations can create an `Index-store` with capacity.
+    fn with_capacity(capacity: usize) -> Self;
 }
 
 pub trait Equals<K> {

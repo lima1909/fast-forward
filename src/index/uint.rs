@@ -57,6 +57,10 @@ impl Store<Idx> for UIntVecIndex {
             None => self.0[k] = Some(Index::new(i)),
         }
     }
+
+    fn with_capacity(capacity: usize) -> Self {
+        UIntVecIndex(Vec::with_capacity(capacity))
+    }
 }
 
 impl Equals<usize> for UIntVecIndex {
@@ -66,12 +70,6 @@ impl Equals<usize> for UIntVecIndex {
             Some(Some(idx)) => idx.get(),
             _ => Cow::Borrowed(EMPTY_IDXS),
         }
-    }
-}
-
-impl UIntVecIndex {
-    pub fn with_capacity(capacity: usize) -> Self {
-        UIntVecIndex(Vec::with_capacity(capacity))
     }
 }
 
