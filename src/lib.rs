@@ -176,6 +176,16 @@ mod tests {
         let r = l.filter(l.eq(2));
         assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..]);
 
+        let r = l.filter(l.eq_iter(2..6));
+        assert_eq!(
+            &[
+                &Car::new(2, "BMW"),
+                &Car::new(5, "Audi"),
+                &Car::new(2, "VW"),
+            ],
+            &r[..]
+        );
+
         let r = l.filter(query(l.eq(2)).or(l.eq(100)).exec());
         assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..]);
     }
@@ -190,6 +200,16 @@ mod tests {
 
         let r = l.filter(l.eq("VW"));
         assert_eq!(&[&Car::new(2, "VW")], &r[..]);
+
+        let r = l.filter(l.eq_iter(["VW", "Audi", "BMW"]));
+        assert_eq!(
+            &[
+                &Car::new(2, "BMW"),
+                &Car::new(5, "Audi"),
+                &Car::new(2, "VW"),
+            ],
+            &r[..]
+        );
 
         let r = l.filter(query(l.eq("VW")).or(l.eq("Audi")).exec());
         assert_eq!(&[&Car::new(5, "Audi"), &Car::new(2, "VW")], &r[..])
