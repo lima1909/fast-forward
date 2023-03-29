@@ -177,6 +177,16 @@ mod tests {
             assert_eq!([2, 5, 6], *i.eq_iter(2..=6));
             assert_eq!([2, 5, 6], *i.eq_iter(2..9));
         }
+
+        #[test]
+        fn contains() {
+            let mut i = UIntIndex::default();
+            i.insert(5, 5);
+            i.insert(2, 2);
+
+            assert!(i.contains(5));
+            assert!(!i.contains(55));
+        }
     }
 
     mod multi {
@@ -221,6 +231,16 @@ mod tests {
             assert_eq!([1, 2, 6], *i.eq_iter([6, 2]));
             assert_eq!([1, 2, 6], *i.eq_iter([9, 6, 2]));
             assert_eq!([1, 2, 5, 6], *i.eq_iter([5, 9, 6, 2]));
+        }
+
+        #[test]
+        fn contains() {
+            let mut i = UIntIndex::default();
+            i.insert(2, 2);
+            i.insert(2, 1);
+
+            assert!(i.contains(2));
+            assert!(!i.contains(55));
         }
     }
 }

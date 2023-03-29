@@ -131,6 +131,11 @@ pub trait Equals<K> {
             None => Cow::Borrowed(EMPTY_IDXS),
         }
     }
+
+    /// Checks whether the `Key` exists.
+    fn contains(&self, key: K) -> bool {
+        !self.eq(key).is_empty()
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]

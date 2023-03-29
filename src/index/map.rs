@@ -125,6 +125,16 @@ mod tests {
                 *idx.eq_iter(["Jasmin", "NotFound", "Mario", "Paul"])
             );
         }
+
+        #[test]
+        fn contains() {
+            let mut idx = StrMapIndex::default();
+            idx.insert("Jasmin".into(), 5);
+            idx.insert("Mario".into(), 2);
+
+            assert!(idx.contains("Jasmin"));
+            assert!(!idx.contains("Paul"));
+        }
     }
 
     mod multi {
@@ -153,6 +163,16 @@ mod tests {
             i.insert("Jasmin".into(), 1);
 
             assert_eq!(*i.eq("Jasmin"), [1, 2]);
+        }
+
+        #[test]
+        fn contains() {
+            let mut idx = StrMapIndex::default();
+            idx.insert("Jasmin".into(), 5);
+            idx.insert("Jasmin".into(), 2);
+
+            assert!(idx.contains("Jasmin"));
+            assert!(!idx.contains("Paul"));
         }
     }
 }
