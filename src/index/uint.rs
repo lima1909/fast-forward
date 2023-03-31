@@ -35,19 +35,27 @@ use crate::{
     index::{Index, Store},
     Idx, EMPTY_IDXS,
 };
-use std::borrow::Cow;
+use std::{borrow::Cow, marker::PhantomData};
 
 use super::Equals;
 
-/// Short name for [`UIntVecIndex`].
-pub type UIntIndex = UIntVecIndex;
-
 /// `Key` is from type [`crate::Idx`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
-pub struct UIntVecIndex(Vec<Option<Index>>);
+pub struct UIntIndex<K: Default = usize>(Vec<Option<Index>>, PhantomData<K>);
 
-impl Store<Idx> for UIntVecIndex {
-    fn insert(&mut self, k: Idx, i: Idx) {
+impl UIntIndex<usize> {
+    pub fn new() -> Self {
+        Self(Vec::new(), PhantomData)
+    }
+}
+
+impl<K> Store<K> for UIntIndex<K>
+where
+    K: Default + Into<usize>,
+{
+    fn insert(&mut self, k: K, i: Idx) {
+        let k = k.into();
+
         if self.0.len() <= k {
             self.0.resize(k + 1, None);
         }
@@ -59,14 +67,17 @@ impl Store<Idx> for UIntVecIndex {
     }
 
     fn with_capacity(capacity: usize) -> Self {
-        UIntVecIndex(Vec::with_capacity(capacity))
+        UIntIndex(Vec::with_capacity(capacity), PhantomData)
     }
 }
 
-impl Equals<usize> for UIntVecIndex {
+impl<K> Equals<K> for UIntIndex<K>
+where
+    K: Default + Into<usize>,
+{
     #[inline]
-    fn eq(&self, key: usize) -> Cow<[Idx]> {
-        match &self.0.get(key) {
+    fn eq(&self, key: K) -> Cow<[Idx]> {
+        match &self.0.get(key.into()) {
             Some(Some(idx)) => idx.get(),
             _ => Cow::Borrowed(EMPTY_IDXS),
         }
@@ -83,24 +94,41 @@ mod tests {
 
         #[test]
         fn empty() {
-            let i = UIntIndex::default();
+            let i = UIntIndex::new();
             assert_eq!(0, i.eq(2).len());
             assert!(i.0.is_empty());
         }
 
         #[test]
-        fn find_idx_2() {
-            let mut i = UIntIndex::default();
+        fn find_idx_2_usize() {
+            let mut i = UIntIndex::new();
             i.insert(2, 4);
 
             assert_eq!(*i.eq(2), [4]);
-            // assert_eq!(i.ne(3), &[]);  TODO: `ne` do not work now
+            assert_eq!(3, i.0.len());
+        }
+
+        #[test]
+        fn find_idx_2_bool() {
+            let mut i = UIntIndex::<bool>::default();
+            i.insert(true, 4);
+
+            assert_eq!(*i.eq(true), [4]);
+            assert_eq!(2, i.0.len());
+        }
+
+        #[test]
+        fn find_idx_2_u16() {
+            let mut i = UIntIndex::<u16>::default();
+            i.insert(2, 4);
+
+            assert_eq!(*i.eq(2), [4]);
             assert_eq!(3, i.0.len());
         }
 
         #[test]
         fn or_find_idx_3_4() {
-            let mut idx = UIntIndex::default();
+            let mut idx = UIntIndex::new();
             idx.insert(2, 4);
             idx.insert(4, 8);
             idx.insert(3, 6);
@@ -128,7 +156,7 @@ mod tests {
 
         #[test]
         fn query_and_or() {
-            let mut idx = UIntIndex::default();
+            let mut idx = UIntIndex::<usize>::default();
             idx.insert(2, 4);
             idx.insert(4, 8);
             idx.insert(3, 6);
@@ -148,13 +176,13 @@ mod tests {
 
         #[test]
         fn out_of_bound() {
-            let i = UIntIndex::default();
+            let i = UIntIndex::<u8>::default();
             assert_eq!(0, i.eq(2).len());
         }
 
         #[test]
         fn with_capacity() {
-            let mut i = UIntIndex::with_capacity(5);
+            let mut i = UIntIndex::<u8>::with_capacity(5);
             i.insert(1, 4);
             assert_eq!(2, i.0.len());
             assert_eq!(5, i.0.capacity());
@@ -162,7 +190,7 @@ mod tests {
 
         #[test]
         fn find_eq_many_unique() {
-            let mut i = UIntIndex::default();
+            let mut i = UIntIndex::<u8>::default();
             i.insert(5, 5);
             i.insert(2, 2);
             i.insert(6, 6);
@@ -180,7 +208,7 @@ mod tests {
 
         #[test]
         fn contains() {
-            let mut i = UIntIndex::default();
+            let mut i = UIntIndex::<u8>::default();
             i.insert(5, 5);
             i.insert(2, 2);
 
@@ -194,14 +222,14 @@ mod tests {
 
         #[test]
         fn empty() {
-            let i = UIntIndex::default();
+            let i = UIntIndex::<u8>::default();
             assert_eq!(0, i.eq(2).len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut i = UIntIndex::default();
+            let mut i = UIntIndex::<u8>::default();
             i.insert(2, 2);
 
             assert_eq!(*i.eq(2), [2]);
@@ -210,7 +238,7 @@ mod tests {
 
         #[test]
         fn double_index() {
-            let mut i = UIntIndex::default();
+            let mut i = UIntIndex::<u8>::default();
             i.insert(2, 2);
             i.insert(2, 1);
 
@@ -219,7 +247,7 @@ mod tests {
 
         #[test]
         fn find_eq_many_unique() {
-            let mut i = UIntIndex::default();
+            let mut i = UIntIndex::<u8>::default();
             i.insert(5, 5);
             i.insert(2, 2);
             i.insert(2, 1);
@@ -235,7 +263,7 @@ mod tests {
 
         #[test]
         fn contains() {
-            let mut i = UIntIndex::default();
+            let mut i = UIntIndex::<u8>::default();
             i.insert(2, 2);
             i.insert(2, 1);
 

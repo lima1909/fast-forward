@@ -255,10 +255,11 @@ mod tests {
         assert_eq!([1], *query(c.id.eq(4)).or(c.name.eq(&"Foo".into())).exec());
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, Default)]
     enum Gender {
         Male,
         Female,
+        #[default]
         None,
     }
 
@@ -275,13 +276,13 @@ mod tests {
     #[derive(Debug)]
     struct Person {
         pk: usize,
-        multi: usize,
+        multi: u16,
         name: String,
         gender: Gender,
     }
 
     impl Person {
-        fn new(pk: usize, multi: usize, name: &str, gender: Gender) -> Self {
+        fn new(pk: usize, multi: u16, name: &str, gender: Gender) -> Self {
             Self {
                 pk,
                 multi,
@@ -293,19 +294,21 @@ mod tests {
 
     #[test]
     fn person_indices() {
+        use Gender::*;
+
         let mut p = fast!(
                 Person as FastPerson {
                     pk: UIntIndex,
-                    multi: UIntIndex,
+                    multi: UIntIndex<u16>,
                     name.clone: MapIndex,
-                    gender.into: UIntIndex,
+                    gender.into: UIntIndex<Gender>,
                 }
         );
 
         let persons = vec![
-            Person::new(3, 7, "Jasmin", Gender::Female),
-            Person::new(41, 7, "Mario", Gender::Male),
-            Person::new(111, 234, "Paul", Gender::Male),
+            Person::new(3, 7, "Jasmin", Female),
+            Person::new(41, 7, "Mario", Male),
+            Person::new(111, 234, "Paul", Male),
         ];
 
         persons
@@ -331,32 +334,37 @@ mod tests {
             .exec();
         assert_eq!(*r, [0, 1]);
 
-        let r = query(p.gender.eq(Gender::Male.into())).exec();
+        let r = query(p.gender.eq(Male)).exec();
         assert_eq!(*r, [1, 2]);
 
-        let r = query(p.gender.eq(Gender::Female.into())).exec();
+        let r = query(p.gender.eq(Female)).exec();
         assert_eq!(*r, [0]);
     }
 
     #[test]
     fn different_idxs() {
         use crate::index::Store;
+        use Gender::*;
 
-        let mut pk = UIntIndex::default();
-        pk.insert(1, 1);
-        pk.insert(2, 2);
-        pk.insert(99, 0);
+        let p = Person::new(0, 0, "Julia", Female);
 
-        let p = Person::new(3, 7, "a", Gender::None);
+        let mut gender = UIntIndex::<Gender>::default();
+        gender.insert(p.gender, 1);
+        gender.insert(Male, 2);
+        gender.insert(None, 0);
+
         let mut name = MapIndex::default();
         name.insert(p.name.as_ref(), 1);
         name.insert("b", 2);
         name.insert("z", 0);
 
-        let r = query(pk.eq(1)).and(name.eq(&"a")).exec();
+        let r = query(gender.eq(Female)).and(name.eq(&"Julia")).exec();
         assert_eq!(*r, [1]);
 
-        let r = query(name.eq(&"z")).or(pk.eq(1)).and(name.eq(&"a")).exec();
+        let r = query(name.eq(&"z"))
+            .or(gender.eq(Female))
+            .and(name.eq(&"Julia"))
+            .exec();
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
         assert_eq!(*r, [0, 1]);
     }
