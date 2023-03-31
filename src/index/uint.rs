@@ -1,13 +1,13 @@
-//! Indices for 32-bit unsigned integer type ([`usize`]).
+//! Indices for [`usize`] compatible types.
 //!
 //! Well suitable for for example `Primary Keys`.
 //!
-//! The `Key` is the position (index) in the Index-Vec ([`UIntVecIndex`]).
+//! The `Key` is the position (index) in the Vec: [`UIntIndex`].
 //!
 //!```text
-//! let _unique_values = vec![3, 2, 4, 1, ...];
+//! let _list_numbers_unique = vec![3, 2, 4, 1, ...];
 //!
-//! Unique Index:
+//! Unique [`UIntIndex`]:
 //!
 //!  Key | Idx (_values)
 //! --------------------
@@ -19,9 +19,9 @@
 //! ...  | ...
 //!
 //!
-//! let _multi_values = vec![3, 2, 3, 1, 2, 2, ...];
+//! let _list_numbers_multi = vec![3, 2, 3, 1, 2, 2, ...];
 //!
-//! Muli Index:
+//! Muli [`UIntIndex`]:
 //!
 //!  Key | Idx (_values)
 //! --------------------

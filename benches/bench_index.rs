@@ -36,7 +36,7 @@ fn list_index(c: &mut Criterion) {
     // create search index
     let mut idx = Indices {
         pk: UIntIndex::with_capacity(HOW_MUCH_PERSON),
-        name: MapIndex::default(),
+        name: MapIndex::with_capacity(HOW_MUCH_PERSON),
     };
 
     for (i, p) in v.iter().enumerate() {

@@ -1,12 +1,12 @@
-//! Indices for string types: ([`str`]).
+//! Indices for `Key`s  which implement: [`std::hash::Hash`] + [`std::cmp::Eq`].
 //!
-//! The `Key` is the Hash-Key in the Index-Map ([`MapIndex`]).
+//! The `Key` is the Hash-Key and the value are the `Index` which are saved in the [`MapIndex`]:
 //!
 //!
 //!```text
-//! let _unique_values = vec!["Paul", "Mario", "Jasmin", ...];
+//! let _list_names_unique = vec!["Paul", "Mario", "Jasmin", ...];
 //!
-//! Unique Index:
+//! Unique [`MapIndex`]:
 //!
 //!  Key      | Idx
 //! --------------------
@@ -15,9 +15,9 @@
 //!  "Paul"   |  0
 //!   ...     | ...
 //!
-//! let _multi_values = vec!["Jasmin", "Mario", "Jasmin", ...];
+//! let _list_names__multi = vec!["Jasmin", "Mario", "Jasmin", ...];
 //!
-//! Multi Index:
+//! Multi [`MapIndex`]:
 //!
 //!  Key      | Idx
 //! --------------------
@@ -34,11 +34,11 @@ use std::{borrow::Cow, collections::HashMap, fmt::Debug, hash::Hash};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
-pub struct MapIndex<K: Default + Debug = String>(HashMap<K, Index>);
+pub struct MapIndex<K: Default = String>(HashMap<K, Index>);
 
 impl<K> Store<K> for MapIndex<K>
 where
-    K: Default + Debug + Eq + Hash,
+    K: Default + Eq + Hash,
 {
     fn insert(&mut self, key: K, i: Idx) {
         match self.0.get_mut(&key) {
@@ -56,7 +56,7 @@ where
 
 impl<'k, K> Equals<&'k K> for MapIndex<K>
 where
-    K: Default + Debug + Eq + Hash,
+    K: Default + Eq + Hash,
 {
     #[inline]
     fn eq(&self, key: &'k K) -> Cow<[Idx]> {
