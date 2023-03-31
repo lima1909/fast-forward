@@ -81,12 +81,33 @@ macro_rules! fast {
     };
 }
 
+pub struct Iter<'i, T> {
+    pos: usize,
+    idxs: Cow<'i, [Idx]>,
+    data: &'i [T],
+}
+
+impl<'i, T> Iter<'i, T> {
+    fn new(idxs: Cow<'i, [Idx]>, data: &'i [T]) -> Self {
+        Self { pos: 0, idxs, data }
+    }
+}
+
+impl<'i, T> Iterator for Iter<'i, T> {
+    type Item = &'i T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let i = self.idxs.get(self.pos)?;
+        self.pos += 1;
+        Some(&self.data[*i])
+    }
+}
+
 pub trait IndexedList<T>: AsRef<[T]> {
     /// **Importand:** if an `Idx` is not valid (inside the borders), then this mehtod panics (OutOfBound).
     #[inline]
-    fn filter(&self, idxs: Cow<'_, [Idx]>) -> Vec<&T> {
-        let inner = self.as_ref();
-        idxs.iter().map(|i| &inner[*i]).collect()
+    fn filter<'i>(&'i self, idxs: Cow<'i, [Idx]>) -> Iter<'i, T> {
+        Iter::new(idxs, self.as_ref())
     }
 }
 
@@ -173,20 +194,18 @@ mod tests {
         l.push(Car::new(2, "VW"));
         l.push(Car::new(99, "Porsche"));
 
-        let r = l.filter(l.eq(2));
-        assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..]);
+        let r = l.filter(l.eq(2)).collect::<Vec<_>>();
+        assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
 
-        let r = l.filter(l.eq_iter(2..6));
-        assert_eq!(
-            &[
-                &Car::new(2, "BMW"),
-                &Car::new(5, "Audi"),
-                &Car::new(2, "VW"),
-            ],
-            &r[..]
-        );
+        let mut r = l.filter(l.eq_iter(2..6));
+        assert_eq!(Some(&Car::new(2, "BMW")), r.next());
+        assert_eq!(Some(&Car::new(5, "Audi")), r.next());
+        assert_eq!(Some(&Car::new(2, "VW")), r.next());
+        assert_eq!(None, r.next());
 
-        let r = l.filter(query(l.eq(2)).or(l.eq(100)).exec());
+        let r = l
+            .filter(query(l.eq(2)).or(l.eq(100)).exec())
+            .collect::<Vec<_>>();
         assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..]);
     }
 
@@ -198,21 +217,23 @@ mod tests {
         l.push(Car::new(2, "VW"));
         l.push(Car::new(99, "Porsche"));
 
-        let r = l.filter(l.eq("VW"));
-        assert_eq!(&[&Car::new(2, "VW")], &r[..]);
+        let r: Vec<&Car> = l.filter(l.eq("VW")).collect();
+        assert_eq!(vec![&Car::new(2, "VW")], r);
 
-        let r = l.filter(l.eq_iter(["VW", "Audi", "BMW"]));
+        let r: Vec<&Car> = l.filter(l.eq_iter(["VW", "Audi", "BMW"])).collect();
         assert_eq!(
-            &[
+            vec![
                 &Car::new(2, "BMW"),
                 &Car::new(5, "Audi"),
                 &Car::new(2, "VW"),
             ],
-            &r[..]
+            r
         );
 
-        let r = l.filter(query(l.eq("VW")).or(l.eq("Audi")).exec());
-        assert_eq!(&[&Car::new(5, "Audi"), &Car::new(2, "VW")], &r[..])
+        let r: Vec<&Car> = l
+            .filter(query(l.eq("VW")).or(l.eq("Audi")).exec())
+            .collect();
+        assert_eq!(vec![&Car::new(5, "Audi"), &Car::new(2, "VW")], r)
     }
 
     #[test]

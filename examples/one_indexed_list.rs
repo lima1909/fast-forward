@@ -27,11 +27,13 @@ fn main() {
     l.push(Car(2, "VW".into()));
     l.push(Car(99, "Porsche".into()));
 
-    let r = l.filter(l.eq(2));
-    assert_eq!(&[&Car(2, "BMW".into()), &Car(2, "VW".into())], &r[..]);
+    let r = l.filter(l.eq(2)).collect::<Vec<_>>();
+    assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
 
-    let r = l.filter(query(l.eq(2)).or(l.eq(100)).exec());
-    assert_eq!(&[&Car(2, "BMW".into()), &Car(2, "VW".into())], &r[..]);
+    let r = l
+        .filter(query(l.eq(2)).or(l.eq(100)).exec())
+        .collect::<Vec<_>>();
+    assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
 
     // ------------------------------
     // With `Name` Index: StrMapIndex
@@ -42,9 +44,11 @@ fn main() {
     l.push(Car(2, "VW".into()));
     l.push(Car(99, "Porsche".into()));
 
-    let r = l.filter(l.eq("VW"));
-    assert_eq!(&[&Car(2, "VW".into())], &r[..]);
+    let r: Vec<&Car> = l.filter(l.eq("VW")).collect();
+    assert_eq!(vec![&Car(2, "VW".into())], r);
 
-    let r = l.filter(query(l.eq("VW")).or(l.eq("Audi")).exec());
-    assert_eq!(&[&Car(5, "Audi".into()), &Car(2, "VW".into())], &r[..])
+    let r: Vec<&Car> = l
+        .filter(query(l.eq("VW")).or(l.eq("Audi")).exec())
+        .collect();
+    assert_eq!(vec![&Car(5, "Audi".into()), &Car(2, "VW".into())], r);
 }
