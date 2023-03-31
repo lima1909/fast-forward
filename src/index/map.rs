@@ -1,6 +1,6 @@
 //! Indices for string types: ([`str`]).
 //!
-//! The `Key` is the Hash-Key in the Index-Map ([`StrMapIndex`]).
+//! The `Key` is the Hash-Key in the Index-Map ([`MapIndex`]).
 //!
 //!
 //!```text
@@ -30,14 +30,17 @@ use crate::{
     index::{Equals, Index, Store},
     Idx, EMPTY_IDXS,
 };
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, fmt::Debug, hash::Hash};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
-pub struct StrMapIndex(HashMap<String, Index>);
+pub struct MapIndex<K: Default + Debug = String>(HashMap<K, Index>);
 
-impl Store<String> for StrMapIndex {
-    fn insert(&mut self, key: String, i: Idx) {
+impl<K> Store<K> for MapIndex<K>
+where
+    K: Default + Debug + Eq + Hash,
+{
+    fn insert(&mut self, key: K, i: Idx) {
         match self.0.get_mut(&key) {
             Some(v) => v.add(i),
             None => {
@@ -47,13 +50,16 @@ impl Store<String> for StrMapIndex {
     }
 
     fn with_capacity(capacity: usize) -> Self {
-        StrMapIndex(HashMap::with_capacity(capacity))
+        MapIndex(HashMap::with_capacity(capacity))
     }
 }
 
-impl<'k> Equals<&'k str> for StrMapIndex {
+impl<'k, K> Equals<&'k K> for MapIndex<K>
+where
+    K: Default + Debug + Eq + Hash,
+{
     #[inline]
-    fn eq(&self, key: &'k str) -> Cow<[Idx]> {
+    fn eq(&self, key: &'k K) -> Cow<[Idx]> {
         match self.0.get(key) {
             Some(i) => i.get(),
             None => Cow::Borrowed(EMPTY_IDXS),
@@ -71,69 +77,87 @@ mod tests {
 
         #[test]
         fn empty() {
-            let i = StrMapIndex::default();
-            assert_eq!(0, i.eq("Jasmin").len());
+            let i = MapIndex::default();
+            assert_eq!(0, i.eq(&"Jasmin").len());
             assert!(i.0.is_empty());
         }
 
         #[test]
-        fn find_idx_2() {
-            let mut i = StrMapIndex::default();
-            i.insert("Jasmin".into(), 4);
+        fn find_idx_2_str() {
+            let mut i = MapIndex::default();
+            i.insert("Jasmin", 4);
 
-            assert_eq!(*i.eq("Jasmin"), [4]);
+            assert_eq!(*i.eq(&"Jasmin"), [4]);
+            assert_eq!(1, i.0.len());
+        }
+
+        #[test]
+        fn find_idx_2_i32() {
+            let mut i = MapIndex::default();
+            i.insert(5, 4);
+
+            assert_eq!(*i.eq(&5), [4]);
+            assert_eq!(1, i.0.len());
+        }
+
+        #[test]
+        fn find_idx_2_char() {
+            let mut i = MapIndex::default();
+            i.insert('x', 4);
+
+            assert_eq!(*i.eq(&'x'), [4]);
             assert_eq!(1, i.0.len());
         }
 
         #[test]
         fn or_find_idx_3_4() {
-            let mut idx = StrMapIndex::default();
-            idx.insert("Jasmin".into(), 4);
-            idx.insert("Mario".into(), 8);
-            idx.insert("Paul".into(), 6);
+            let mut idx = MapIndex::default();
+            idx.insert("Jasmin", 4);
+            idx.insert("Mario", 8);
+            idx.insert("Paul", 6);
 
-            let r = query(idx.eq("Mario")).or(idx.eq("Paul")).exec();
+            let r = query(idx.eq(&"Mario")).or(idx.eq(&"Paul")).exec();
             assert_eq!(*r, [6, 8]);
 
-            let r = query(idx.eq("Paul")).or(idx.eq("Blub")).exec();
+            let r = query(idx.eq(&"Paul")).or(idx.eq(&"Blub")).exec();
             assert_eq!(*r, [6]);
 
-            let r = query(idx.eq("Blub")).or(idx.eq("Mario")).exec();
+            let r = query(idx.eq(&"Blub")).or(idx.eq(&"Mario")).exec();
             assert_eq!(*r, [8]);
         }
 
         #[test]
         fn out_of_bound() {
-            let i = StrMapIndex::default();
-            assert_eq!(0, i.eq("Jasmin").len());
+            let i = MapIndex::default();
+            assert_eq!(0, i.eq(&"Jasmin").len());
         }
 
         #[test]
         fn find_eq_many_unique() {
-            let mut idx = StrMapIndex::default();
-            idx.insert("Jasmin".into(), 5);
-            idx.insert("Mario".into(), 2);
-            idx.insert("Paul".into(), 6);
+            let mut idx = MapIndex::default();
+            idx.insert("Jasmin", 5);
+            idx.insert("Mario", 2);
+            idx.insert("Paul", 6);
 
             assert_eq!(0, idx.eq_iter([]).iter().len());
-            assert_eq!(0, idx.eq_iter(["NotFound"]).iter().len());
-            assert_eq!([2], *idx.eq_iter(["Mario"]));
-            assert_eq!([2, 6], *idx.eq_iter(["Paul", "Mario"]));
-            assert_eq!([2, 6], *idx.eq_iter(["NotFound", "Paul", "Mario"]));
+            assert_eq!(0, idx.eq_iter([&"NotFound"]).iter().len());
+            assert_eq!([2], *idx.eq_iter([&"Mario"]));
+            assert_eq!([2, 6], *idx.eq_iter([&"Paul", &"Mario"]));
+            assert_eq!([2, 6], *idx.eq_iter([&"NotFound", &"Paul", &"Mario"]));
             assert_eq!(
                 [2, 5, 6],
-                *idx.eq_iter(["Jasmin", "NotFound", "Mario", "Paul"])
+                *idx.eq_iter([&"Jasmin", &"NotFound", &"Mario", &"Paul"])
             );
         }
 
         #[test]
         fn contains() {
-            let mut idx = StrMapIndex::default();
-            idx.insert("Jasmin".into(), 5);
-            idx.insert("Mario".into(), 2);
+            let mut idx = MapIndex::default();
+            idx.insert("Jasmin", 5);
+            idx.insert("Mario", 2);
 
-            assert!(idx.contains("Jasmin"));
-            assert!(!idx.contains("Paul"));
+            assert!(idx.contains(&"Jasmin"));
+            assert!(!idx.contains(&"Paul"));
         }
     }
 
@@ -142,37 +166,37 @@ mod tests {
 
         #[test]
         fn empty() {
-            let i = StrMapIndex::default();
-            assert_eq!(0, i.eq("Jasmin").len());
+            let i = MapIndex::default();
+            assert_eq!(0, i.eq(&"Jasmin").len());
             assert!(i.0.is_empty());
         }
 
         #[test]
         fn find_idx_2() {
-            let mut i = StrMapIndex::default();
-            i.insert("Jasmin".into(), 2);
+            let mut i = MapIndex::default();
+            i.insert("Jasmin", 2);
 
-            assert_eq!(*i.eq("Jasmin"), [2]);
+            assert_eq!(*i.eq(&"Jasmin"), [2]);
             assert_eq!(1, i.0.len());
         }
 
         #[test]
         fn double_index() {
-            let mut i = StrMapIndex::default();
-            i.insert("Jasmin".into(), 2);
-            i.insert("Jasmin".into(), 1);
+            let mut i = MapIndex::default();
+            i.insert("Jasmin", 2);
+            i.insert("Jasmin", 1);
 
-            assert_eq!(*i.eq("Jasmin"), [1, 2]);
+            assert_eq!(*i.eq(&"Jasmin"), [1, 2]);
         }
 
         #[test]
         fn contains() {
-            let mut idx = StrMapIndex::default();
-            idx.insert("Jasmin".into(), 5);
-            idx.insert("Jasmin".into(), 2);
+            let mut idx = MapIndex::default();
+            idx.insert("Jasmin", 5);
+            idx.insert("Jasmin", 2);
 
-            assert!(idx.contains("Jasmin"));
-            assert!(!idx.contains("Paul"));
+            assert!(idx.contains(&"Jasmin"));
+            assert!(!idx.contains(&"Paul"));
         }
     }
 }

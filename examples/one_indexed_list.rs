@@ -1,5 +1,5 @@
 use fast_forward::{
-    index::{map::StrMapIndex, uint::UIntIndex, Equals},
+    index::{map::MapIndex, uint::UIntIndex, Equals},
     query::query,
     IndexedList, OneIndexedList,
 };
@@ -38,17 +38,17 @@ fn main() {
     // ------------------------------
     // With `Name` Index: StrMapIndex
     // ------------------------------
-    let mut l = OneIndexedList::new(Car::name, StrMapIndex::default());
+    let mut l = OneIndexedList::new(Car::name, MapIndex::default());
     l.insert(Car(2, "BMW".into()));
     l.insert(Car(5, "Audi".into()));
     l.insert(Car(2, "VW".into()));
     l.insert(Car(99, "Porsche".into()));
 
-    let r: Vec<&Car> = l.filter(l.eq("VW")).collect();
+    let r: Vec<&Car> = l.filter(l.eq(&"VW".into())).collect();
     assert_eq!(vec![&Car(2, "VW".into())], r);
 
     let r: Vec<&Car> = l
-        .filter(query(l.eq("VW")).or(l.eq("Audi")).exec())
+        .filter(query(l.eq(&"VW".into())).or(l.eq(&"Audi".into())).exec())
         .collect();
     assert_eq!(vec![&Car(5, "Audi".into()), &Car(2, "VW".into())], r);
 }

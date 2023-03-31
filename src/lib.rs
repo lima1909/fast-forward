@@ -156,7 +156,7 @@ impl<T, F, S> Deref for OneIndexedList<T, F, S> {
 mod tests {
     use crate::{
         fast,
-        index::{map::StrMapIndex, uint::UIntIndex, Equals},
+        index::{map::MapIndex, uint::UIntIndex, Equals},
         query::query,
         IndexedList, OneIndexedList,
     };
@@ -211,16 +211,18 @@ mod tests {
 
     #[test]
     fn one_indexed_list_string() {
-        let mut l = OneIndexedList::new(Car::name, StrMapIndex::default());
+        let mut l = OneIndexedList::new(Car::name, MapIndex::default());
         l.insert(Car::new(2, "BMW"));
         l.insert(Car::new(5, "Audi"));
         l.insert(Car::new(2, "VW"));
         l.insert(Car::new(99, "Porsche"));
 
-        let r: Vec<&Car> = l.filter(l.eq("VW")).collect();
+        let r: Vec<&Car> = l.filter(l.eq(&"VW".into())).collect();
         assert_eq!(vec![&Car::new(2, "VW")], r);
 
-        let r: Vec<&Car> = l.filter(l.eq_iter(["VW", "Audi", "BMW"])).collect();
+        let r: Vec<&Car> = l
+            .filter(l.eq_iter([&"VW".into(), &"Audi".into(), &"BMW".into()]))
+            .collect();
         assert_eq!(
             vec![
                 &Car::new(2, "BMW"),
@@ -231,7 +233,7 @@ mod tests {
         );
 
         let r: Vec<&Car> = l
-            .filter(query(l.eq("VW")).or(l.eq("Audi")).exec())
+            .filter(query(l.eq(&"VW".into())).or(l.eq(&"Audi".into())).exec())
             .collect();
         assert_eq!(vec![&Car::new(5, "Audi"), &Car::new(2, "VW")], r)
     }
@@ -240,7 +242,7 @@ mod tests {
     fn fast() {
         let mut c = fast!(Car {
             id: UIntIndex,
-            name.clone: StrMapIndex,
+            name.clone: MapIndex,
         });
 
         let c1 = Car {
@@ -250,7 +252,7 @@ mod tests {
         };
         c.insert(&c1, 1);
 
-        assert_eq!([1], *query(c.id.eq(4)).or(c.name.eq("Foo")).exec());
+        assert_eq!([1], *query(c.id.eq(4)).or(c.name.eq(&"Foo".into())).exec());
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -295,7 +297,7 @@ mod tests {
                 Person as FastPerson {
                     pk: UIntIndex,
                     multi: UIntIndex,
-                    name.clone: StrMapIndex,
+                    name.clone: MapIndex,
                     gender.into: UIntIndex,
                 }
         );
@@ -321,10 +323,12 @@ mod tests {
         let r = query(p.multi.eq(3)).or(p.multi.eq(7)).exec();
         assert_eq!(*r, [0, 1]);
 
-        let r = query(p.name.eq("Jasmin")).exec();
+        let r = query(p.name.eq(&"Jasmin".into())).exec();
         assert_eq!(*r, [0]);
 
-        let r = query(p.name.eq("Jasmin")).or(p.name.eq("Mario")).exec();
+        let r = query(p.name.eq(&"Jasmin".into()))
+            .or(p.name.eq(&"Mario".into()))
+            .exec();
         assert_eq!(*r, [0, 1]);
 
         let r = query(p.gender.eq(Gender::Male.into())).exec();
@@ -344,15 +348,15 @@ mod tests {
         pk.insert(99, 0);
 
         let p = Person::new(3, 7, "a", Gender::None);
-        let mut name = StrMapIndex::default();
-        name.insert(p.name, 1);
-        name.insert("b".into(), 2);
-        name.insert("z".into(), 0);
+        let mut name = MapIndex::default();
+        name.insert(p.name.as_ref(), 1);
+        name.insert("b", 2);
+        name.insert("z", 0);
 
-        let r = query(pk.eq(1)).and(name.eq("a")).exec();
+        let r = query(pk.eq(1)).and(name.eq(&"a")).exec();
         assert_eq!(*r, [1]);
 
-        let r = query(name.eq("z")).or(pk.eq(1)).and(name.eq("a")).exec();
+        let r = query(name.eq(&"z")).or(pk.eq(1)).and(name.eq(&"a")).exec();
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
         assert_eq!(*r, [0, 1]);
     }

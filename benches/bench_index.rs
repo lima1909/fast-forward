@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use fast_forward::index::map::StrMapIndex;
+use fast_forward::index::map::MapIndex;
 use fast_forward::index::uint::UIntIndex;
 use fast_forward::index::{Equals, Store};
 use fast_forward::query::{and, or, query};
@@ -16,7 +16,7 @@ struct Person(usize, String);
 
 struct Indices {
     pk: UIntIndex,
-    name: StrMapIndex,
+    name: MapIndex,
 }
 
 impl Indices {
@@ -36,7 +36,7 @@ fn list_index(c: &mut Criterion) {
     // create search index
     let mut idx = Indices {
         pk: UIntIndex::with_capacity(HOW_MUCH_PERSON),
-        name: StrMapIndex::default(),
+        name: MapIndex::default(),
     };
 
     for (i, p) in v.iter().enumerate() {
