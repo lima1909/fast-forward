@@ -22,10 +22,10 @@ fn main() {
     // With `ID Index: UIntIndex
     // -------------------------
     let mut l = OneIndexedList::new(Car::id, UIntIndex::default());
-    l.push(Car(2, "BMW".into()));
-    l.push(Car(5, "Audi".into()));
-    l.push(Car(2, "VW".into()));
-    l.push(Car(99, "Porsche".into()));
+    l.insert(Car(2, "BMW".into()));
+    l.insert(Car(5, "Audi".into()));
+    l.insert(Car(2, "VW".into()));
+    l.insert(Car(99, "Porsche".into()));
 
     let r = l.filter(l.eq(2)).collect::<Vec<_>>();
     assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
@@ -39,10 +39,10 @@ fn main() {
     // With `Name` Index: StrMapIndex
     // ------------------------------
     let mut l = OneIndexedList::new(Car::name, StrMapIndex::default());
-    l.push(Car(2, "BMW".into()));
-    l.push(Car(5, "Audi".into()));
-    l.push(Car(2, "VW".into()));
-    l.push(Car(99, "Porsche".into()));
+    l.insert(Car(2, "BMW".into()));
+    l.insert(Car(5, "Audi".into()));
+    l.insert(Car(2, "VW".into()));
+    l.insert(Car(99, "Porsche".into()));
 
     let r: Vec<&Car> = l.filter(l.eq("VW")).collect();
     assert_eq!(vec![&Car(2, "VW".into())], r);

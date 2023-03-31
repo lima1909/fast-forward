@@ -126,7 +126,7 @@ impl<T, F, S> OneIndexedList<T, F, S> {
         }
     }
 
-    pub fn push<K>(&mut self, v: T)
+    pub fn insert<K>(&mut self, v: T)
     where
         S: crate::index::Store<K>,
         F: Fn(&T) -> K,
@@ -189,10 +189,10 @@ mod tests {
     #[test]
     fn one_indexed_list_idx() {
         let mut l = OneIndexedList::new(Car::id, UIntIndex::default());
-        l.push(Car::new(2, "BMW"));
-        l.push(Car::new(5, "Audi"));
-        l.push(Car::new(2, "VW"));
-        l.push(Car::new(99, "Porsche"));
+        l.insert(Car::new(2, "BMW"));
+        l.insert(Car::new(5, "Audi"));
+        l.insert(Car::new(2, "VW"));
+        l.insert(Car::new(99, "Porsche"));
 
         let r = l.filter(l.eq(2)).collect::<Vec<_>>();
         assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
@@ -212,10 +212,10 @@ mod tests {
     #[test]
     fn one_indexed_list_string() {
         let mut l = OneIndexedList::new(Car::name, StrMapIndex::default());
-        l.push(Car::new(2, "BMW"));
-        l.push(Car::new(5, "Audi"));
-        l.push(Car::new(2, "VW"));
-        l.push(Car::new(99, "Porsche"));
+        l.insert(Car::new(2, "BMW"));
+        l.insert(Car::new(5, "Audi"));
+        l.insert(Car::new(2, "VW"));
+        l.insert(Car::new(99, "Porsche"));
 
         let r: Vec<&Car> = l.filter(l.eq("VW")).collect();
         assert_eq!(vec![&Car::new(2, "VW")], r);

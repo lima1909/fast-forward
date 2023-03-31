@@ -58,7 +58,7 @@ fn main() {
     ];
 
     let mut nidxs = OneIndexedList::new(Node::id, UIntIndex::default());
-    tree.into_iter().for_each(|n| nidxs.push(n));
+    tree.into_iter().for_each(|n| nidxs.insert(n));
 
     let nodes: &[Node] = nidxs.as_ref();
 
