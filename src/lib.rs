@@ -27,7 +27,7 @@ pub mod error;
 pub mod index;
 pub mod query;
 
-use std::{borrow::Cow, ops::Deref};
+use std::borrow::Cow;
 
 /// `Idx` is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
@@ -35,21 +35,30 @@ pub type Idx = usize;
 /// Empty array of `Idx`
 pub const EMPTY_IDXS: &[Idx] = &[];
 
+/// Create an `IndexedList` on a given `struct`.
+///
+/// ## Example for struct Person
+///
+/// ```not_run
+/// struct Person {
+///     id: usize,
+///     name: String,
+/// }
+///
+/// let fast_persons = fast!(
+///     FastPersonList => Person {
+///         id:   UIntIndex => id,
+///         name: MapIndex  => name.clone,
+///     }
+/// );
+/// ```
+
 #[macro_export]
 macro_rules! fast {
-    (   $strukt:ident
-        {
-            $( $fast_field:ident $(.$func:ident)?: $typ:ty ), + $(,)*
+    (
+        $fast:ident => $strukt:ident {
+            $( $fast_field:tt: $typ:ty => $strukt_field:ident $(.$func:ident)? ), + $(,)*
         }
-    ) => {
-        fast!($strukt as Fast { $( $fast_field $(.$func)?: $typ ), + })
-    };
-
-    (   $strukt:ident as $fast:ident
-        {
-            $( $fast_field:ident $(.$func:ident)?: $typ:ty ), + $(,)*
-        }
-
     ) => {
 
         {
@@ -57,6 +66,7 @@ macro_rules! fast {
         /// Container-struct for all indices.
         #[derive(Default)]
         struct $fast {
+            data: Vec<$strukt>,
             $(
                 $fast_field: $typ,
             )+
@@ -64,15 +74,25 @@ macro_rules! fast {
 
         /// Insert in all indices-stores the `Key` and the `Index`.
         impl $fast {
-            fn insert(&mut self, s: &$strukt, idx: $crate::Idx)  {
+            fn insert(&mut self, s: $strukt)  {
                 use $crate::index::Store;
 
                 $(
-                    self.$fast_field.insert(s.$fast_field$(.$func())?, idx);
+                    self.$fast_field.insert(s.$strukt_field$(.$func())?, self.data.len());
                 )+
+                self.data.push(s);
 
             }
         }
+
+        impl $crate::IndexedList<$strukt> for $fast {}
+
+        impl AsRef<[$strukt]> for $fast {
+            fn as_ref(&self) -> &[$strukt] {
+                &self.data
+            }
+        }
+
 
         $fast::default()
 
@@ -111,60 +131,18 @@ pub trait IndexedList<T>: AsRef<[T]> {
     }
 }
 
-pub struct OneIndexedList<T, F, S> {
-    inner: Vec<T>,
-    get_id_fn: F,
-    store: S,
-}
-
-impl<T, F, S> OneIndexedList<T, F, S> {
-    pub fn new(f: F, store: S) -> Self {
-        Self {
-            inner: vec![],
-            get_id_fn: f,
-            store,
-        }
-    }
-
-    pub fn insert<K>(&mut self, v: T)
-    where
-        S: crate::index::Store<K>,
-        F: Fn(&T) -> K,
-    {
-        self.store.insert((self.get_id_fn)(&v), self.inner.len());
-        self.inner.push(v);
-    }
-}
-
-impl<T, F, S> IndexedList<T> for OneIndexedList<T, F, S> {}
-
-impl<T, F, S> AsRef<[T]> for OneIndexedList<T, F, S> {
-    fn as_ref(&self) -> &[T] {
-        &self.inner
-    }
-}
-
-impl<T, F, S> Deref for OneIndexedList<T, F, S> {
-    type Target = S;
-
-    fn deref(&self) -> &Self::Target {
-        &self.store
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
         fast,
         index::{map::MapIndex, uint::UIntIndex, Equals},
         query::query,
-        IndexedList, OneIndexedList,
+        IndexedList,
     };
 
     #[derive(Debug, Eq, PartialEq)]
     struct Car {
         id: usize,
-        _no_index: usize,
         name: String,
     }
 
@@ -172,56 +150,51 @@ mod tests {
         fn new(id: usize, name: &str) -> Self {
             Self {
                 id,
-                _no_index: 0,
-                name: name.into(),
+                name: name.to_string(),
             }
-        }
-
-        fn id(&self) -> usize {
-            self.id
-        }
-
-        fn name(&self) -> String {
-            self.name.clone()
         }
     }
 
     #[test]
     fn one_indexed_list_idx() {
-        let mut l = OneIndexedList::new(Car::id, UIntIndex::default());
-        l.insert(Car::new(2, "BMW"));
-        l.insert(Car::new(5, "Audi"));
-        l.insert(Car::new(2, "VW"));
-        l.insert(Car::new(99, "Porsche"));
+        let mut fast_cars = fast!(FastCars => Car {id: UIntIndex => id});
+        fast_cars.insert(Car::new(2, "BMW"));
+        fast_cars.insert(Car::new(5, "Audi"));
+        fast_cars.insert(Car::new(2, "VW"));
+        fast_cars.insert(Car::new(99, "Porsche"));
 
-        let r = l.filter(l.eq(2)).collect::<Vec<_>>();
+        let r = fast_cars.filter(fast_cars.id.eq(2)).collect::<Vec<_>>();
         assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
 
-        let mut r = l.filter(l.eq_iter(2..6));
+        let mut r = fast_cars.filter(fast_cars.id.eq_iter(2..6));
         assert_eq!(Some(&Car::new(2, "BMW")), r.next());
         assert_eq!(Some(&Car::new(5, "Audi")), r.next());
         assert_eq!(Some(&Car::new(2, "VW")), r.next());
         assert_eq!(None, r.next());
 
-        let r = l
-            .filter(query(l.eq(2)).or(l.eq(100)).exec())
+        let r = fast_cars
+            .filter(query(fast_cars.id.eq(2)).or(fast_cars.id.eq(100)).exec())
             .collect::<Vec<_>>();
         assert_eq!(&[&Car::new(2, "BMW"), &Car::new(2, "VW")], &r[..]);
     }
 
     #[test]
     fn one_indexed_list_string() {
-        let mut l = OneIndexedList::new(Car::name, MapIndex::default());
-        l.insert(Car::new(2, "BMW"));
-        l.insert(Car::new(5, "Audi"));
-        l.insert(Car::new(2, "VW"));
-        l.insert(Car::new(99, "Porsche"));
+        let mut fast_cars = fast!(FastCars => Car {name: MapIndex => name.clone});
+        fast_cars.insert(Car::new(2, "BMW"));
+        fast_cars.insert(Car::new(5, "Audi"));
+        fast_cars.insert(Car::new(2, "VW"));
+        fast_cars.insert(Car::new(99, "Porsche"));
 
-        let r: Vec<&Car> = l.filter(l.eq(&"VW".into())).collect();
+        let r: Vec<&Car> = fast_cars.filter(fast_cars.name.eq(&"VW".into())).collect();
         assert_eq!(vec![&Car::new(2, "VW")], r);
 
-        let r: Vec<&Car> = l
-            .filter(l.eq_iter([&"VW".into(), &"Audi".into(), &"BMW".into()]))
+        let r: Vec<&Car> = fast_cars
+            .filter(
+                fast_cars
+                    .name
+                    .eq_iter([&"VW".into(), &"Audi".into(), &"BMW".into()]),
+            )
             .collect();
         assert_eq!(
             vec![
@@ -232,27 +205,35 @@ mod tests {
             r
         );
 
-        let r: Vec<&Car> = l
-            .filter(query(l.eq(&"VW".into())).or(l.eq(&"Audi".into())).exec())
+        let r: Vec<&Car> = fast_cars
+            .filter(
+                query(fast_cars.name.eq(&"VW".into()))
+                    .or(fast_cars.name.eq(&"Audi".into()))
+                    .exec(),
+            )
             .collect();
         assert_eq!(vec![&Car::new(5, "Audi"), &Car::new(2, "VW")], r)
     }
 
     #[test]
     fn fast() {
-        let mut c = fast!(Car {
-            id: UIntIndex,
-            name.clone: MapIndex,
-        });
+        let mut fast_cars = fast!(
+                FastCars => Car {
+                    id:     UIntIndex       => id,
+                    id_map: MapIndex<usize> => id,
+                    name:   MapIndex        => name.clone,
+                }
+        );
+        fast_cars.insert(Car::new(1, "Mercedes"));
+        fast_cars.insert(Car::new(4, "Porsche"));
 
-        let c1 = Car {
-            id: 4,
-            _no_index: 8,
-            name: "Foo".into(),
-        };
-        c.insert(&c1, 1);
-
-        assert_eq!([1], *query(c.id.eq(4)).or(c.name.eq(&"Foo".into())).exec());
+        assert_eq!([0], *query(fast_cars.id_map.eq(&1)).exec());
+        assert_eq!(
+            [1],
+            *query(fast_cars.id.eq(4))
+                .or(fast_cars.name.eq(&"Porsche".into()))
+                .exec()
+        );
     }
 
     #[derive(Debug, Clone, Copy, Default)]
@@ -296,48 +277,44 @@ mod tests {
     fn person_indices() {
         use Gender::*;
 
-        let mut p = fast!(
-                Person as FastPerson {
-                    pk: UIntIndex,
-                    multi: UIntIndex<u16>,
-                    name.clone: MapIndex,
-                    gender.into: UIntIndex<Gender>,
+        // CREATE INDEX index1 ON schema1.table1 (column1);
+        let mut fast_persons = fast!(
+                FastPersons => Person {
+                    pk:     UIntIndex         => pk,
+                    multi:  UIntIndex<u16>    => multi,
+                    name:   MapIndex          => name.clone,
+                    gender: UIntIndex<Gender> => gender.into,
                 }
         );
 
-        let persons = vec![
-            Person::new(3, 7, "Jasmin", Female),
-            Person::new(41, 7, "Mario", Male),
-            Person::new(111, 234, "Paul", Male),
-        ];
+        fast_persons.insert(Person::new(3, 7, "Jasmin", Female));
+        fast_persons.insert(Person::new(41, 7, "Mario", Male));
+        fast_persons.insert(Person::new(111, 234, "Paul", Male));
 
-        persons
-            .iter()
-            .enumerate()
-            .for_each(|(i, person)| p.insert(person, i));
+        assert_eq!([1], *query(fast_persons.pk.eq(41)).exec());
+        assert_eq!([0], *query(fast_persons.pk.eq(3)).exec());
+        assert!(query(fast_persons.pk.eq(101)).exec().is_empty());
 
-        assert_eq!([1], *query(p.pk.eq(41)).exec());
-        assert_eq!([0], *query(p.pk.eq(3)).exec());
-        assert!(query(p.pk.eq(101)).exec().is_empty());
-
-        let r = query(p.multi.eq(7)).exec();
+        let r = query(fast_persons.multi.eq(7)).exec();
         assert_eq!(*r, [0, 1]);
 
-        let r = query(p.multi.eq(3)).or(p.multi.eq(7)).exec();
-        assert_eq!(*r, [0, 1]);
-
-        let r = query(p.name.eq(&"Jasmin".into())).exec();
-        assert_eq!(*r, [0]);
-
-        let r = query(p.name.eq(&"Jasmin".into()))
-            .or(p.name.eq(&"Mario".into()))
+        let r = query(fast_persons.multi.eq(3))
+            .or(fast_persons.multi.eq(7))
             .exec();
         assert_eq!(*r, [0, 1]);
 
-        let r = query(p.gender.eq(Male)).exec();
+        let r = query(fast_persons.name.eq(&"Jasmin".into())).exec();
+        assert_eq!(*r, [0]);
+
+        let r = query(fast_persons.name.eq(&"Jasmin".into()))
+            .or(fast_persons.name.eq(&"Mario".into()))
+            .exec();
+        assert_eq!(*r, [0, 1]);
+
+        let r = query(fast_persons.gender.eq(Male)).exec();
         assert_eq!(*r, [1, 2]);
 
-        let r = query(p.gender.eq(Female)).exec();
+        let r = query(fast_persons.gender.eq(Female)).exec();
         assert_eq!(*r, [0]);
     }
 

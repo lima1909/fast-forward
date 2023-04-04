@@ -1,7 +1,8 @@
 use fast_forward::{
+    fast,
     index::{uint::UIntIndex, Equals},
     query::or,
-    Idx, OneIndexedList, EMPTY_IDXS,
+    Idx, EMPTY_IDXS,
 };
 
 use std::borrow::Cow;
@@ -35,44 +36,37 @@ impl Node {
     fn new(id: usize, parent: usize) -> Self {
         Self { id, parent }
     }
-
-    fn id(&self) -> usize {
-        self.id
-    }
 }
 
 fn main() {
+    let mut fast_nodes = fast!(FastNodes => Node {id: UIntIndex => id});
+
     //     0
     //   1   4
     // 2   3
     // 5
     // 6
-    let tree = vec![
-        Node::new(0, 0),
-        Node::new(1, 0),
-        Node::new(2, 1),
-        Node::new(3, 1),
-        Node::new(4, 0),
-        Node::new(5, 2),
-        Node::new(6, 5),
-    ];
+    fast_nodes.insert(Node::new(0, 0));
+    fast_nodes.insert(Node::new(1, 0));
+    fast_nodes.insert(Node::new(2, 1));
+    fast_nodes.insert(Node::new(3, 1));
+    fast_nodes.insert(Node::new(4, 0));
+    fast_nodes.insert(Node::new(5, 2));
+    fast_nodes.insert(Node::new(6, 5));
 
-    let mut nidxs = OneIndexedList::new(Node::id, UIntIndex::default());
-    tree.into_iter().for_each(|n| nidxs.insert(n));
-
-    let nodes: &[Node] = nidxs.as_ref();
+    let nodes: &[Node] = fast_nodes.as_ref();
 
     // PARENTS: up to the root node
-    assert!(nidxs.parents(9, 0, nodes).is_empty());
-    assert!(nidxs.parents(0, 0, nodes).is_empty());
+    assert!(fast_nodes.id.parents(9, 0, nodes).is_empty());
+    assert!(fast_nodes.id.parents(0, 0, nodes).is_empty());
 
-    assert_eq!(&[0], &nidxs.parents(1, 0, nodes)[..]);
-    assert_eq!(&[0], &nidxs.parents(4, 0, nodes)[..]);
-    assert_eq!(&[0, 1], &nidxs.parents(2, 0, nodes)[..]);
-    assert_eq!(&[0, 1], &nidxs.parents(3, 0, nodes)[..]);
-    assert_eq!(&[0, 1, 2], &nidxs.parents(5, 0, nodes)[..]);
-    assert_eq!(&[0, 1, 2, 5], &nidxs.parents(6, 0, nodes)[..]);
+    assert_eq!(&[0], &fast_nodes.id.parents(1, 0, nodes)[..]);
+    assert_eq!(&[0], &fast_nodes.id.parents(4, 0, nodes)[..]);
+    assert_eq!(&[0, 1], &fast_nodes.id.parents(2, 0, nodes)[..]);
+    assert_eq!(&[0, 1], &fast_nodes.id.parents(3, 0, nodes)[..]);
+    assert_eq!(&[0, 1, 2], &fast_nodes.id.parents(5, 0, nodes)[..]);
+    assert_eq!(&[0, 1, 2, 5], &fast_nodes.id.parents(6, 0, nodes)[..]);
 
     // PARENTS-SUBTREE: NOT up to the root node
-    assert_eq!(&[2, 5], &nidxs.parents(6, 2, nodes)[..]);
+    assert_eq!(&[2, 5], &fast_nodes.id.parents(6, 2, nodes)[..]);
 }
