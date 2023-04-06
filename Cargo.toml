@@ -4,11 +4,18 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Mario Linke"]
 description = "Quering lists blazing fast."
-keywords = ["filter", "query", "index", "search", "inmemory", "database", "embedded"]
 license = "MIT"
 documentation = "https://docs.rs/fast-forward/"
 repository = "https://github.com/lima1909/fast-forward"
+keywords = ["filter", "query", "index", "search", "inmemory", "database", "embedded"]
+categories = ["data-structures ", "caching ", "embedded"]
 
+include = [
+    "src/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
 
 [dependencies]
 
