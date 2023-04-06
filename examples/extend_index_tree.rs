@@ -39,7 +39,7 @@ impl Node {
 }
 
 fn main() {
-    let mut fast_nodes = fast!(FastNodes => Node {id: UIntIndex => id});
+    let mut fast_nodes = fast!(Nodes on Node {id: UIntIndex => id});
 
     //     0
     //   1   4

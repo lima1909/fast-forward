@@ -24,36 +24,36 @@ fn main() {
     // -------------------------
     // With `ID Index: UIntIndex
     // -------------------------
-    let mut fast_cars = fast!(FastCars => Car {id: UIntIndex => id});
-    fast_cars.insert(Car::new(2, "BMW"));
-    fast_cars.insert(Car::new(5, "Audi"));
-    fast_cars.insert(Car::new(2, "VW"));
-    fast_cars.insert(Car::new(99, "Porsche"));
+    let mut cars = fast!(Cars on Car {id: UIntIndex => id});
+    cars.insert(Car::new(2, "BMW"));
+    cars.insert(Car::new(5, "Audi"));
+    cars.insert(Car::new(2, "VW"));
+    cars.insert(Car::new(99, "Porsche"));
 
-    let r = fast_cars.filter(fast_cars.id.eq(2)).collect::<Vec<_>>();
+    let r = cars.filter(cars.id.eq(2)).collect::<Vec<_>>();
     assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
 
-    let r = fast_cars
-        .filter(query(fast_cars.id.eq(2)).or(fast_cars.id.eq(100)).exec())
+    let r = cars
+        .filter(query(cars.id.eq(2)).or(cars.id.eq(100)).exec())
         .collect::<Vec<_>>();
     assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
 
     // ------------------------------
     // With `Name` Index: StrMapIndex
     // ------------------------------
-    let mut fast_cars = fast!(FastCars => Car {name: MapIndex => name.clone});
-    fast_cars.insert(Car::new(2, "BMW"));
-    fast_cars.insert(Car::new(5, "Audi"));
-    fast_cars.insert(Car::new(2, "VW"));
-    fast_cars.insert(Car::new(99, "Porsche"));
+    let mut cars = fast!(Cars on Car {name: MapIndex => name.clone});
+    cars.insert(Car::new(2, "BMW"));
+    cars.insert(Car::new(5, "Audi"));
+    cars.insert(Car::new(2, "VW"));
+    cars.insert(Car::new(99, "Porsche"));
 
-    let r: Vec<&Car> = fast_cars.filter(fast_cars.name.eq(&"VW".into())).collect();
+    let r: Vec<&Car> = cars.filter(cars.name.eq(&"VW".into())).collect();
     assert_eq!(vec![&Car::new(2, "VW")], r);
 
-    let r: Vec<&Car> = fast_cars
+    let r: Vec<&Car> = cars
         .filter(
-            query(fast_cars.name.eq(&"VW".into()))
-                .or(fast_cars.name.eq(&"Audi".into()))
+            query(cars.name.eq(&"VW".into()))
+                .or(cars.name.eq(&"Audi".into()))
                 .exec(),
         )
         .collect();

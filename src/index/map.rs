@@ -54,12 +54,12 @@ where
     }
 }
 
-impl<'k, K> Equals<&'k K> for MapIndex<K>
+impl<K> Equals<&K> for MapIndex<K>
 where
     K: Default + Eq + Hash,
 {
     #[inline]
-    fn eq(&self, key: &'k K) -> Cow<[Idx]> {
+    fn eq(&self, key: &K) -> Cow<[Idx]> {
         match self.0.get(key) {
             Some(i) => i.get(),
             None => Cow::Borrowed(EMPTY_IDXS),
