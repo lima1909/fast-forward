@@ -66,7 +66,7 @@ macro_rules! fast {
         /// Container-struct for all indices.
         #[derive(Default)]
         struct $fast {
-            data: Vec<$strukt>,
+            _data_: Vec<$strukt>,
             $(
                 $fast_field: $typ,
             )+
@@ -78,9 +78,9 @@ macro_rules! fast {
                 use $crate::index::Store;
 
                 $(
-                    self.$fast_field.insert(s.$strukt_field$(.$func())?, self.data.len());
+                    self.$fast_field.insert(s.$strukt_field$(.$func())?, self._data_.len());
                 )+
-                self.data.push(s);
+                self._data_.push(s);
 
             }
         }
@@ -89,7 +89,7 @@ macro_rules! fast {
 
         impl AsRef<[$strukt]> for $fast {
             fn as_ref(&self) -> &[$strukt] {
-                &self.data
+                &self._data_
             }
         }
 
@@ -168,19 +168,19 @@ mod tests {
 
     #[test]
     fn one_indexed_list_string() {
-        let mut cars = fast!(Cars on Car {name: MapIndex => 1.clone});
+        let mut cars = fast!(Cars on Car {name: MapIndex => 1.to_lowercase});
         cars.insert(Car(2, "BMW".into()));
         cars.insert(Car(5, "Audi".into()));
         cars.insert(Car(2, "VW".into()));
         cars.insert(Car(99, "Porsche".into()));
 
-        let r: Vec<&Car> = cars.filter(cars.name.eq(&"VW".into())).collect();
+        let r: Vec<&Car> = cars.filter(cars.name.eq(&"vw".into())).collect();
         assert_eq!(vec![&Car(2, "VW".into())], r);
 
         let r: Vec<&Car> = cars
             .filter(
                 cars.name
-                    .eq_iter([&"VW".into(), &"Audi".into(), &"BMW".into()]),
+                    .eq_iter([&"vw".into(), &"audi".into(), &"bmw".into()]),
             )
             .collect();
         assert_eq!(
@@ -194,8 +194,8 @@ mod tests {
 
         let r: Vec<&Car> = cars
             .filter(
-                query(cars.name.eq(&"VW".into()))
-                    .or(cars.name.eq(&"Audi".into()))
+                query(cars.name.eq(&"vw".into()))
+                    .or(cars.name.eq(&"audi".into()))
                     .exec(),
             )
             .collect();
