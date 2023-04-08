@@ -1,13 +1,12 @@
-//! Indices for [`usize`] compatible types.
+//! This `Index` is well suitable for `IDs` with [`usize`] compatible data types (for example `Primary Keys`).
 //!
-//! Well suitable for for example `Primary Keys`.
-//!
-//! The `Key` is the position (index) in the Vec: [`UIntIndex`].
+//! Performance: The `eq - filter` is: O(1).
+//! The `Key` is the position (index) in the Vec..
 //!
 //!```text
 //! let _list_numbers_unique = vec![3, 2, 4, 1, ...];
 //!
-//! Unique [`UIntIndex`]:
+//! Unique-Index:
 //!
 //!  Key | Idx (_values)
 //! --------------------
@@ -21,7 +20,7 @@
 //!
 //! let _list_numbers_multi = vec![3, 2, 3, 1, 2, 2, ...];
 //!
-//! Muli [`UIntIndex`]:
+//! Muli-Index:
 //!
 //!  Key | Idx (_values)
 //! --------------------
@@ -39,13 +38,21 @@ use std::{borrow::Cow, marker::PhantomData};
 
 use super::Equals;
 
-/// `Key` is from type [`crate::Idx`] and the information are saved in a List (Store).
+/// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
-pub struct UIntIndex<K: Default = usize>(Vec<Option<Index>>, PhantomData<K>);
+pub struct UIntIndex<K: Default = usize> {
+    data: Vec<Option<Index>>,
+    min: usize,
+    _key: PhantomData<K>,
+}
 
 impl UIntIndex<usize> {
     pub fn new() -> Self {
-        Self(Vec::new(), PhantomData)
+        Self {
+            data: Vec::new(),
+            min: 0,
+            _key: PhantomData,
+        }
     }
 }
 
@@ -56,18 +63,26 @@ where
     fn insert(&mut self, k: K, i: Idx) {
         let k = k.into();
 
-        if self.0.len() <= k {
-            self.0.resize(k + 1, None);
+        if self.data.len() <= k {
+            self.data.resize(k + 1, None);
         }
 
-        match self.0[k].as_mut() {
+        match self.data[k].as_mut() {
             Some(idx) => idx.add(i),
-            None => self.0[k] = Some(Index::new(i)),
+            None => self.data[k] = Some(Index::new(i)),
+        }
+
+        if self.min == 0 || self.min > k {
+            self.min = k;
         }
     }
 
     fn with_capacity(capacity: usize) -> Self {
-        UIntIndex(Vec::with_capacity(capacity), PhantomData)
+        UIntIndex {
+            data: Vec::with_capacity(capacity),
+            min: 0,
+            _key: PhantomData,
+        }
     }
 }
 
@@ -77,9 +92,37 @@ where
 {
     #[inline]
     fn eq(&self, key: K) -> Cow<[Idx]> {
-        match &self.0.get(key.into()) {
+        match &self.data.get(key.into()) {
             Some(Some(idx)) => idx.get(),
             _ => Cow::Borrowed(EMPTY_IDXS),
+        }
+    }
+}
+
+impl<K> UIntIndex<K>
+where
+    K: Default,
+{
+    /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
+    pub fn min(&self) -> usize {
+        self.min
+    }
+
+    /// Find `min` key. E.g. importand, if the min value was removed, to find the new valid `min Key`.
+    fn _find_min(&self) -> usize {
+        self.data
+            .iter()
+            .enumerate()
+            .find(|(_i, item)| item.is_some())
+            .map(|(pos, _item)| pos)
+            .unwrap_or_default()
+    }
+
+    /// Filter for get the highest (`max`) `Key` which is stored in `UIntIndex`.
+    pub fn max(&self) -> usize {
+        match self.data.last() {
+            Some(Some(_)) => self.data.len() - 1,
+            _ => 0,
         }
     }
 }
@@ -96,7 +139,7 @@ mod tests {
         fn empty() {
             let i = UIntIndex::new();
             assert_eq!(0, i.eq(2).len());
-            assert!(i.0.is_empty());
+            assert!(i.data.is_empty());
         }
 
         #[test]
@@ -105,7 +148,7 @@ mod tests {
             i.insert(2, 4);
 
             assert_eq!(*i.eq(2), [4]);
-            assert_eq!(3, i.0.len());
+            assert_eq!(3, i.data.len());
         }
 
         #[test]
@@ -114,7 +157,7 @@ mod tests {
             i.insert(true, 4);
 
             assert_eq!(*i.eq(true), [4]);
-            assert_eq!(2, i.0.len());
+            assert_eq!(2, i.data.len());
         }
 
         #[test]
@@ -123,7 +166,7 @@ mod tests {
             i.insert(2, 4);
 
             assert_eq!(*i.eq(2), [4]);
-            assert_eq!(3, i.0.len());
+            assert_eq!(3, i.data.len());
         }
 
         #[test]
@@ -184,8 +227,8 @@ mod tests {
         fn with_capacity() {
             let mut i = UIntIndex::<u8>::with_capacity(5);
             i.insert(1, 4);
-            assert_eq!(2, i.0.len());
-            assert_eq!(5, i.0.capacity());
+            assert_eq!(2, i.data.len());
+            assert_eq!(5, i.data.capacity());
         }
 
         #[test]
@@ -215,6 +258,40 @@ mod tests {
             assert!(i.contains(5));
             assert!(!i.contains(55));
         }
+
+        #[test]
+        fn min() {
+            let mut idx = UIntIndex::<u16>::with_capacity(100);
+            assert_eq!(0, idx.min());
+            assert_eq!(0, idx._find_min());
+
+            idx.insert(4, 4);
+            assert_eq!(4, idx.min());
+            assert_eq!(4, idx._find_min());
+
+            idx.insert(2, 8);
+            assert_eq!(2, idx.min());
+            assert_eq!(2, idx._find_min());
+
+            idx.insert(99, 6);
+            assert_eq!(2, idx.min());
+            assert_eq!(2, idx._find_min());
+        }
+
+        #[test]
+        fn max() {
+            let mut idx = UIntIndex::<u16>::with_capacity(100);
+            assert_eq!(0, idx.max());
+
+            idx.insert(4, 4);
+            assert_eq!(4, idx.max());
+
+            idx.insert(2, 8);
+            assert_eq!(4, idx.max());
+
+            idx.insert(99, 6);
+            assert_eq!(99, idx.max());
+        }
     }
 
     mod multi {
@@ -224,7 +301,7 @@ mod tests {
         fn empty() {
             let i = UIntIndex::<u8>::default();
             assert_eq!(0, i.eq(2).len());
-            assert!(i.0.is_empty());
+            assert!(i.data.is_empty());
         }
 
         #[test]
@@ -233,7 +310,7 @@ mod tests {
             i.insert(2, 2);
 
             assert_eq!(*i.eq(2), [2]);
-            assert_eq!(3, i.0.len());
+            assert_eq!(3, i.data.len());
         }
 
         #[test]

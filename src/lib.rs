@@ -167,6 +167,21 @@ mod tests {
     }
 
     #[test]
+    fn one_indexed_list_idx_min_max() {
+        let mut cars = fast!(Cars on Car {id: UIntIndex => 0});
+        cars.insert(Car(2, "BMW".into()));
+        cars.insert(Car(5, "Audi".into()));
+        cars.insert(Car(2, "VW".into()));
+        cars.insert(Car(99, "Porsche".into()));
+
+        let r = cars.filter(cars.id.eq(2)).collect::<Vec<_>>();
+        assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
+
+        assert_eq!(2, cars.id.min());
+        assert_eq!(99, cars.id.max());
+    }
+
+    #[test]
     fn one_indexed_list_string() {
         let mut cars = fast!(Cars on Car {name: MapIndex => 1.to_lowercase});
         cars.insert(Car(2, "BMW".into()));
