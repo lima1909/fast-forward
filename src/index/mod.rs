@@ -138,6 +138,28 @@ pub trait Equals<K> {
     }
 }
 
+#[derive(Debug, Default)]
+struct MinMax<K> {
+    min: K,
+    max: K,
+}
+
+impl<K: Default + Ord> MinMax<K> {
+    fn new_min(&mut self, key: K) -> &K {
+        if self.min == K::default() || self.min > key {
+            self.min = key
+        }
+        &self.min
+    }
+
+    fn new_max(&mut self, key: K) -> &K {
+        if self.max < key {
+            self.max = key
+        }
+        &self.max
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Index(Vec<Idx>);
 
@@ -228,5 +250,44 @@ mod tests {
 
         lhs.add(0);
         assert_eq!([0, 5], *lhs.or(rhs.get()));
+    }
+
+    #[test]
+    fn min() {
+        assert_eq!(0, MinMax::default().min);
+        assert_eq!(&0, MinMax::default().new_min(0));
+        assert_eq!(&1, MinMax::default().new_min(1));
+
+        let mut min = MinMax::default();
+        min.new_min(1);
+        min.new_min(0);
+        assert_eq!(0, min.min);
+
+        let mut min = MinMax::default();
+        min.new_min(1);
+        min.new_min(2);
+        assert_eq!(1, min.min);
+
+        let mut min = MinMax::default();
+        min.new_min(2);
+        min.new_min(1);
+        assert_eq!(1, min.min);
+    }
+
+    #[test]
+    fn max() {
+        assert_eq!(0, MinMax::default().max);
+        assert_eq!(&0, MinMax::default().new_max(0));
+        assert_eq!(&1, MinMax::default().new_max(1));
+
+        let mut max = MinMax::default();
+        max.new_max(1);
+        max.new_max(0);
+        assert_eq!(1, max.max);
+
+        let mut max = MinMax::default();
+        max.new_max(1);
+        max.new_max(2);
+        assert_eq!(2, max.max);
     }
 }

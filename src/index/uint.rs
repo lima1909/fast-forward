@@ -36,13 +36,13 @@ use crate::{
 };
 use std::{borrow::Cow, marker::PhantomData};
 
-use super::Equals;
+use super::{Equals, MinMax};
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
 pub struct UIntIndex<K: Default = usize> {
     data: Vec<Option<Index>>,
-    min: usize,
+    min_max_cache: MinMax<usize>,
     _key: PhantomData<K>,
 }
 
@@ -50,7 +50,7 @@ impl UIntIndex<usize> {
     pub fn new() -> Self {
         Self {
             data: Vec::new(),
-            min: 0,
+            min_max_cache: MinMax::default(),
             _key: PhantomData,
         }
     }
@@ -72,15 +72,14 @@ where
             None => self.data[k] = Some(Index::new(i)),
         }
 
-        if self.min == 0 || self.min > k {
-            self.min = k;
-        }
+        self.min_max_cache.new_min(k);
+        self.min_max_cache.new_max(k);
     }
 
     fn with_capacity(capacity: usize) -> Self {
         UIntIndex {
             data: Vec::with_capacity(capacity),
-            min: 0,
+            min_max_cache: MinMax::default(),
             _key: PhantomData,
         }
     }
@@ -105,10 +104,15 @@ where
 {
     /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
     pub fn min(&self) -> usize {
-        self.min
+        self.min_max_cache.min
     }
 
-    /// Find `min` key. E.g. importand, if the min value was removed, to find the new valid `min Key`.
+    /// Filter for get the highest (`max`) `Key` which is stored in `UIntIndex`.
+    pub fn max(&self) -> usize {
+        self.min_max_cache.max
+    }
+
+    /// Find `min` key. _Importand_ if the min value was removed, to find the new valid `min Key`.
     fn _find_min(&self) -> usize {
         self.data
             .iter()
@@ -118,8 +122,8 @@ where
             .unwrap_or_default()
     }
 
-    /// Filter for get the highest (`max`) `Key` which is stored in `UIntIndex`.
-    pub fn max(&self) -> usize {
+    /// Find `max` key. _Importand_ if the max value was removed, to find the new valid `max Key`.
+    fn _find_max(&self) -> usize {
         match self.data.last() {
             Some(Some(_)) => self.data.len() - 1,
             _ => 0,
@@ -276,6 +280,23 @@ mod tests {
             idx.insert(99, 6);
             assert_eq!(2, idx.min());
             assert_eq!(2, idx._find_min());
+        }
+
+        #[test]
+        fn min_rm() {
+            let mut idx = UIntIndex::<u16>::with_capacity(100);
+            idx.insert(4, 4);
+            assert_eq!(4, idx.min());
+            assert_eq!(4, idx._find_min());
+
+            idx.insert(2, 8);
+            assert_eq!(2, idx.min());
+            assert_eq!(2, idx._find_min());
+
+            // remove min value on Index 2
+            *idx.data.get_mut(2).unwrap() = None;
+            assert_eq!(2, idx.min()); // this cached value is now false
+            assert_eq!(4, idx._find_min()); // this is the correct value
         }
 
         #[test]
