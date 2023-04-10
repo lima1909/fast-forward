@@ -49,6 +49,14 @@ where
         }
     }
 
+    fn delete(&mut self, key: K, idx: Idx) {
+        if let Some(rm_idx) = self.0.get_mut(&key) {
+            if rm_idx.remove(idx).is_empty() {
+                self.0.remove(&key);
+            }
+        }
+    }
+
     fn with_capacity(capacity: usize) -> Self {
         MapIndex(HashMap::with_capacity(capacity))
     }
@@ -158,6 +166,45 @@ mod tests {
 
             assert!(idx.contains(&"Jasmin"));
             assert!(!idx.contains(&"Paul"));
+        }
+
+        #[test]
+        fn update() {
+            let mut idx = MapIndex::default();
+            idx.insert("Jasmin", 5);
+
+            // (old) Key: Jasmin do not exist, insert a (new) Key Jasmin NEW?
+            idx.update("Jasmin", 4, "Jasmin NEW");
+            assert_eq!([4], *idx.eq(&"Jasmin NEW"));
+
+            // (old) Key 2 exist, but not with Index: 8, insert known Key: 2 with add new Index 8
+            idx.update("Jasmin NEW", 8, "Jasmin NEW");
+            assert_eq!([4, 8], *idx.eq(&"Jasmin NEW"));
+
+            // old Key 2 with Index 8 was removed and (new) Key 4 was added with Index 8
+            idx.update("Jasmin NEW", 8, "Jasmin NEW NEW");
+            assert_eq!([8], *idx.eq(&"Jasmin NEW NEW"));
+            assert_eq!([4], *idx.eq(&"Jasmin NEW"));
+        }
+
+        #[test]
+        fn delete() {
+            let mut idx = MapIndex::default();
+            idx.insert("Jasmin", 4);
+            idx.insert("Jasmin", 3);
+            idx.insert("Mario", 1);
+
+            // delete correct Key with wrong Index, nothing happens
+            idx.delete("Jasmin", 100);
+            assert_eq!([3, 4], *idx.eq(&"Jasmin"));
+
+            // delete correct Key with correct Index
+            idx.delete("Jasmin", 3);
+            assert_eq!([4], *idx.eq(&"Jasmin"));
+
+            // delete correct Key with last correct Index, Key now longer exist
+            idx.delete("Jasmin", 4);
+            assert!(idx.eq(&"Jasmin").is_empty());
         }
     }
 

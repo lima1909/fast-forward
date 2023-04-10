@@ -61,6 +61,15 @@ pub trait Store<K>: Default {
     ///     Male   | 1,5
     ///     Female | 2,3,4
     ///
+    /// otherwise (`Key` has exact one `Index`), then remove complete row (`Key` and `Index`).
+    ///
+    /// Before:
+    ///     Male   | 2
+    ///     Female | 3,4
+    /// `Update: (Male, 2, Female)`
+    /// After:
+    ///     Female | 2,3,4
+    ///
     /// If the old `Key` not exist, then is it a insert with the new `Key`:
     ///
     /// Before:
@@ -68,8 +77,10 @@ pub trait Store<K>: Default {
     /// `Update: (Male, 2, Female)`
     /// After:
     ///     Female | 2,3,4
-
-    fn update(&mut self, _old_key: K, _idx: Idx, _new_key: K) {}
+    fn update(&mut self, old_key: K, idx: Idx, new_key: K) {
+        self.delete(old_key, idx);
+        self.insert(new_key, idx);
+    }
 
     /// Delete means: if an `Key` has more than one `Index`, then remove only this `Index`:
     ///
@@ -98,7 +109,7 @@ pub trait Store<K>: Default {
     /// After:
     ///     Female | 3,4
     ///
-    fn delete(&mut self, _key: K, _idx: Idx) {}
+    fn delete(&mut self, key: K, idx: Idx);
 
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
@@ -181,6 +192,12 @@ impl Index {
         Cow::Borrowed(&self.0)
     }
 
+    #[inline]
+    pub fn remove(&mut self, idx: Idx) -> Cow<[Idx]> {
+        self.0.retain(|v| v != &idx);
+        self.get()
+    }
+
     pub fn or<'a>(&'a self, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
         crate::query::or(self.get(), rhs)
     }
@@ -191,13 +208,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn unique() {
+    fn pos_unique() {
         let u = Index::new(0);
         assert_eq!([0], *u.get());
     }
 
     #[test]
-    fn multi() {
+    fn pos_multi() {
         let mut m = Index::new(2);
         assert_eq!([2], *m.get());
 
@@ -206,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn multi_duplicate() {
+    fn pos_multi_duplicate() {
         let mut m = Index::new(1);
         assert_eq!([1], *m.get());
 
@@ -216,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn multi_ordered() {
+    fn pos_multi_ordered() {
         let mut m = Index::new(5);
         assert_eq!([5], *m.get());
 
@@ -228,7 +245,7 @@ mod tests {
     }
 
     #[test]
-    fn container_multi() {
+    fn pos_container_multi() {
         let mut lhs = Index::new(5);
         lhs.add(3);
         lhs.add(2);
@@ -242,7 +259,7 @@ mod tests {
     }
 
     #[test]
-    fn container_unique() {
+    fn pos_container_unique() {
         let mut lhs = Index::new(5);
 
         let rhs = Index::new(5);
@@ -250,6 +267,24 @@ mod tests {
 
         lhs.add(0);
         assert_eq!([0, 5], *lhs.or(rhs.get()));
+    }
+
+    #[test]
+    fn pos_remove() {
+        let mut pos = Index::new(5);
+        assert_eq!([5], *pos.get());
+
+        assert!(pos.remove(5).is_empty());
+        // double remove
+        assert!(pos.remove(5).is_empty());
+
+        let mut pos = Index::new(5);
+        pos.add(2);
+        assert_eq!([2], *pos.remove(5));
+
+        let mut pos = Index::new(5);
+        pos.add(2);
+        assert_eq!([5], *pos.remove(2));
     }
 
     #[test]

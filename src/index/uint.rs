@@ -76,6 +76,23 @@ where
         self.min_max_cache.new_max(k);
     }
 
+    fn delete(&mut self, key: K, idx: Idx) {
+        let k = key.into();
+        if let Some(Some(rm_idx)) = self.data.get_mut(k) {
+            // if the Index is the last, then remove complete Index
+            if rm_idx.remove(idx).is_empty() {
+                self.data[k] = None
+            }
+        }
+
+        if k == self.min_max_cache.min {
+            self.min_max_cache.min = self._find_min();
+        }
+        if k == self.min_max_cache.max {
+            self.min_max_cache.max = self._find_max();
+        }
+    }
+
     fn with_capacity(capacity: usize) -> Self {
         UIntIndex {
             data: Vec::with_capacity(capacity),
@@ -312,6 +329,58 @@ mod tests {
 
             idx.insert(99, 6);
             assert_eq!(99, idx.max());
+        }
+
+        #[test]
+        fn update() {
+            let mut idx = UIntIndex::new();
+            idx.insert(2, 4);
+
+            assert_eq!(2, idx.min());
+            assert_eq!(2, idx.max());
+
+            // (old) Key: 99 do not exist, insert a (new) Key 100?
+            idx.update(99, 4, 100);
+            assert_eq!(101, idx.data.len());
+            assert_eq!([4], *idx.eq(100));
+
+            // (old) Key 2 exist, but not with Index: 8, insert known Key: 2 with add new Index 8
+            idx.update(2, 8, 2);
+            assert_eq!([4, 8], *idx.eq(2));
+
+            // old Key 2 with Index 8 was removed and (new) Key 4 was added with Index 8
+            idx.update(2, 8, 4);
+            assert_eq!([8], *idx.eq(4));
+            assert_eq!([4], *idx.eq(2));
+
+            assert_eq!(2, idx.min());
+            assert_eq!(100, idx.max());
+        }
+
+        #[test]
+        fn delete() {
+            let mut idx = UIntIndex::new();
+            idx.insert(2, 4);
+            idx.insert(2, 3);
+            idx.insert(3, 1);
+
+            assert_eq!(2, idx.min());
+            assert_eq!(3, idx.max());
+
+            // delete correct Key with wrong Index, nothing happens
+            idx.delete(2, 100);
+            assert_eq!([3, 4], *idx.eq(2));
+
+            // delete correct Key with correct Index
+            idx.delete(2, 3);
+            assert_eq!([4], *idx.eq(2));
+
+            // delete correct Key with last correct Index, Key now longer exist
+            idx.delete(2, 4);
+            assert!(idx.eq(2).is_empty());
+
+            assert_eq!(3, idx.min());
+            assert_eq!(3, idx.max());
         }
     }
 

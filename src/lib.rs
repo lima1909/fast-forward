@@ -56,8 +56,8 @@ pub const EMPTY_IDXS: &[Idx] = &[];
 #[macro_export]
 macro_rules! fast {
     (
-        $fast:ident on $strukt:ident {
-            $( $fast_field:tt: $typ:ty => $strukt_field:tt $(.$func:ident)? ), + $(,)*
+        $fast:ident on $item:ident {
+            $( $store:tt: $store_type:ty => $item_field:tt $(.$item_field_func:ident)? ), + $(,)*
         }
     ) => {
 
@@ -66,29 +66,79 @@ macro_rules! fast {
         /// Container-struct for all indices.
         #[derive(Default)]
         struct $fast {
-            _data_: Vec<$strukt>,
             $(
-                $fast_field: $typ,
+                $store: $store_type,
             )+
+            _data_: Vec<$item>,
         }
 
-        /// Insert in all indices-stores the `Key` and the `Index`.
+        ///
         impl $fast {
-            fn insert(&mut self, s: $strukt)  {
+
+            /// Insert the given item.
+            ///
+            #[allow(dead_code)]
+            fn insert(&mut self, item: $item) {
                 use $crate::index::Store;
 
                 $(
-                    self.$fast_field.insert(s.$strukt_field$(.$func())?, self._data_.len());
+                    self.$store.insert(
+                                item.$item_field$(.$item_field_func())?,
+                                self._data_.len()
+                                );
                 )+
-                self._data_.push(s);
+                self._data_.push(item);
 
             }
+
+            /// Update the item on the given position.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the pos is out of bound.
+            ///
+            #[allow(dead_code)]
+            fn update<F>(&mut self, pos: usize, update_fn: F) where F: Fn(&$item)-> $item {
+                use $crate::index::Store;
+
+                let old = &self._data_[pos];
+                let new = (update_fn)(old);
+                $(
+                    self.$store.update(
+                                old.$item_field$(.$item_field_func())?,
+                                pos,
+                                new.$item_field$(.$item_field_func())?
+                                );
+                )+
+                self._data_[pos] = new;
+            }
+
+            /// Delete the item on the given position.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the pos is out of bound.
+            ///
+            #[allow(dead_code)]
+            fn delete(&mut self, pos: usize) {
+                use $crate::index::Store;
+
+                let item = &self._data_[pos];
+                $(
+                    self.$store.delete(
+                                item.$item_field$(.$item_field_func())?,
+                                pos,
+                                );
+                )+
+                // TODO: handle remove in self._data_
+            }
+
         }
 
-        impl $crate::IndexedList<$strukt> for $fast {}
+        impl $crate::IndexedList<$item> for $fast {}
 
-        impl AsRef<[$strukt]> for $fast {
-            fn as_ref(&self) -> &[$strukt] {
+        impl AsRef<[$item]> for $fast {
+            fn as_ref(&self) -> &[$item] {
                 &self._data_
             }
         }
@@ -151,19 +201,33 @@ mod tests {
         cars.insert(Car(2, "VW".into()));
         cars.insert(Car(99, "Porsche".into()));
 
+        // simple equals filter
         let r = cars.filter(cars.id.eq(2)).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
 
+        // many/iter equals filter
         let mut r = cars.filter(cars.id.eq_iter(2..6));
         assert_eq!(Some(&Car(2, "BMW".into())), r.next());
         assert_eq!(Some(&Car(5, "Audi".into())), r.next());
         assert_eq!(Some(&Car(2, "VW".into())), r.next());
         assert_eq!(None, r.next());
 
+        // or equals query
         let r = cars
             .filter(query(cars.id.eq(2)).or(cars.id.eq(100)).exec())
             .collect::<Vec<_>>();
         assert_eq!(&[&Car(2, "BMW".into()), &Car(2, "VW".into())], &r[..]);
+
+        // update one Car
+        assert_eq!(None, cars.filter(cars.id.eq(100)).next());
+        cars.update(cars.id.eq(99)[0], |c: &Car| Car(c.0 + 1, c.1.clone()));
+        let r = cars.filter(cars.id.eq(100)).collect::<Vec<_>>();
+        assert_eq!(vec![&Car(100, "Porsche".into())], r);
+
+        // remove one Car
+        assert!(cars.filter(cars.id.eq(100)).next().is_some());
+        cars.delete(cars.id.eq(100)[0]);
+        assert_eq!(None, cars.filter(cars.id.eq(100)).next());
     }
 
     #[test]
@@ -174,9 +238,11 @@ mod tests {
         cars.insert(Car(2, "VW".into()));
         cars.insert(Car(99, "Porsche".into()));
 
+        // simple equals filter
         let r = cars.filter(cars.id.eq(2)).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
 
+        // min and max
         assert_eq!(2, cars.id.min());
         assert_eq!(99, cars.id.max());
     }
@@ -189,9 +255,11 @@ mod tests {
         cars.insert(Car(2, "VW".into()));
         cars.insert(Car(99, "Porsche".into()));
 
+        // simple equals filter
         let r: Vec<&Car> = cars.filter(cars.name.eq(&"vw".into())).collect();
         assert_eq!(vec![&Car(2, "VW".into())], r);
 
+        // many/iter equals filter
         let r: Vec<&Car> = cars
             .filter(
                 cars.name
@@ -207,6 +275,7 @@ mod tests {
             r
         );
 
+        // or equals query
         let r: Vec<&Car> = cars
             .filter(
                 query(cars.name.eq(&"vw".into()))
@@ -214,7 +283,25 @@ mod tests {
                     .exec(),
             )
             .collect();
-        assert_eq!(vec![&Car(5, "Audi".into()), &Car(2, "VW".into())], r)
+        assert_eq!(vec![&Car(5, "Audi".into()), &Car(2, "VW".into())], r);
+
+        // update one Car
+        assert_eq!(None, cars.filter(cars.name.eq(&"mercedes".into())).next());
+        cars.update(cars.name.eq(&"porsche".into())[0], |c: &Car| {
+            Car(c.0, "Mercedes".into())
+        });
+        let r = cars
+            .filter(cars.name.eq(&"mercedes".into()))
+            .collect::<Vec<_>>();
+        assert_eq!(vec![&Car(99, "Mercedes".into())], r);
+
+        // remove one Car
+        assert!(cars
+            .filter(cars.name.eq(&"mercedes".into()))
+            .next()
+            .is_some());
+        cars.delete(cars.name.eq(&"mercedes".into())[0]);
+        assert_eq!(None, cars.filter(cars.name.eq(&"mercedes".into())).next());
     }
 
     #[test]
@@ -263,7 +350,7 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct Person {
         pk: usize,
         multi: u16,
