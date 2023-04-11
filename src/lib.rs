@@ -25,6 +25,7 @@
 //! To Find the `Key`: "Jon" with the `operation equals` is only one step necessary.
 //!
 pub mod error;
+mod idea;
 pub mod index;
 pub mod query;
 
