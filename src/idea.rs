@@ -44,11 +44,11 @@ impl<T> List<T> {
     }
 
     fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, T> {
-        FilterIter::new(filter, &self)
+        FilterIter::new(filter, self)
     }
 
     fn iter(&self) -> Iter<'_, T> {
-        Iter::new(&self)
+        Iter::new(self)
     }
 }
 
@@ -121,6 +121,6 @@ impl<'i, T> Iterator for FilterIter<'i, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let idx = self.filter[self.pos];
         self.pos += 1;
-        return Some(&self.list[idx]);
+        Some(&self.list[idx])
     }
 }
