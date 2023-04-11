@@ -1,8 +1,9 @@
 //! **Fast-Forward** is a library for filtering items in a (large) list, _faster_ than an `Iterator` ([`std::iter::Iterator::filter`]).
+//! It is not a replacement of the `Iterator`, but an addition.
 //!
 //! This _faster_ is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the list.
 //!
-//! An Index has two parts, a `Key` (item to searching for) and a position (the index in the list) [`Idx`].
+//! An `Index` has two parts, a `Key` (item to searching for) and a `Position` (the index) in the list.
 //!
 //! ## A simple Example:
 //!
@@ -21,7 +22,7 @@
 //!   ...    | ...
 //! ```
 //!
-//! To Find the `Key`: "Jon" with the `operation = equals` is only one step necessary.
+//! To Find the `Key`: "Jon" with the `operation equals` is only one step necessary.
 //!
 pub mod error;
 pub mod index;
@@ -35,7 +36,11 @@ pub type Idx = usize;
 /// Empty array of `Idx`
 pub const EMPTY_IDXS: &[Idx] = &[];
 
-/// Create an `IndexedList` on a given `struct`.
+/// This `macro` is not a solution, it is more an POC (proof of concept)!
+/// The Problem with this macro is the visibility. This means, it can not hide internal fields,
+/// like the `_items_` Vec, for example. But it illustrate the idea behind `fast forward`.
+///
+/// Create an `Indexed List` on a given `struct`.
 ///
 /// ## Example for struct Person
 ///
@@ -52,7 +57,6 @@ pub const EMPTY_IDXS: &[Idx] = &[];
 ///     }
 /// );
 /// ```
-
 #[macro_export]
 macro_rules! fast {
     (
@@ -69,7 +73,8 @@ macro_rules! fast {
             $(
                 $store: $store_type,
             )+
-            _data_: Vec<$item>,
+            _items_: Vec<$item>,
+            _deleted_pos_: Vec<usize>,
         }
 
         ///
@@ -78,16 +83,18 @@ macro_rules! fast {
             /// Insert the given item.
             ///
             #[allow(dead_code)]
-            fn insert(&mut self, item: $item) {
+            fn insert(&mut self, item: $item) -> usize {
                 use $crate::index::Store;
 
+                let pos = self._items_.len();
                 $(
                     self.$store.insert(
                                 item.$item_field$(.$item_field_func())?,
-                                self._data_.len()
+                                pos
                                 );
                 )+
-                self._data_.push(item);
+                self._items_.push(item);
+                pos
 
             }
 
@@ -101,7 +108,7 @@ macro_rules! fast {
             fn update<F>(&mut self, pos: usize, update_fn: F) where F: Fn(&$item)-> $item {
                 use $crate::index::Store;
 
-                let old = &self._data_[pos];
+                let old = &self._items_[pos];
                 let new = (update_fn)(old);
                 $(
                     self.$store.update(
@@ -110,7 +117,7 @@ macro_rules! fast {
                                 new.$item_field$(.$item_field_func())?
                                 );
                 )+
-                self._data_[pos] = new;
+                self._items_[pos] = new;
             }
 
             /// Delete the item on the given position.
@@ -123,24 +130,36 @@ macro_rules! fast {
             fn delete(&mut self, pos: usize) {
                 use $crate::index::Store;
 
-                let item = &self._data_[pos];
+                let item = &self._items_[pos];
                 $(
                     self.$store.delete(
                                 item.$item_field$(.$item_field_func())?,
                                 pos,
                                 );
                 )+
-                // TODO: handle remove in self._data_
+                self._deleted_pos_.push(pos);
             }
 
-        }
-
-        impl $crate::IndexedList<$item> for $fast {}
-
-        impl AsRef<[$item]> for $fast {
-            fn as_ref(&self) -> &[$item] {
-                &self._data_
+            /// Create an Iterator for the given Filter.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the positions are out of bound.
+            ///
+            #[allow(dead_code)]
+            fn filter<'i>(&'i self, idxs: std::borrow::Cow<'i, [$crate::Idx]>) -> $crate::Iter<'i, $item> {
+                $crate::Iter::new(idxs, &self._items_, &self._deleted_pos_)
             }
+
+            #[allow(dead_code)]
+            fn iter<'i>(&'i self) -> $crate::Iter<'i, $item> {
+                $crate::Iter::new(
+                    std::borrow::Cow::Owned(self._items_.iter().enumerate().map(|(i,_)| i).collect::<Vec<_>>()),
+                    &self._items_,
+                    &self._deleted_pos_
+                )
+            }
+
         }
 
 
@@ -154,12 +173,18 @@ macro_rules! fast {
 pub struct Iter<'i, T> {
     pos: usize,
     idxs: Cow<'i, [Idx]>,
-    data: &'i [T],
+    items: &'i [T],
+    deleted_pos: &'i [usize],
 }
 
 impl<'i, T> Iter<'i, T> {
-    fn new(idxs: Cow<'i, [Idx]>, data: &'i [T]) -> Self {
-        Self { pos: 0, idxs, data }
+    pub fn new(idxs: Cow<'i, [Idx]>, items: &'i [T], deleted_pos: &'i [usize]) -> Self {
+        Self {
+            pos: 0,
+            idxs,
+            items,
+            deleted_pos,
+        }
     }
 }
 
@@ -167,17 +192,14 @@ impl<'i, T> Iterator for Iter<'i, T> {
     type Item = &'i T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let i = self.idxs.get(self.pos)?;
-        self.pos += 1;
-        Some(&self.data[*i])
-    }
-}
-
-pub trait IndexedList<T>: AsRef<[T]> {
-    /// **Importand:** if an `Idx` is not valid (inside the borders), then this mehtod panics (OutOfBound).
-    #[inline]
-    fn filter<'i>(&'i self, idxs: Cow<'i, [Idx]>) -> Iter<'i, T> {
-        Iter::new(idxs, self.as_ref())
+        loop {
+            let i = self.idxs.get(self.pos)?;
+            self.pos += 1;
+            if self.deleted_pos.contains(i) {
+                continue;
+            }
+            return Some(&self.items[*i]);
+        }
     }
 }
 
@@ -187,11 +209,53 @@ mod tests {
         fast,
         index::{map::MapIndex, uint::UIntIndex, Equals},
         query::query,
-        IndexedList,
     };
 
     #[derive(Debug, Eq, PartialEq)]
     struct Car(usize, String);
+
+    #[test]
+    fn one_indexed_list_delete_item() {
+        let mut cars = fast!(Cars on Car {id: UIntIndex => 0});
+        cars.insert(Car(0, "Porsche".into()));
+        cars.insert(Car(1, "BMW".into()));
+        cars.insert(Car(2, "Porsche".into()));
+        cars.insert(Car(3, "Audi".into()));
+        cars.insert(Car(4, "VW".into()));
+        cars.insert(Car(5, "VW".into()));
+
+        let r = cars.iter().collect::<Vec<_>>();
+        assert_eq!(
+            vec![
+                &Car(0, "Porsche".into()),
+                &Car(1, "BMW".into()),
+                &Car(2, "Porsche".into()),
+                &Car(3, "Audi".into()),
+                &Car(4, "VW".into()),
+                &Car(5, "VW".into())
+            ],
+            r
+        );
+
+        cars.delete(3);
+
+        let r = cars.iter().collect::<Vec<_>>();
+        assert_eq!(
+            vec![
+                &Car(0, "Porsche".into()),
+                &Car(1, "BMW".into()),
+                &Car(2, "Porsche".into()),
+                &Car(4, "VW".into()),
+                &Car(5, "VW".into())
+            ],
+            r
+        );
+
+        // idx [1,3,5]
+        // del [3]
+        let r = cars.filter(cars.id.eq_iter([1, 3, 5])).collect::<Vec<_>>();
+        assert_eq!(vec![&Car(1, "BMW".into()), &Car(5, "VW".into())], r);
+    }
 
     #[test]
     fn one_indexed_list_idx() {

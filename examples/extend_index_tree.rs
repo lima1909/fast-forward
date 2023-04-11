@@ -54,7 +54,8 @@ fn main() {
     fast_nodes.insert(Node::new(5, 2));
     fast_nodes.insert(Node::new(6, 5));
 
-    let nodes: &[Node] = fast_nodes.as_ref();
+    // access to the `_items_` field is not so nice
+    let nodes: &[Node] = &fast_nodes._items_.as_ref();
 
     // PARENTS: up to the root node
     assert!(fast_nodes.id.parents(9, 0, nodes).is_empty());

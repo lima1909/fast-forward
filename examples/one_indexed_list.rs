@@ -2,7 +2,6 @@ use fast_forward::{
     fast,
     index::{map::MapIndex, uint::UIntIndex, Equals},
     query::query,
-    IndexedList,
 };
 
 #[derive(Debug, Eq, PartialEq)]
