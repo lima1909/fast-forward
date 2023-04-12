@@ -1,24 +1,21 @@
-#![allow(dead_code)]
-
 use std::{borrow::Cow, ops::Index};
 
-trait Interceptor<T> {
-    fn insert(&mut self, item: &T, pos: usize);
-    fn delete(&mut self, item: &T, pos: usize);
-}
-
 #[derive(Debug, Default, Clone)]
-struct List<T> {
+pub struct List<T> {
     items: Vec<T>,
     deleted_pos: Vec<usize>,
-    // interceptor: I,
 }
 
+/// List for saving Items with trigger by insert, update and delete, to inform e.g. `Store` to update the `Index`.
 impl<T> List<T> {
     /// Insert the given item  and return the inserted position in the list.
-    fn insert(&mut self, item: T) -> usize {
-        // self.interceptor.insert(&item, self.len());
+    pub fn insert<F>(&mut self, item: T, trigger: F) -> usize
+    where
+        F: Fn(&T, usize),
+    {
         let pos = self.items.len();
+        trigger(&item, pos);
+
         self.items.push(item);
         pos
     }
@@ -29,13 +26,17 @@ impl<T> List<T> {
     ///
     /// Panics if the pos is out of bound.
     ///
-    fn update<F>(&mut self, pos: usize, update_fn: F) -> bool
+    pub fn update<U, F>(&mut self, pos: usize, update_fn: U, trigger: F) -> bool
     where
-        F: Fn(&T) -> T,
+        U: Fn(&T) -> T,
+        F: Fn(&T, usize, &T),
     {
         match self.items.get(pos) {
             Some(old) => {
-                self.items[pos] = (update_fn)(old);
+                let new = (update_fn)(old);
+                trigger(old, pos, &new);
+
+                self.items[pos] = new;
                 true
             }
             None => false,
@@ -43,18 +44,22 @@ impl<T> List<T> {
     }
 
     /// The Item in the list will not be delteted. It will be marked as deleted.
-    fn delete(&mut self, pos: usize) {
-        // let del_item = &self.items[pos];
-        // self.interceptor.delete(&del_item, self.len());
+    pub fn delete<F>(&mut self, pos: usize, trigger: F)
+    where
+        F: Fn(&T, usize),
+    {
+        let del_item = &self.items[pos];
+        trigger(del_item, pos);
+
         self.deleted_pos.push(pos);
     }
 
-    fn is_deleted(&self, pos: usize) -> bool {
+    pub fn is_deleted(&self, pos: usize) -> bool {
         self.deleted_pos.contains(&pos)
     }
 
     /// Get the Item on the given position in the List. If the Item was deleted, the return `get` -> `None`
-    fn get(&self, pos: usize) -> Option<&T> {
+    pub fn get(&self, pos: usize) -> Option<&T> {
         let item = self.items.get(pos)?;
         if self.is_deleted(pos) {
             return None;
@@ -63,20 +68,25 @@ impl<T> List<T> {
     }
 
     /// The number of not deleted Items in the List.
-    fn count(&self) -> usize {
+    pub fn count(&self) -> usize {
         self.items.len() - self.deleted_pos.len()
     }
 
+    /// Len == 0 or Len == deleted Items
+    pub fn is_empty(&self) -> bool {
+        self.items.len() == self.deleted_pos.len()
+    }
+
     /// The length of the List (including the deleted Items).
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.items.len()
     }
 
-    fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, T> {
+    pub fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, T> {
         FilterIter::new(filter, self)
     }
 
-    fn iter(&self) -> Iter<'_, T> {
+    pub fn iter(&self) -> Iter<'_, T> {
         Iter::new(self)
     }
 }
@@ -85,7 +95,7 @@ impl<T: Default> From<Vec<T>> for List<T> {
     fn from(v: Vec<T>) -> Self {
         let mut l = List::default();
         for i in v {
-            l.insert(i);
+            l.insert(i, |_, _| {});
         }
         l
     }
@@ -102,7 +112,7 @@ impl<T> Index<usize> for List<T> {
     }
 }
 
-struct Iter<'i, T> {
+pub struct Iter<'i, T> {
     pos: usize,
     list: &'i List<T>,
 }
@@ -140,7 +150,7 @@ impl<'i, T> Iterator for Iter<'i, T> {
     }
 }
 
-struct FilterIter<'i, T> {
+pub struct FilterIter<'i, T> {
     pos: usize,
     filter: Cow<'i, [usize]>,
     list: &'i List<T>,
@@ -181,20 +191,47 @@ mod tests {
         let mut l = List::default();
         assert_eq!(0, l.len());
         assert_eq!(0, l.count());
+        assert!(l.is_empty());
 
-        assert_eq!(0, l.insert("A"));
-        assert_eq!(1, l.insert("B"));
+        assert_eq!(0, l.insert("A", |_, _| {}));
+        assert_eq!(1, l.insert("B", |_, _| {}));
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_trigger() {
+        let mut l = List::default();
+        assert_eq!(
+            0,
+            l.insert("A", |_, _| {
+                panic!();
+            })
+        );
     }
 
     #[test]
     fn update() {
         let mut l = List::default();
 
-        assert_eq!(0, l.insert("A"));
-        assert_eq!(1, l.insert("B"));
+        assert_eq!(0, l.insert("A", |_, _| {}));
+        assert_eq!(1, l.insert("B", |_, _| {}));
 
-        assert!(l.update(0, |_| "C"));
-        assert!(!l.update(100, |_| "C"));
+        assert!(l.update(0, |_| "C", |_, _, _| {}));
+        assert!(!l.update(100, |_| "C", |_, _, _| {}));
+    }
+
+    #[test]
+    #[should_panic]
+    fn update_trigger() {
+        let mut l = List::default();
+        assert_eq!(0, l.insert("A", |_, _| {}));
+        assert!(l.update(
+            0,
+            |_| "C",
+            |_, _, _| {
+                panic!();
+            }
+        ));
     }
 
     #[test]
@@ -209,10 +246,19 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn delete_trigger() {
+        let mut l: List<_> = vec![1, 2, 3].into();
+        l.delete(0, |_, _| {
+            panic!();
+        });
+    }
+
+    #[test]
     fn delete_first() {
         let mut l: List<_> = vec![1, 2, 3].into();
 
-        l.delete(0);
+        l.delete(0, |_, _| {});
         assert_eq!(3, l.len());
         assert_eq!(2, l.count());
 
@@ -230,7 +276,7 @@ mod tests {
     fn delete_mid() {
         let mut l: List<_> = vec![1, 2, 3].into();
 
-        l.delete(1);
+        l.delete(1, |_, _| {});
         assert_eq!(3, l.len());
         assert_eq!(2, l.count());
 
@@ -248,7 +294,7 @@ mod tests {
     fn delete_last() {
         let mut l: List<_> = vec![1, 2, 3].into();
 
-        l.delete(2);
+        l.delete(2, |_, _| {});
         assert_eq!(3, l.len());
         assert_eq!(2, l.count());
 
@@ -266,7 +312,7 @@ mod tests {
     #[should_panic]
     fn delete_index_panic() {
         let mut l: List<_> = vec![1, 2, 3].into();
-        l.delete(0);
+        l.delete(0, |_, _| {});
         assert_eq!(1, l[0]);
     }
 
@@ -299,5 +345,16 @@ mod tests {
         assert_eq!(Some(&2), it.next());
         assert_eq!(Some(&3), it.next());
         assert_eq!(None, it.next());
+    }
+
+    #[test]
+    fn is_empty() {
+        let mut l: List<_> = vec![1].into();
+        assert!(!l.is_empty());
+
+        l.delete(0, |_, _| {});
+        assert_eq!(0, l.count());
+        assert!(l.is_empty());
+        assert_eq!(1, l.len());
     }
 }
