@@ -9,9 +9,9 @@ pub struct List<T> {
 /// List for saving Items with trigger by insert, update and delete, to inform e.g. `Store` to update the `Index`.
 impl<T> List<T> {
     /// Insert the given item  and return the inserted position in the list.
-    pub fn insert<F>(&mut self, item: T, trigger: F) -> usize
+    pub fn insert<F>(&mut self, item: T, mut trigger: F) -> usize
     where
-        F: Fn(&T, usize),
+        F: FnMut(&T, usize), // param are: &Item, position in the list after inserting
     {
         let pos = self.items.len();
         trigger(&item, pos);
@@ -26,10 +26,10 @@ impl<T> List<T> {
     ///
     /// Panics if the pos is out of bound.
     ///
-    pub fn update<U, F>(&mut self, pos: usize, update_fn: U, trigger: F) -> bool
+    pub fn update<U, F>(&mut self, pos: usize, update_fn: U, mut trigger: F) -> bool
     where
         U: Fn(&T) -> T,
-        F: Fn(&T, usize, &T),
+        F: FnMut(&T, usize, &T), // param are: (old) &Item, current position in the list, (new) &Item
     {
         match self.items.get(pos) {
             Some(old) => {
@@ -44,9 +44,9 @@ impl<T> List<T> {
     }
 
     /// The Item in the list will not be delteted. It will be marked as deleted.
-    pub fn delete<F>(&mut self, pos: usize, trigger: F)
+    pub fn delete<F>(&mut self, pos: usize, mut trigger: F)
     where
-        F: Fn(&T, usize),
+        F: FnMut(&T, usize), // param are: &Item, current position in the list
     {
         let del_item = &self.items[pos];
         trigger(del_item, pos);
@@ -198,15 +198,18 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn insert_trigger() {
         let mut l = List::default();
+        l.insert("A", |_, _| {});
+
+        let mut call_trigger_pos = 0usize;
         assert_eq!(
-            0,
-            l.insert("A", |_, _| {
-                panic!();
+            1,
+            l.insert("B", |_, pos| {
+                call_trigger_pos += pos;
             })
         );
+        assert_eq!(1, call_trigger_pos);
     }
 
     #[test]
@@ -221,17 +224,20 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn update_trigger() {
         let mut l = List::default();
         assert_eq!(0, l.insert("A", |_, _| {}));
+        assert_eq!(1, l.insert("B", |_, _| {}));
+
+        let mut call_trigger_pos = 0usize;
         assert!(l.update(
-            0,
+            1,
             |_| "C",
-            |_, _, _| {
-                panic!();
+            |_, pos, _| {
+                call_trigger_pos += pos;
             }
         ));
+        assert_eq!(1, call_trigger_pos);
     }
 
     #[test]
@@ -246,12 +252,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn delete_trigger() {
         let mut l: List<_> = vec![1, 2, 3].into();
-        l.delete(0, |_, _| {
-            panic!();
+
+        let mut call_trigger_pos = 0usize;
+        l.delete(1, |_, pos| {
+            call_trigger_pos += pos;
         });
+        assert_eq!(1, call_trigger_pos);
     }
 
     #[test]
