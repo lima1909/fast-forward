@@ -24,8 +24,8 @@
 //!
 //! To Find the `Key`: "Jon" with the `operation equals` is only one step necessary.
 //!
-mod idea;
 pub mod index;
+pub mod list;
 pub mod query;
 
 use std::borrow::Cow;
