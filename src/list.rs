@@ -1,6 +1,6 @@
 use std::{borrow::Cow, ops::Index};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct List<T> {
     items: Vec<T>,
     deleted_pos: Vec<usize>,
@@ -97,7 +97,16 @@ impl<T> List<T> {
     }
 }
 
-impl<T: Default> From<Vec<T>> for List<T> {
+impl<T> Default for List<T> {
+    fn default() -> Self {
+        Self {
+            items: Vec::new(),
+            deleted_pos: Vec::new(),
+        }
+    }
+}
+
+impl<T> From<Vec<T>> for List<T> {
     fn from(v: Vec<T>) -> Self {
         let mut l = List::default();
         for i in v {

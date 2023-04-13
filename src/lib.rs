@@ -28,8 +28,6 @@ pub mod index;
 pub mod list;
 pub mod query;
 
-use std::borrow::Cow;
-
 /// `Idx` is the index/position in a List ([`std::vec::Vec`]).
 pub type Idx = usize;
 
@@ -73,8 +71,7 @@ macro_rules! fast {
             $(
                 $store: $store_type,
             )+
-            _items_: Vec<$item>,
-            _deleted_pos_: Vec<usize>,
+            _items_: $crate::list::List<$item>,
         }
 
         ///
@@ -86,15 +83,14 @@ macro_rules! fast {
             fn insert(&mut self, item: $item) -> usize {
                 use $crate::index::Store;
 
-                let pos = self._items_.len();
-                $(
-                    self.$store.insert(
-                                item.$item_field$(.$item_field_func())?,
-                                pos
-                                );
-                )+
-                self._items_.push(item);
-                pos
+                self._items_.insert(item, |it: &$item, pos: usize| {
+                    $(
+                        self.$store.insert(
+                                    it.$item_field$(.$item_field_func())?,
+                                    pos
+                                    );
+                    )+
+                })
 
             }
 
@@ -105,19 +101,18 @@ macro_rules! fast {
             /// Panics if the pos is out of bound.
             ///
             #[allow(dead_code)]
-            fn update<F>(&mut self, pos: usize, update_fn: F) where F: Fn(&$item)-> $item {
+            fn update<F>(&mut self, pos: usize, update_fn: F) -> bool where F: Fn(&$item)-> $item {
                 use $crate::index::Store;
 
-                let old = &self._items_[pos];
-                let new = (update_fn)(old);
-                $(
-                    self.$store.update(
-                                old.$item_field$(.$item_field_func())?,
-                                pos,
-                                new.$item_field$(.$item_field_func())?
-                                );
-                )+
-                self._items_[pos] = new;
+                self._items_.update(pos, update_fn, |old: &$item, pos: usize, new: &$item| {
+                    $(
+                        self.$store.update(
+                                    old.$item_field$(.$item_field_func())?,
+                                    pos,
+                                    new.$item_field$(.$item_field_func())?
+                                    );
+                    )+
+                })
             }
 
             /// Delete the item on the given position.
@@ -127,17 +122,17 @@ macro_rules! fast {
             /// Panics if the pos is out of bound.
             ///
             #[allow(dead_code)]
-            fn delete(&mut self, pos: usize) {
+            fn delete(&mut self, pos: usize) -> &$item{
                 use $crate::index::Store;
 
-                let item = &self._items_[pos];
-                $(
-                    self.$store.delete(
-                                item.$item_field$(.$item_field_func())?,
-                                pos,
-                                );
-                )+
-                self._deleted_pos_.push(pos);
+                self._items_.delete(pos, |it: &$item, pos: usize| {
+                    $(
+                        self.$store.delete(
+                                    it.$item_field$(.$item_field_func())?,
+                                    pos
+                                    );
+                    )+
+                })
             }
 
             /// Create an Iterator for the given Filter.
@@ -147,17 +142,13 @@ macro_rules! fast {
             /// Panics if the positions are out of bound.
             ///
             #[allow(dead_code)]
-            fn filter<'i>(&'i self, idxs: std::borrow::Cow<'i, [$crate::Idx]>) -> $crate::Iter<'i, $item> {
-                $crate::Iter::new(idxs, &self._items_, &self._deleted_pos_)
+            fn filter<'i>(&'i self, filter: std::borrow::Cow<'i, [$crate::Idx]>) -> $crate::list::FilterIter<'i, $item> {
+                self._items_.filter(filter)
             }
 
             #[allow(dead_code)]
-            fn iter<'i>(&'i self) -> $crate::Iter<'i, $item> {
-                $crate::Iter::new(
-                    std::borrow::Cow::Owned(self._items_.iter().enumerate().map(|(i,_)| i).collect::<Vec<_>>()),
-                    &self._items_,
-                    &self._deleted_pos_
-                )
+            fn iter<'i>(&'i self) -> $crate::list::Iter<'i, $item> {
+                self._items_.iter()
             }
 
         }
@@ -168,39 +159,6 @@ macro_rules! fast {
         }
 
     };
-}
-
-pub struct Iter<'i, T> {
-    pos: usize,
-    idxs: Cow<'i, [Idx]>,
-    items: &'i [T],
-    deleted_pos: &'i [usize],
-}
-
-impl<'i, T> Iter<'i, T> {
-    pub fn new(idxs: Cow<'i, [Idx]>, items: &'i [T], deleted_pos: &'i [usize]) -> Self {
-        Self {
-            pos: 0,
-            idxs,
-            items,
-            deleted_pos,
-        }
-    }
-}
-
-impl<'i, T> Iterator for Iter<'i, T> {
-    type Item = &'i T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let i = self.idxs.get(self.pos)?;
-            self.pos += 1;
-            if self.deleted_pos.contains(i) {
-                continue;
-            }
-            return Some(&self.items[*i]);
-        }
-    }
 }
 
 #[cfg(test)]

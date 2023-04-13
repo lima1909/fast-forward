@@ -5,10 +5,13 @@ use fast_forward::{
     Idx, EMPTY_IDXS,
 };
 
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Index};
 
 trait Tree: Equals<usize> {
-    fn parents(&self, key: usize, stop: usize, nodes: &[Node]) -> Cow<[Idx]> {
+    fn parents<I>(&self, key: usize, stop: usize, nodes: &I) -> Cow<[Idx]>
+    where
+        I: Index<usize, Output = Node>,
+    {
         let mut result = Cow::Borrowed(EMPTY_IDXS);
 
         if key == stop {
@@ -55,7 +58,7 @@ fn main() {
     fast_nodes.insert(Node::new(6, 5));
 
     // access to the `_items_` field is not so nice
-    let nodes: &[Node] = &fast_nodes._items_.as_ref();
+    let nodes = &fast_nodes._items_;
 
     // PARENTS: up to the root node
     assert!(fast_nodes.id.parents(9, 0, nodes).is_empty());
