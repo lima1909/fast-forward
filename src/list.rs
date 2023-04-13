@@ -44,7 +44,12 @@ impl<T> List<T> {
     }
 
     /// The Item in the list will not be delteted. It will be marked as deleted.
-    pub fn delete<F>(&mut self, pos: usize, mut trigger: F)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the pos is out of bound.
+    ///
+    pub fn delete<F>(&mut self, pos: usize, mut trigger: F) -> &T
     where
         F: FnMut(&T, usize), // param are: &Item, current position in the list
     {
@@ -52,6 +57,7 @@ impl<T> List<T> {
         trigger(del_item, pos);
 
         self.deleted_pos.push(pos);
+        del_item
     }
 
     pub fn is_deleted(&self, pos: usize) -> bool {
@@ -82,11 +88,11 @@ impl<T> List<T> {
         self.items.len()
     }
 
-    pub fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, T> {
+    pub const fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, T> {
         FilterIter::new(filter, self)
     }
 
-    pub fn iter(&self) -> Iter<'_, T> {
+    pub const fn iter(&self) -> Iter<'_, T> {
         Iter::new(self)
     }
 }
@@ -118,7 +124,7 @@ pub struct Iter<'i, T> {
 }
 
 impl<'i, T> Iter<'i, T> {
-    pub fn new(list: &'i List<T>) -> Self {
+    pub const fn new(list: &'i List<T>) -> Self {
         Self { pos: 0, list }
     }
 }
@@ -157,7 +163,7 @@ pub struct FilterIter<'i, T> {
 }
 
 impl<'i, T> FilterIter<'i, T> {
-    pub fn new(filter: Cow<'i, [usize]>, list: &'i List<T>) -> Self {
+    pub const fn new(filter: Cow<'i, [usize]>, list: &'i List<T>) -> Self {
         Self {
             pos: 0,
             filter,
@@ -266,7 +272,7 @@ mod tests {
     fn delete_first() {
         let mut l: List<_> = vec![1, 2, 3].into();
 
-        l.delete(0, |_, _| {});
+        assert_eq!(&1, l.delete(0, |_, _| {}));
         assert_eq!(3, l.len());
         assert_eq!(2, l.count());
 
