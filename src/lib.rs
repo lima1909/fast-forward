@@ -147,7 +147,7 @@ macro_rules! fast {
             }
 
             #[allow(dead_code)]
-            fn iter<'i>(&'i self) -> $crate::list::Iter<'i, $item> {
+            fn iter(&self) -> $crate::list::Iter<'_, $item> {
                 self._items_.iter()
             }
 
