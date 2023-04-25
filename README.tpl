@@ -8,6 +8,9 @@
 
 ⏩ Quering lists blazing fast.
 
+This is a very, very, ... early state. This means, this implementation is on the way to find out, what is a good solution 
+and want anyone use it. The API can change a lot! Please, try it out and give me feedback.
+
 # Overview
 
 {{readme}}
