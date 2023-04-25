@@ -7,7 +7,6 @@ use fast_forward::index::map::MapIndex;
 use fast_forward::index::uint::UIntIndex;
 use fast_forward::index::{Equals, Store};
 use fast_forward::query::{and, or, query};
-use fast_forward::Idx;
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
@@ -21,7 +20,7 @@ struct Indices {
 }
 
 impl Indices {
-    fn insert(&mut self, p: &Person, idx: Idx) {
+    fn insert(&mut self, p: &Person, idx: usize) {
         self.pk.insert(p.0, idx);
         self.name.insert(p.1.clone(), idx);
     }

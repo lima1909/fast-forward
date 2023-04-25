@@ -2,13 +2,13 @@ use fast_forward::{
     fast,
     index::{uint::UIntIndex, Equals},
     query::or,
-    Idx, EMPTY_IDXS,
+    EMPTY_IDXS,
 };
 
 use std::{borrow::Cow, ops::Index};
 
 trait Tree: Equals<usize> {
-    fn parents<I>(&self, key: usize, stop: usize, nodes: &I) -> Cow<[Idx]>
+    fn parents<I>(&self, key: usize, stop: usize, nodes: &I) -> Cow<[usize]>
     where
         I: Index<usize, Output = Node>,
     {

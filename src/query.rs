@@ -1,5 +1,5 @@
 //! Query combines different filter. Filters can be linked using `and` and `or`.
-use crate::{Idx, EMPTY_IDXS};
+use crate::EMPTY_IDXS;
 use std::{
     borrow::Cow,
     cmp::{min, Ordering::*},
@@ -52,7 +52,7 @@ impl<'q> Query<'q> {
 }
 
 // Logical `Or`, the union of two Inices.
-pub fn or<'a>(lhs: Cow<'a, [Idx]>, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
+pub fn or<'a>(lhs: Cow<'a, [usize]>, rhs: Cow<'a, [usize]>) -> Cow<'a, [usize]> {
     match (lhs.is_empty(), rhs.is_empty()) {
         (false, false) => {
             let (ll, lr) = (lhs.len(), rhs.len());
@@ -95,7 +95,7 @@ pub fn or<'a>(lhs: Cow<'a, [Idx]>, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
 }
 
 // Logical `And`, the intersection of two Inices.
-pub fn and<'a>(lhs: &[Idx], rhs: &[Idx]) -> Cow<'a, [Idx]> {
+pub fn and<'a>(lhs: &[usize], rhs: &[usize]) -> Cow<'a, [usize]> {
     if lhs.is_empty() || rhs.is_empty() {
         return Cow::Borrowed(EMPTY_IDXS);
     }
@@ -129,10 +129,10 @@ mod tests {
     use super::*;
 
     mod or {
-        use crate::{query::EMPTY_IDXS, Idx};
+        use crate::query::EMPTY_IDXS;
         use std::borrow::Cow;
 
-        pub fn or<'a>(lhs: &'a [Idx], rhs: &'a [Idx]) -> Cow<'a, [Idx]> {
+        pub fn or<'a>(lhs: &'a [usize], rhs: &'a [usize]) -> Cow<'a, [usize]> {
             super::or(Cow::Borrowed(lhs), Cow::Borrowed(rhs))
         }
 
@@ -240,7 +240,7 @@ mod tests {
         struct List(Vec<i32>);
 
         impl List {
-            fn eq(&self, i: i32) -> Cow<[Idx]> {
+            fn eq(&self, i: i32) -> Cow<[usize]> {
                 match self.0.binary_search(&i) {
                     Ok(pos) => Cow::Owned(vec![pos]),
                     Err(_) => Cow::Borrowed(EMPTY_IDXS),

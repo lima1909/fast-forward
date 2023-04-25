@@ -1,23 +1,23 @@
 //! The purpose of an Index is to find faster a specific item in a list (Slice, Vec, ...).
 //! This means, it does not have to touch and compare every item in the list.
 //!
-//! An Index has two parts, a `Key` (item to search for) and a position (the index in the list) [`Idx`].
+//! An Index has two parts, a `Key` (item to search for) and a position (the index in the list) `Index`.
 //!
 //! There are two types of Index:
-//! - `Unique Index`: for a given `Key` exist exactly one [`Idx`].
-//! - `Multi Index` : for a given `Key` exists many [`Idx`]s.
+//! - `Unique Index`: for a given `Key` exist exactly one Index.
+//! - `Multi Index` : for a given `Key` exists many Indices.
 //!
 //! # Example for an Vec-Multi-Index:
 //!
 //! Map-Index:
 //!
-//! - `Key` = name (String)
-//! - [`Idx`] = index is the position in a List (Vec)
+//! - `Key`   = name (String)
+//! - `Index` = index is the position in a List (Vec)
 //!
 //! ```text
 //! let _names = vec!["Paul", "Jasmin", "Inge", "Paul", ...];
 //!
-//!  Key       | Idx
+//!  Key       | Index
 //! -------------------
 //!  "Jasmin"  | 1
 //!  "Paul"    | 0, 3
@@ -27,7 +27,7 @@
 pub mod map;
 pub mod uint;
 
-use crate::{Idx, EMPTY_IDXS};
+use crate::EMPTY_IDXS;
 use std::borrow::Cow;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
@@ -49,7 +49,7 @@ pub trait Store<K>: Default {
     /// After:
     ///     Female | 2,3,4
     ///
-    fn insert(&mut self, key: K, idx: Idx);
+    fn insert(&mut self, key: K, idx: usize);
 
     /// Update means: `Key` changed, but `Index` stays the same
     ///
@@ -77,7 +77,7 @@ pub trait Store<K>: Default {
     /// `Update: (Male, 2, Female)`
     /// After:
     ///     Female | 2,3,4
-    fn update(&mut self, old_key: K, idx: Idx, new_key: K) {
+    fn update(&mut self, old_key: K, idx: usize, new_key: K) {
         self.delete(old_key, idx);
         self.insert(new_key, idx);
     }
@@ -109,7 +109,7 @@ pub trait Store<K>: Default {
     /// After:
     ///     Female | 3,4
     ///
-    fn delete(&mut self, key: K, idx: Idx);
+    fn delete(&mut self, key: K, idx: usize);
 
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
@@ -117,7 +117,7 @@ pub trait Store<K>: Default {
 
 pub trait Equals<K> {
     /// Find all `Idx` with the given `Key`.
-    fn eq(&self, key: K) -> Cow<[Idx]>;
+    fn eq(&self, key: K) -> Cow<[usize]>;
 
     /// Combined all given `keys` with an logical `OR`.
     ///
@@ -126,7 +126,7 @@ pub trait Equals<K> {
     /// eq_iter([2, 5, 6]) => eq(2) OR eq(5) OR eq(6)
     /// eq_iter(2..6]) => eq(2) OR eq(3) OR eq(4) OR eq(5)
     /// ```
-    fn eq_iter<I>(&self, keys: I) -> Cow<[Idx]>
+    fn eq_iter<I>(&self, keys: I) -> Cow<[usize]>
     where
         I: IntoIterator<Item = K>,
     {
@@ -172,33 +172,33 @@ impl<K: Default + Ord> MinMax<K> {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct Index(Vec<Idx>);
+pub struct Index(Vec<usize>);
 
 impl Index {
     #[inline]
-    pub fn new(idx: Idx) -> Self {
+    pub fn new(idx: usize) -> Self {
         Self(vec![idx])
     }
 
     #[inline]
-    pub fn add(&mut self, idx: Idx) {
+    pub fn add(&mut self, idx: usize) {
         if let Err(pos) = self.0.binary_search(&idx) {
             self.0.insert(pos, idx);
         }
     }
 
     #[inline]
-    pub fn get(&self) -> Cow<[Idx]> {
+    pub fn get(&self) -> Cow<[usize]> {
         Cow::Borrowed(&self.0)
     }
 
     #[inline]
-    pub fn remove(&mut self, idx: Idx) -> Cow<[Idx]> {
+    pub fn remove(&mut self, idx: usize) -> Cow<[usize]> {
         self.0.retain(|v| v != &idx);
         self.get()
     }
 
-    pub fn or<'a>(&'a self, rhs: Cow<'a, [Idx]>) -> Cow<'a, [Idx]> {
+    pub fn or<'a>(&'a self, rhs: Cow<'a, [usize]>) -> Cow<'a, [usize]> {
         crate::query::or(self.get(), rhs)
     }
 }

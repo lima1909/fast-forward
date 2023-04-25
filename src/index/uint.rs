@@ -32,7 +32,7 @@
 //! ```
 use crate::{
     index::{Index, Store},
-    Idx, EMPTY_IDXS,
+    EMPTY_IDXS,
 };
 use std::{borrow::Cow, marker::PhantomData};
 
@@ -60,7 +60,7 @@ impl<K> Store<K> for UIntIndex<K>
 where
     K: Default + Into<usize>,
 {
-    fn insert(&mut self, k: K, i: Idx) {
+    fn insert(&mut self, k: K, i: usize) {
         let k = k.into();
 
         if self.data.len() <= k {
@@ -76,7 +76,7 @@ where
         self.min_max_cache.new_max(k);
     }
 
-    fn delete(&mut self, key: K, idx: Idx) {
+    fn delete(&mut self, key: K, idx: usize) {
         let k = key.into();
         if let Some(Some(rm_idx)) = self.data.get_mut(k) {
             // if the Index is the last, then remove complete Index
@@ -107,7 +107,7 @@ where
     K: Default + Into<usize>,
 {
     #[inline]
-    fn eq(&self, key: K) -> Cow<[Idx]> {
+    fn eq(&self, key: K) -> Cow<[usize]> {
         match &self.data.get(key.into()) {
             Some(Some(idx)) => idx.get(),
             _ => Cow::Borrowed(EMPTY_IDXS),

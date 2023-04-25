@@ -28,7 +28,7 @@
 //! ```
 use crate::{
     index::{Equals, Index, Store},
-    Idx, EMPTY_IDXS,
+    EMPTY_IDXS,
 };
 use std::{borrow::Cow, collections::HashMap, fmt::Debug, hash::Hash};
 
@@ -40,7 +40,7 @@ impl<K> Store<K> for MapIndex<K>
 where
     K: Default + Eq + Hash,
 {
-    fn insert(&mut self, key: K, i: Idx) {
+    fn insert(&mut self, key: K, i: usize) {
         match self.0.get_mut(&key) {
             Some(v) => v.add(i),
             None => {
@@ -49,7 +49,7 @@ where
         }
     }
 
-    fn delete(&mut self, key: K, idx: Idx) {
+    fn delete(&mut self, key: K, idx: usize) {
         if let Some(rm_idx) = self.0.get_mut(&key) {
             if rm_idx.remove(idx).is_empty() {
                 self.0.remove(&key);
@@ -67,7 +67,7 @@ where
     K: Default + Eq + Hash,
 {
     #[inline]
-    fn eq(&self, key: &K) -> Cow<[Idx]> {
+    fn eq(&self, key: &K) -> Cow<[usize]> {
         match self.0.get(key) {
             Some(i) => i.get(),
             None => Cow::Borrowed(EMPTY_IDXS),

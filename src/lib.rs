@@ -28,11 +28,8 @@ pub mod index;
 pub mod list;
 pub mod query;
 
-/// `Idx` is the index/position in a List ([`std::vec::Vec`]).
-pub type Idx = usize;
-
 /// Empty array of `Idx`
-pub const EMPTY_IDXS: &[Idx] = &[];
+pub const EMPTY_IDXS: &[usize] = &[];
 
 /// This `macro` is not a solution, it is more an POC (proof of concept)!
 /// The Problem with this macro is the visibility. This means, it can not hide internal fields,
@@ -142,7 +139,7 @@ macro_rules! fast {
             /// Panics if the positions are out of bound.
             ///
             #[allow(dead_code)]
-            fn filter<'i>(&'i self, filter: std::borrow::Cow<'i, [$crate::Idx]>) -> $crate::list::FilterIter<'i, $item> {
+            fn filter<'i>(&'i self, filter: std::borrow::Cow<'i, [usize]>) -> $crate::list::FilterIter<'i, $item> {
                 self._items_.filter(filter)
             }
 
