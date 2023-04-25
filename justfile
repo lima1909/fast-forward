@@ -9,6 +9,9 @@ alias l := clippy
 test filter="":
   @cargo test --all-features {{filter}}
 
+first:
+  @cargo t -- run first.rs
+
 # cargo watch for test with given filter
 watch filter="":
   @cargo watch -q -c -x 'test {{filter}}'
