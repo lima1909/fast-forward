@@ -13,9 +13,9 @@ pub fn indexed(input: TokenStream) -> TokenStream {
             let ts = l.tokens.clone();
             if let Some(proc_macro2::TokenTree::Ident(ident)) = ts.into_iter().next() {
                 println!("ATTR:\n {:#?}", ident);
-                if ident.to_string() == "core" {
-                    let err = syn::Error::new(ident.span(), "Nö").to_compile_error();
-                    return quote::quote!( #err ).into();
+                if ident == "core" {
+                    let _err = syn::Error::new(ident.span(), "Nö").to_compile_error();
+                    // return quote::quote!( #err ).into();
                 }
             }
             return quote::quote!( let _c: #clone; ).into();
