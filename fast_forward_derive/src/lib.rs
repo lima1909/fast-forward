@@ -10,7 +10,14 @@ pub fn indexed(input: TokenStream) -> TokenStream {
     if let Some(index) = ast.attrs.first() {
         if let syn::Meta::List(ref l) = index.meta {
             let clone = l.tokens.clone();
-            // println!("ATTR:\n {:#?}", l.tokens);
+            let ts = l.tokens.clone();
+            if let Some(proc_macro2::TokenTree::Ident(ident)) = ts.into_iter().next() {
+                println!("ATTR:\n {:#?}", ident);
+                if ident.to_string() == "core" {
+                    let err = syn::Error::new(ident.span(), "Nö").to_compile_error();
+                    return quote::quote!( #err ).into();
+                }
+            }
             return quote::quote!( let _c: #clone; ).into();
         }
     }
