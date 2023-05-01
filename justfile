@@ -10,7 +10,7 @@ test filter="":
   @cargo test --all-features {{filter}}
 
 first:
-  @cargo t -- run first.rs
+  cargo test -- ui trybuild=ui_first.rs
 
 # cargo watch for test with given filter
 watch filter="":

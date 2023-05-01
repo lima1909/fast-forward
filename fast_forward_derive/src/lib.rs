@@ -1,85 +1,89 @@
-use std::fmt::Display;
-
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{parse::Parse, parse_macro_input, DeriveInput, Error};
 
 #[proc_macro_derive(Indexed, attributes(index))]
 pub fn indexed(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
 
     match ast.data {
-        syn::Data::Struct(s) => create_struct(&ast.ident, &s.fields),
-        syn::Data::Enum(ref _e) => to_compile_erro(ast, "'Enum' are not supported for Index Lists"),
-        syn::Data::Union(_) => to_compile_erro(ast, "'Union' are not supported for Index Lists"),
+        syn::Data::Struct(s) => create_struct(&ast.ident, &s.fields).into(),
+        syn::Data::Enum(_) => Error::new_spanned(ast, "Enum are not supported for Index Lists")
+            .to_compile_error()
+            .into(),
+        syn::Data::Union(_) => Error::new_spanned(ast, "Union are not supported for Index Lists")
+            .to_compile_error()
+            .into(),
     }
-
-    // if let Some(index) = ast.attrs.first() {
-    //     if let syn::Meta::List(ref l) = index.meta {
-    //         let clone = l.tokens.clone();
-    //         let ts = l.tokens.clone();
-    //         if let Some(proc_macro2::TokenTree::Ident(ident)) = ts.into_iter().next() {
-    //             // println!("ATTR:\n {:#?}", ident);
-    //             if ident == "core" {
-    //                 let _err = syn::Error::new(ident.span(), "Nö").to_compile_error();
-    //                 // return quote::quote!( #err ).into();
-    //             }
-    //         }
-    //         return quote::quote!( let _c: #clone; ).into();
-    //     }
-    // }
-
-    // quote::quote!(
-    //         mod __bar {
-
-    //         use super::*;
-
-    //         pub struct Bar {
-    //             a: i32,
-    //         }
-
-    //         impl Bar {
-    //             pub fn new(a: i32) -> Self {
-    //                 Self { a }
-    //             }
-
-    //             pub fn foo(&self, _f: First) {}
-    //         }
-
-    //     }
-
-    //     pub use __bar::Bar;
-
-    //     impl First {
-    //         fn foo(&self)-> &str {
-    //             &self.name
-    //         }
-    //     }
-    // )
-    // .into()
 }
 
-fn to_compile_erro<T: quote::ToTokens, M: Display>(t: T, msg: M) -> TokenStream {
-    let err = syn::Error::new_spanned(t, msg).to_compile_error();
-    quote!( #err ).into()
-}
+fn create_struct(name: &syn::Ident, fields: &syn::Fields) -> proc_macro2::TokenStream {
+    let fs: Vec<_> = fields.iter().map(create_field).collect();
 
-fn create_struct(name: &syn::Ident, _fields: &syn::Fields) -> TokenStream {
     let name = syn::Ident::new(&format!("{name}List"), name.span());
     quote! {
-      // const _:() = {
        /// Container-struct for all indices.
        #[derive(Default)]
        pub struct #name {
-          //  $(
-          //      $store: $store_type,
-          //  )+
-          //  _items_: $crate::list::List<$item>,
+            #(#fs)*
        }
-
-      // };
     }
-    .into()
+}
+
+fn create_field(field: &syn::Field) -> proc_macro2::TokenStream {
+    let field_defs: Vec<_> = field
+        .attrs
+        .iter()
+        .filter(|a| {
+            a.path().is_ident("index")
+            // if a.path().is_ident("index") {
+            //     if let syn::Meta::List(ref l) = a.meta {
+            //         return l.path.is_ident("index");
+            //         // let s = a.parse_args::<Store>().unwrap();
+            //     }
+            // }
+            // false
+        })
+        .map(|a| match a.parse_args::<FieldAttr>() {
+            Ok(field_attr) => field_attr.to_tokenstream(field.ident.clone()),
+            Err(err) => Error::new_spanned(a, err).to_compile_error(),
+        })
+        .collect();
+
+    quote!( #(#field_defs)* )
+}
+
+enum FieldAttr {
+    Store(syn::Type),
+    // Rename(String),
+}
+
+impl Parse for FieldAttr {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let b = input.peek(syn::Ident);
+        println!("----- TYP: {b:?}");
+
+        let ident = syn::Ident::parse(input)?;
+        let _eq = proc_macro2::Punct::parse(input)?;
+        match ident.to_string().as_str() {
+            "store" => {
+                let store = syn::Type::parse(input)?;
+                Ok(FieldAttr::Store(store))
+            }
+            _ => Err(Error::new_spanned(
+                ident.clone(),
+                format!("Invalid field attribute: {ident}"),
+            )),
+        }
+    }
+}
+
+impl FieldAttr {
+    fn to_tokenstream(&self, field_name: Option<syn::Ident>) -> proc_macro2::TokenStream {
+        match self {
+            FieldAttr::Store(ty) => quote! { #field_name: #ty, },
+        }
+    }
 }
 
 /*

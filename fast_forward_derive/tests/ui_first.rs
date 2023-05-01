@@ -1,8 +1,9 @@
+#![allow(dead_code)]
 use fast_forward_derive::Indexed;
 
 #[derive(Indexed)]
-// #[index(core::clone::Clone)]
 pub struct First {
+    #[index(store = fast_forward::index::uint::UIntIndex)]
     pub id: i32,
     pub name: String,
 }
@@ -13,7 +14,7 @@ fn main() {
         name: "Me".into(),
     };
 
-    let _l = FirstList {};
+    let _l = FirstList::default();
 
     // let b = Bar::new(5);
     // b.foo(f);
