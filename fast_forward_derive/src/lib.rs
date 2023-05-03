@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, parse_macro_input, DeriveInput, Error};
+use syn::{
+    parse::Parse, parse_macro_input, punctuated::Punctuated, DeriveInput, Error, Ident, Token,
+};
 
 #[proc_macro_derive(Indexed, attributes(index))]
 pub fn indexed(input: TokenStream) -> TokenStream {
@@ -34,47 +36,47 @@ fn create_field(field: &syn::Field) -> proc_macro2::TokenStream {
     let field_defs: Vec<_> = field
         .attrs
         .iter()
-        .filter(|a| {
-            a.path().is_ident("index")
-            // if a.path().is_ident("index") {
-            //     if let syn::Meta::List(ref l) = a.meta {
-            //         return l.path.is_ident("index");
-            //         // let s = a.parse_args::<Store>().unwrap();
-            //     }
-            // }
-            // false
-        })
+        .filter(|a| a.path().is_ident("index"))
         .map(|a| match a.parse_args::<FieldAttr>() {
             Ok(field_attr) => field_attr.to_tokenstream(field.ident.clone()),
-            Err(err) => Error::new_spanned(a, err).to_compile_error(),
+            Err(err) => Error::new_spanned(a, format!("Error by parsing Attribute ({a:?}): {err}"))
+                .to_compile_error(),
         })
         .collect();
 
     quote!( #(#field_defs)* )
 }
 
+#[derive(Debug, Clone)]
 enum FieldAttr {
-    Store(syn::Type),
+    Store(Punctuated<Ident, Token!(::)>),
     // Rename(String),
 }
 
 impl Parse for FieldAttr {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let b = input.peek(syn::Ident);
-        println!("----- TYP: {b:?}");
+        let starts_with_name_and_eq = FieldAttr::parse_name_and_eq(input);
+        if !starts_with_name_and_eq {
+            return match Punctuated::<Ident, Token![::]>::parse_terminated(input) {
+                Ok(store) => Ok(FieldAttr::Store(store)),
+                Err(err) => Err(Error::new(input.span(), format!("Invalid TypePath: {err}"))),
+            };
+        }
 
-        let ident = syn::Ident::parse(input)?;
+        let ident = match syn::Ident::parse(input) {
+            Ok(ident) => ident,
+            Err(err) => panic!("Invalid ident {err}"),
+        };
         let _eq = proc_macro2::Punct::parse(input)?;
-        match ident.to_string().as_str() {
-            "store" => {
-                let store = syn::Type::parse(input)?;
-                Ok(FieldAttr::Store(store))
-            }
+
+        let r = match ident.to_string().as_str() {
+            "rename" => todo!(),
             _ => Err(Error::new_spanned(
                 ident.clone(),
                 format!("Invalid field attribute: {ident}"),
             )),
-        }
+        };
+        r
     }
 }
 
@@ -83,6 +85,25 @@ impl FieldAttr {
         match self {
             FieldAttr::Store(ty) => quote! { #field_name: #ty, },
         }
+    }
+
+    fn parse_name_and_eq(input: syn::parse::ParseStream) -> bool {
+        let with_name = input.peek(Ident);
+        if with_name {
+            return input.peek2(Token![=]);
+        }
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn attr_index() {
+        let field_attr = syn::parse_str::<FieldAttr>("fast_forward::index::uint::UIntIndex");
+        println!("-----------: {field_attr:?}");
     }
 }
 

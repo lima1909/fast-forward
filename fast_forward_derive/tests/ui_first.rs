@@ -3,7 +3,7 @@ use fast_forward_derive::Indexed;
 
 #[derive(Indexed)]
 pub struct First {
-    #[index(store = fast_forward::index::uint::UIntIndex)]
+    #[index(fast_forward::index::uint::UIntIndex)]
     pub id: i32,
     pub name: String,
 }
