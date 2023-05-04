@@ -37,7 +37,7 @@ fn create_field(field: &syn::Field) -> proc_macro2::TokenStream {
         .attrs
         .iter()
         .filter(|a| a.path().is_ident("index"))
-        .map(|a| match a.parse_args::<attr::FieldAttr>() {
+        .map(|a| match a.parse_args::<attr::Attr>() {
             Ok(field_attr) => field_attr.to_tokenstream(field.ident.clone()),
             Err(err) => Error::new_spanned(a, format!("Error by parsing Attribute ({a:?}): {err}"))
                 .to_compile_error(),
