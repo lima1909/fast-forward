@@ -64,12 +64,38 @@ pub(crate) fn parse_name_and_eq(input: syn::parse::ParseStream) -> Option<Ident>
     None
 }
 
-impl Attr {
-    pub(crate) fn to_tokenstream(&self, field_name: Option<Ident>) -> proc_macro2::TokenStream {
-        match self {
-            Attr::Index(ty) => quote! { #field_name: #ty, },
-            Attr::Rename(rename) => quote! { #rename },
+// impl Attr {
+//     pub(crate) fn to_tokenstream(&self, field_name: Option<Ident>) -> proc_macro2::TokenStream {
+//         match self {
+//             Attr::Index(ty) => quote! { #field_name: #ty, },
+//             Attr::Rename(rename) => quote! { #rename },
+//         }
+//     }
+// }
+
+#[derive(Debug, Default, Clone)]
+pub(crate) struct Attrs {
+    index: Option<Punctuated<Ident, Token!(::)>>,
+    rename: Option<LitStr>,
+}
+
+impl Attrs {
+    pub(crate) fn add(&mut self, attr: Attr) {
+        match attr {
+            Attr::Index(p) => self.index = Some(p),
+            Attr::Rename(name) => self.rename = Some(name),
         }
+    }
+
+    pub(crate) fn to_tokenstream(&self, field_name: Option<Ident>) -> proc_macro2::TokenStream {
+        let field_name = if let Some(name) = &self.rename {
+            Ident::new(name.value().as_str(), name.span())
+        } else {
+            field_name.unwrap() // TODO replace unwrap with error handling
+        };
+
+        let ty = self.index.as_ref().unwrap(); // TODO replace unwrap with error handling
+        quote! { #field_name: #ty, }
     }
 }
 

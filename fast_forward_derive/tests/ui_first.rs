@@ -8,6 +8,14 @@ pub struct First {
     pub name: String,
 }
 
+// #[derive(Indexed)]
+// pub struct Second(
+//     #[index(fast_forward::index::uint::UIntIndex)]
+//     #[index(rename = "id")]
+//     i32,
+//     String,
+// );
+
 fn main() {
     let _f = First {
         id: 1,
@@ -15,6 +23,7 @@ fn main() {
     };
 
     let _l = FirstList::default();
+    // let _l = SecondList::default();
 
     // let b = Bar::new(5);
     // b.foo(f);
