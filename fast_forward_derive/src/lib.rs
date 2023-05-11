@@ -1,4 +1,4 @@
-use attr::{Attr, Attrs};
+use attr::FieldAttrs;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Error};
@@ -21,37 +21,55 @@ pub fn indexed(input: TokenStream) -> TokenStream {
 }
 
 fn create_struct(name: &syn::Ident, fields: &syn::Fields) -> proc_macro2::TokenStream {
-    let fields: Vec<_> = fields.iter().map(create_field).collect();
+    let mut index_fields = Vec::new();
+
+    match fields {
+        syn::Fields::Named(f) => {
+            let _it = f.named.iter();
+        }
+        syn::Fields::Unnamed(f) => {
+            let _it = f.unnamed.iter();
+        }
+        syn::Fields::Unit => {
+            // TODO error
+        }
+    }
+
+    for field in fields {
+        match field_to_attrs(field) {
+            Ok(attrs) => {
+                if let Some(attrs) = attrs {
+                    index_fields.push(attrs.to_tokenstream())
+                }
+            }
+            Err(err) => return err.to_compile_error(),
+        }
+    }
 
     let name = syn::Ident::new(&format!("{name}List"), name.span());
     quote! {
        /// Container-struct for all indices.
        #[derive(Default)]
        pub struct #name {
-            #(#fields)*
+            #(#index_fields)*
        }
     }
 }
 
-fn create_field(field: &syn::Field) -> proc_macro2::TokenStream {
-    let field_defs: Vec<_> = field
-        .attrs
-        .iter()
-        .filter(|a| a.path().is_ident("index"))
-        .map(
-            |a| a.parse_args::<attr::Attr>().unwrap(), //     match a.parse_args::<attr::Attr>() {
-                                                       //     Ok(field_attr) => field_attr.to_tokenstream(field.ident.clone()),
-                                                       //     Err(err) => Error::new_spanned(a, format!("Error by parsing Attribute ({a:?}): {err}"))
-                                                       //         .to_compile_error(),
-                                                       // }
-        )
-        .collect();
-
-    let mut attrs = Attrs::default();
-    for a in field_defs {
-        attrs.add(a);
+fn field_to_attrs(field: &syn::Field) -> syn::Result<Option<FieldAttrs>> {
+    if field.attrs.is_empty() {
+        return Ok(None);
     }
 
-    attrs.to_tokenstream(field.ident.clone())
-    // quote!( #(#field_defs)* )
+    let mut attrs = FieldAttrs::new(field.clone());
+    for attr in field.attrs.iter().filter(|a| a.path().is_ident("index")) {
+        match attr.parse_args::<attr::Attr>() {
+            Ok(attr) => attrs.add(attr),
+            Err(err) => {
+                return Err(err);
+            }
+        }
+    }
+
+    Ok(Some(attrs))
 }

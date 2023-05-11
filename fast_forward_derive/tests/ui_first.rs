@@ -1,20 +1,22 @@
 #![allow(dead_code)]
+use fast_forward::index::Equals;
 use fast_forward_derive::Indexed;
 
 #[derive(Indexed)]
 pub struct First {
     #[index(fast_forward::index::uint::UIntIndex)]
+    #[index(name = "new_id")]
     pub id: i32,
     pub name: String,
 }
 
-// #[derive(Indexed)]
-// pub struct Second(
-//     #[index(fast_forward::index::uint::UIntIndex)]
-//     #[index(rename = "id")]
-//     i32,
-//     String,
-// );
+#[derive(Indexed)]
+pub struct Second(
+    #[index(fast_forward::index::uint::UIntIndex)]
+    #[index(name = "id")]
+    i32,
+    String,
+);
 
 fn main() {
     let _f = First {
@@ -22,10 +24,13 @@ fn main() {
         name: "Me".into(),
     };
 
-    let _l = FirstList::default();
-    // let _l = SecondList::default();
+    let l = FirstList::default();
+    let r = l.new_id.eq(5);
+    println!("Result FirstList: {r:?}");
+    assert!(r.is_empty());
 
-    // let b = Bar::new(5);
-    // b.foo(f);
-    // println!("------- {}", f.foo());
+    let l = SecondList::default();
+    let r = l.id.eq(5);
+    println!("Result SecondList: {r:?}");
+    assert!(r.is_empty());
 }

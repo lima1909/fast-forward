@@ -1,10 +1,10 @@
 use quote::quote;
-use syn::{parse::Parse, punctuated::Punctuated, Error, Expr, Ident, LitStr, Token};
+use syn::{parse::Parse, Error, Expr, Field, Ident, LitStr, Token, TypePath};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Attr {
-    Index(Punctuated<Ident, Token!(::)>),
-    Rename(LitStr),
+    Index(TypePath),
+    Name(LitStr),
 }
 
 impl Parse for Attr {
@@ -14,14 +14,14 @@ impl Parse for Attr {
                 //
                 // #[index(rename = "other_name")]
                 //
-                if ident.eq("rename") {
+                if ident.eq("name") {
                     let expr = Expr::parse(input)?;
                     if let Expr::Lit(syn::ExprLit {
                         lit: syn::Lit::Str(lit),
                         ..
                     }) = expr
                     {
-                        Ok(Attr::Rename(lit))
+                        Ok(Attr::Name(lit))
                     } else {
                         Err(Error::new(
                             input.span(),
@@ -43,11 +43,11 @@ impl Parse for Attr {
                 //
                 // #[index(fast_forward::index::uint::UIntIndex)]
                 //
-                match Punctuated::<Ident, Token![::]>::parse_terminated(input) {
-                    Ok(store) => Ok(Attr::Index(store)),
+                match TypePath::parse(input) {
+                    Ok(path) => Ok(Attr::Index(path)),
                     Err(err) => Err(Error::new(
                         input.span(),
-                        format!("Invalid Index (TypePath): {err}"),
+                        format!("Invalid Index format: {err}"),
                     )),
                 }
             }
@@ -64,38 +64,71 @@ pub(crate) fn parse_name_and_eq(input: syn::parse::ParseStream) -> Option<Ident>
     None
 }
 
-// impl Attr {
-//     pub(crate) fn to_tokenstream(&self, field_name: Option<Ident>) -> proc_macro2::TokenStream {
-//         match self {
-//             Attr::Index(ty) => quote! { #field_name: #ty, },
-//             Attr::Rename(rename) => quote! { #rename },
-//         }
-//     }
-// }
-
-#[derive(Debug, Default, Clone)]
-pub(crate) struct Attrs {
-    index: Option<Punctuated<Ident, Token!(::)>>,
-    rename: Option<LitStr>,
+#[derive(Debug, Clone)]
+pub(crate) struct FieldAttrs {
+    field: syn::Field,
+    index: Option<TypePath>,
+    name: Option<LitStr>,
 }
 
-impl Attrs {
-    pub(crate) fn add(&mut self, attr: Attr) {
-        match attr {
-            Attr::Index(p) => self.index = Some(p),
-            Attr::Rename(name) => self.rename = Some(name),
+impl FieldAttrs {
+    pub(crate) fn new(field: syn::Field) -> Self {
+        Self {
+            field,
+            index: None,
+            name: None,
         }
     }
 
-    pub(crate) fn to_tokenstream(&self, field_name: Option<Ident>) -> proc_macro2::TokenStream {
-        let field_name = if let Some(name) = &self.rename {
-            Ident::new(name.value().as_str(), name.span())
-        } else {
-            field_name.unwrap() // TODO replace unwrap with error handling
-        };
+    pub(crate) fn add(&mut self, attr: Attr) {
+        match attr {
+            Attr::Index(p) => self.index = Some(p),
+            Attr::Name(name) => self.name = Some(name),
+        }
+    }
 
-        let ty = self.index.as_ref().unwrap(); // TODO replace unwrap with error handling
+    pub(crate) fn name(&self) -> syn::Result<Ident> {
+        if let Some(name) = &self.name {
+            Ok(Ident::new(name.value().as_str(), name.span()))
+        } else {
+            match &self.field.ident {
+                Some(ident) => Ok(ident.clone()),
+                None => Err(Error::new_spanned(
+                    self.field.clone(),
+                    "Could not create a Index for an unnamed field",
+                )),
+            }
+        }
+    }
+
+    pub(crate) fn index(&self) -> syn::Result<TypePath> {
+        if let Some(path) = &self.index {
+            Ok(path.clone())
+        } else {
+            Err(Error::new_spanned(
+                self.field.clone(),
+                "Index is a mandatory field",
+            ))
+        }
+    }
+
+    pub(crate) fn to_tokenstream(&self) -> proc_macro2::TokenStream {
+        let field_name = self.name().unwrap();
+        let ty = self.index().unwrap();
+
         quote! { #field_name: #ty, }
+    }
+}
+
+impl TryFrom<Field> for FieldAttrs {
+    type Error = &'static str;
+
+    fn try_from(field: Field) -> Result<Self, Self::Error> {
+        if field.attrs.is_empty() {
+            return Err("");
+        }
+
+        Err("")
     }
 }
 
@@ -106,38 +139,32 @@ mod tests {
 
     #[test]
     fn index() {
-        let result = syn::parse_str::<Attr>("fast_forward::index::uint::UIntIndex");
-
-        let mut p = Punctuated::new();
-        let span = Span::call_site();
-        p.push(Ident::new("fast_forward", span));
-        p.push(Ident::new("index", span));
-        p.push(Ident::new("uint", span));
-        p.push(Ident::new("UIntIndex", span));
-        assert_eq!(Attr::Index(p), result.unwrap())
+        let result = syn::parse_str::<Attr>("fast_forward::index::uint::UIntIndex").unwrap();
+        let path = syn::parse_str::<TypePath>("fast_forward::index::uint::UIntIndex").unwrap();
+        assert_eq!(Attr::Index(path), result)
     }
 
     #[test]
     fn rename() {
-        let result = syn::parse_str::<Attr>("rename = \"new_name\"");
+        let result = syn::parse_str::<Attr>("name = \"new_name\"");
         assert_eq!(
-            Attr::Rename(LitStr::new("new_name", Span::call_site())),
+            Attr::Name(LitStr::new("new_name", Span::call_site())),
             result.unwrap()
         );
     }
 
     #[test]
     fn rename_with_space() {
-        let result = syn::parse_str::<Attr>("rename = \"new name\"");
+        let result = syn::parse_str::<Attr>("name = \"new name\"");
         assert_eq!(
-            Attr::Rename(LitStr::new("new name", Span::call_site())),
+            Attr::Name(LitStr::new("new name", Span::call_site())),
             result.unwrap()
         );
     }
 
     #[test]
     fn rename_no_double_quotes() {
-        let result = syn::parse_str::<Attr>("rename = new_name");
+        let result = syn::parse_str::<Attr>("name = new_name");
         assert_eq!(
             "Expected string in double quotes: \"string_value\"",
             result.err().unwrap().to_string()
@@ -146,7 +173,7 @@ mod tests {
 
     #[test]
     fn lex_err() {
-        let result = syn::parse_str::<Attr>("rename = \"new_name");
+        let result = syn::parse_str::<Attr>("name = \"new_name");
         assert_eq!("lex error", result.err().unwrap().to_string());
     }
 
@@ -161,7 +188,7 @@ mod tests {
 
     #[test]
     fn not_expr() {
-        let result = syn::parse_str::<Attr>("rename = =");
+        let result = syn::parse_str::<Attr>("name = =");
         assert!(result
             .err()
             .unwrap()
