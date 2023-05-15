@@ -92,11 +92,16 @@ impl FieldAttrs {
     fn to_tokenstream(&self) -> Result<proc_macro2::TokenStream, Error> {
         match (self.name(), &self.index) {
             // no name and index => Err
-            (None, Some(index)) => Err(Error::new_spanned(index, "Index-Field has no name")),
+            (None, Some(_index)) => Err(Error::new_spanned(
+                self.field.clone(),
+                r#"The field has no name. Please add for example: '#[index(name = "id")]'"#,
+            )),
             // name and no index => Err
             (Some(name), None) => Err(Error::new_spanned(
-                name.clone(),
-                format!("Field: {name} must have an Index-Type"),
+                self.field.clone(),
+                format!(
+                    r#"Field: '{name}' must have an Index-Type. Please add for example: '#[index(fast_forward::index::uint::UIntIndex)]'"#
+                ),
             )),
             // no name and no index => OK
             (None, None) => Ok(proc_macro2::TokenStream::new()),
@@ -237,7 +242,7 @@ mod tests {
         assert!(token.is_err());
         assert_eq!(
             token.err().unwrap().to_string(),
-            "Field: id must have an Index-Type"
+            r#"Field: 'id' must have an Index-Type. Please add for example: '#[index(fast_forward::index::uint::UIntIndex)]'"#
         );
     }
 
@@ -248,7 +253,7 @@ mod tests {
         assert!(token.is_err());
         assert_eq!(
             token.err().unwrap().to_string(),
-            "Field: pk must have an Index-Type"
+            r#"Field: 'pk' must have an Index-Type. Please add for example: '#[index(fast_forward::index::uint::UIntIndex)]'"#
         );
     }
 }
