@@ -118,7 +118,7 @@ pub trait Store<K>: Default {
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
 
-    fn filter<'a>(&'a self) -> Self::Filter<'a>;
+    fn filter(&self) -> Self::Filter<'_>;
 }
 
 pub trait Equals<K> {

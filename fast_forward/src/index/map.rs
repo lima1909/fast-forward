@@ -63,7 +63,7 @@ where
         MapIndex(HashMap::with_capacity(capacity))
     }
 
-    fn filter<'a>(&'a self) -> Self::Filter<'a> {
+    fn filter(&self) -> Self::Filter<'_> {
         Filter { store: self }
     }
 }

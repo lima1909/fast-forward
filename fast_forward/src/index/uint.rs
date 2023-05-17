@@ -103,7 +103,7 @@ where
         }
     }
 
-    fn filter<'a>(&'a self) -> Self::Filter<'a> {
+    fn filter(&self) -> Self::Filter<'_> {
         Filter { store: self }
     }
 }
