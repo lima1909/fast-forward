@@ -32,6 +32,10 @@ use std::borrow::Cow;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store<K>: Default {
+    type Filter<'a>
+    where
+        Self: 'a;
+
     /// Insert an `Key` for a given `Index`.
     ///
     /// Before:
@@ -113,6 +117,8 @@ pub trait Store<K>: Default {
 
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
+
+    fn filter<'a>(&'a self) -> Self::Filter<'a>;
 }
 
 pub trait Equals<K> {

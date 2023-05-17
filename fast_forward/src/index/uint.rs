@@ -60,6 +60,8 @@ impl<K> Store<K> for UIntIndex<K>
 where
     K: Default + Into<usize>,
 {
+    type Filter<'a> = Filter<'a, K> where K:'a;
+
     fn insert(&mut self, k: K, i: usize) {
         let k = k.into();
 
@@ -98,6 +100,27 @@ where
             data: Vec::with_capacity(capacity),
             min_max_cache: MinMax::default(),
             _key: PhantomData,
+        }
+    }
+
+    fn filter<'a>(&'a self) -> Self::Filter<'a> {
+        Filter { store: self }
+    }
+}
+
+pub struct Filter<'a, K: Default> {
+    store: &'a UIntIndex<K>,
+}
+
+impl<'a, K> Equals<K> for Filter<'a, K>
+where
+    K: Default + Into<usize>,
+{
+    #[inline]
+    fn eq(&self, key: K) -> Cow<[usize]> {
+        match &self.store.data.get(key.into()) {
+            Some(Some(idx)) => idx.get(),
+            _ => Cow::Borrowed(EMPTY_IDXS),
         }
     }
 }

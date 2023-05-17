@@ -40,6 +40,8 @@ impl<K> Store<K> for MapIndex<K>
 where
     K: Default + Eq + Hash,
 {
+    type Filter<'a> = Filter<'a, K> where K:'a;
+
     fn insert(&mut self, key: K, i: usize) {
         match self.0.get_mut(&key) {
             Some(v) => v.add(i),
@@ -59,6 +61,27 @@ where
 
     fn with_capacity(capacity: usize) -> Self {
         MapIndex(HashMap::with_capacity(capacity))
+    }
+
+    fn filter<'a>(&'a self) -> Self::Filter<'a> {
+        Filter { store: self }
+    }
+}
+
+pub struct Filter<'a, K: Default> {
+    store: &'a MapIndex<K>,
+}
+
+impl<'a, K> Equals<&K> for Filter<'a, K>
+where
+    K: Default + Eq + Hash,
+{
+    #[inline]
+    fn eq(&self, key: &K) -> Cow<[usize]> {
+        match self.store.0.get(key) {
+            Some(i) => i.get(),
+            None => Cow::Borrowed(EMPTY_IDXS),
+        }
     }
 }
 
