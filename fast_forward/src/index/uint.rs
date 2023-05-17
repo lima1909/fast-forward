@@ -32,6 +32,7 @@
 //! ```
 use crate::{
     index::{Index, Store},
+    list::{FilterIter, ListFilter},
     EMPTY_IDXS,
 };
 use std::{borrow::Cow, marker::PhantomData};
@@ -60,7 +61,7 @@ impl<K> Store<K> for UIntIndex<K>
 where
     K: Default + Into<usize>,
 {
-    type Filter<'a> = Filter<'a, K> where K:'a;
+    type Filter<'a, I> = Filter<'a, K, I> where K:'a, I:'a;
 
     fn insert(&mut self, k: K, i: usize) {
         let k = k.into();
@@ -103,16 +104,17 @@ where
         }
     }
 
-    fn filter(&self) -> Self::Filter<'_> {
-        Filter { store: self }
+    fn filter<'a, I>(&'a self, list: &'a dyn ListFilter<Item = I>) -> Self::Filter<'a, I> {
+        Filter { store: self, list }
     }
 }
 
-pub struct Filter<'a, K: Default> {
+pub struct Filter<'a, K: Default, I> {
     store: &'a UIntIndex<K>,
+    list: &'a dyn ListFilter<Item = I>,
 }
 
-impl<'a, K> Equals<K> for Filter<'a, K>
+impl<'a, K, I> Equals<K> for Filter<'a, K, I>
 where
     K: Default + Into<usize>,
 {
@@ -122,6 +124,15 @@ where
             Some(Some(idx)) => idx.get(),
             _ => Cow::Borrowed(EMPTY_IDXS),
         }
+    }
+}
+
+impl<'a, K, I> Filter<'a, K, I>
+where
+    K: Default + Into<usize>,
+{
+    pub fn get(&'a self, key: K) -> FilterIter<'a, I> {
+        self.list.filter(self.eq(key))
     }
 }
 

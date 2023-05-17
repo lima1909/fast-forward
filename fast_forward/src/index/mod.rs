@@ -27,14 +27,15 @@
 pub mod map;
 pub mod uint;
 
-use crate::EMPTY_IDXS;
+use crate::{list::ListFilter, EMPTY_IDXS};
 use std::borrow::Cow;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store<K>: Default {
-    type Filter<'a>
+    type Filter<'a, I>
     where
-        Self: 'a;
+        Self: 'a,
+        I: 'a;
 
     /// Insert an `Key` for a given `Index`.
     ///
@@ -118,7 +119,8 @@ pub trait Store<K>: Default {
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
 
-    fn filter(&self) -> Self::Filter<'_>;
+    /// Create a new (Filter) instance, to provide Store specific read operations.
+    fn filter<'a, I>(&'a self, list: &'a dyn ListFilter<Item = I>) -> Self::Filter<'a, I>;
 }
 
 pub trait Equals<K> {

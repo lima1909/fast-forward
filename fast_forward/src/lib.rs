@@ -140,6 +140,8 @@ macro_rules! fast {
             ///
             #[allow(dead_code)]
             fn filter<'i>(&'i self, filter: std::borrow::Cow<'i, [usize]>) -> $crate::list::FilterIter<'i, $item> {
+                use $crate::list::ListFilter;
+
                 self._items_.filter(filter)
             }
 
@@ -148,6 +150,14 @@ macro_rules! fast {
                 self._items_.iter()
             }
 
+            // Create and get a Filter for the Store
+            // $(
+            // fn $store(&self) -> <$store_type as $crate::index::Store<usize>>::Filter<'_, $item> {
+
+            //     // self.$store.filter(&self._items_)
+            //     todo!()
+            // }
+            // )+
         }
 
 
@@ -168,6 +178,12 @@ mod tests {
 
     #[derive(Debug, Eq, PartialEq)]
     struct Car(usize, String);
+
+    // fn foo<'a>() -> <UIntIndex as Store<usize>>::Filter<'a, Car> {
+    //     let cars = fast!(Cars on Car {id: UIntIndex => 0});
+    //     // let _x: <UIntIndex as Store<_>>::Filter<'_, Car> =
+    //     cars.id.filter(&crate::list::List::<Car>::default())
+    // }
 
     #[test]
     fn one_indexed_list_delete_item() {

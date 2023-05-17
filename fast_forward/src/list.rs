@@ -43,6 +43,13 @@ impl<T> List<T> {
         }
     }
 
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+            deleted_pos: Vec::new(),
+        }
+    }
+
     /// The Item in the list will not be delteted. It will be marked as deleted.
     ///
     /// # Panics
@@ -88,12 +95,22 @@ impl<T> List<T> {
         self.items.len()
     }
 
-    pub const fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, T> {
-        FilterIter::new(filter, self)
-    }
-
     pub const fn iter(&self) -> Iter<'_, T> {
         Iter::new(self)
+    }
+}
+
+pub trait ListFilter {
+    type Item;
+
+    fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, Self::Item>;
+}
+
+impl<T> ListFilter for List<T> {
+    type Item = T;
+
+    fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, Self::Item> {
+        FilterIter::new(filter, self)
     }
 }
 
@@ -108,7 +125,7 @@ impl<T> Default for List<T> {
 
 impl<T> From<Vec<T>> for List<T> {
     fn from(v: Vec<T>) -> Self {
-        let mut l = List::default();
+        let mut l = List::with_capacity(v.len());
         for i in v {
             l.insert(i, |_, _| {});
         }
