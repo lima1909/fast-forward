@@ -57,10 +57,11 @@ impl UIntIndex<usize> {
     }
 }
 
-impl<K> Store<K> for UIntIndex<K>
+impl<K> Store for UIntIndex<K>
 where
     K: Default + Into<usize>,
 {
+    type Key = K;
     type Filter<'a, I> = Filter<'a, K, I> where K:'a, I:'a;
 
     fn insert(&mut self, k: K, i: usize) {
@@ -104,14 +105,17 @@ where
         }
     }
 
-    fn filter<'a, I>(&'a self, list: &'a dyn ListFilter<Item = I>) -> Self::Filter<'a, I> {
-        Filter { store: self, list }
+    fn create_filter<'a, I>(&'a self, list: &'a dyn ListFilter<Item = I>) -> Self::Filter<'a, I> {
+        Filter {
+            store: self,
+            items: list,
+        }
     }
 }
 
 pub struct Filter<'a, K: Default, I> {
     store: &'a UIntIndex<K>,
-    list: &'a dyn ListFilter<Item = I>,
+    items: &'a dyn ListFilter<Item = I>,
 }
 
 impl<'a, K, I> Equals<K> for Filter<'a, K, I>
@@ -132,7 +136,7 @@ where
     K: Default + Into<usize>,
 {
     pub fn get(&'a self, key: K) -> FilterIter<'a, I> {
-        self.list.filter(self.eq(key))
+        self.items.filter(self.eq(key))
     }
 }
 

@@ -150,14 +150,15 @@ macro_rules! fast {
                 self._items_.iter()
             }
 
-            // Create and get a Filter for the Store
-            // $(
-            // fn $store(&self) -> <$store_type as $crate::index::Store<usize>>::Filter<'_, $item> {
+            $(
+                /// Create and get a Filter for the Store
+                #[allow(dead_code)]
+                fn $store(&self) -> <$store_type as $crate::index::Store>::Filter<'_, $item> {
+                    use $crate::index::Store;
 
-            //     // self.$store.filter(&self._items_)
-            //     todo!()
-            // }
-            // )+
+                    self.$store.create_filter(&self._items_)
+                }
+            )+
         }
 
 
@@ -176,14 +177,25 @@ mod tests {
         query::query,
     };
 
-    #[derive(Debug, Eq, PartialEq)]
+    #[derive(Debug, Eq, PartialEq, Clone)]
     struct Car(usize, String);
 
-    // fn foo<'a>() -> <UIntIndex as Store<usize>>::Filter<'a, Car> {
-    //     let cars = fast!(Cars on Car {id: UIntIndex => 0});
-    //     // let _x: <UIntIndex as Store<_>>::Filter<'_, Car> =
-    //     cars.id.filter(&crate::list::List::<Car>::default())
-    // }
+    #[test]
+    fn one_indexed_list_filter() {
+        let mut cars = fast!(Cars on Car {id: UIntIndex => 0});
+        cars.insert(Car(2, "BMW".into()));
+        cars.insert(Car(5, "Audi".into()));
+        cars.insert(Car(2, "VW".into()));
+        cars.insert(Car(99, "Porsche".into()));
+
+        let id_filter = cars.id();
+        let r = id_filter.get(2).collect::<Vec<_>>();
+        assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
+
+        let mut it = id_filter.get(5);
+        assert_eq!(it.next(), Some(&Car(5, "Audi".into())));
+        assert_eq!(it.next(), None);
+    }
 
     #[test]
     fn one_indexed_list_delete_item() {

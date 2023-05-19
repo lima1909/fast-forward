@@ -37,10 +37,11 @@ use std::{borrow::Cow, collections::HashMap, fmt::Debug, hash::Hash};
 #[derive(Debug, Default)]
 pub struct MapIndex<K: Default = String>(HashMap<K, Index>);
 
-impl<K> Store<K> for MapIndex<K>
+impl<K> Store for MapIndex<K>
 where
     K: Default + Eq + Hash,
 {
+    type Key = K;
     type Filter<'a, I> = Filter<'a, K, I> where K:'a, I:'a;
 
     fn insert(&mut self, key: K, i: usize) {
@@ -64,14 +65,17 @@ where
         MapIndex(HashMap::with_capacity(capacity))
     }
 
-    fn filter<'a, I>(&'a self, list: &'a dyn ListFilter<Item = I>) -> Self::Filter<'a, I> {
-        Filter { store: self, list }
+    fn create_filter<'a, I>(&'a self, list: &'a dyn ListFilter<Item = I>) -> Self::Filter<'a, I> {
+        Filter {
+            store: self,
+            items: list,
+        }
     }
 }
 
 pub struct Filter<'a, K: Default, I> {
     store: &'a MapIndex<K>,
-    list: &'a dyn ListFilter<Item = I>,
+    items: &'a dyn ListFilter<Item = I>,
 }
 
 impl<'a, K, I> Equals<&K> for Filter<'a, K, I>
@@ -92,7 +96,7 @@ where
     K: Default + Eq + Hash,
 {
     pub fn get(&'a self, key: K) -> FilterIter<'a, I> {
-        self.list.filter(self.eq(&key))
+        self.items.filter(self.eq(&key))
     }
 }
 

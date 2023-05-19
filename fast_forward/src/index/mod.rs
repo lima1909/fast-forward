@@ -31,7 +31,8 @@ use crate::{list::ListFilter, EMPTY_IDXS};
 use std::borrow::Cow;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
-pub trait Store<K>: Default {
+pub trait Store: Default {
+    type Key;
     type Filter<'a, I>
     where
         Self: 'a,
@@ -54,7 +55,7 @@ pub trait Store<K>: Default {
     /// After:
     ///     Female | 2,3,4
     ///
-    fn insert(&mut self, key: K, idx: usize);
+    fn insert(&mut self, key: Self::Key, idx: usize);
 
     /// Update means: `Key` changed, but `Index` stays the same
     ///
@@ -82,7 +83,7 @@ pub trait Store<K>: Default {
     /// `Update: (Male, 2, Female)`
     /// After:
     ///     Female | 2,3,4
-    fn update(&mut self, old_key: K, idx: usize, new_key: K) {
+    fn update(&mut self, old_key: Self::Key, idx: usize, new_key: Self::Key) {
         self.delete(old_key, idx);
         self.insert(new_key, idx);
     }
@@ -114,13 +115,13 @@ pub trait Store<K>: Default {
     /// After:
     ///     Female | 3,4
     ///
-    fn delete(&mut self, key: K, idx: usize);
+    fn delete(&mut self, key: Self::Key, idx: usize);
 
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
 
     /// Create a new (Filter) instance, to provide Store specific read operations.
-    fn filter<'a, I>(&'a self, list: &'a dyn ListFilter<Item = I>) -> Self::Filter<'a, I>;
+    fn create_filter<'a, I>(&'a self, list: &'a dyn ListFilter<Item = I>) -> Self::Filter<'a, I>;
 }
 
 pub trait Equals<K> {
