@@ -24,12 +24,70 @@
 //!
 //! To Find the `Key`: "Jon" with the `operation equals` is only one step necessary.
 //!
+
+use std::borrow::Cow;
+
 pub mod index;
 pub mod list;
 pub mod query;
 
 /// Empty array of `Idx`
 pub const EMPTY_IDXS: &[usize] = &[];
+
+/// `Filterable` means, that you get an `Iterator` over all `Items` which exists for a given list of indices.
+pub trait Filterable {
+    type Item;
+
+    /// Returns `Some(Item)` from the given index (position) if it exist, otherwise `None`
+    fn item(&self, index: usize) -> Option<&Self::Item>;
+
+    /// Returns a `Iterator` over all `Items` with the given index list.
+    fn filter<'i>(&'i self, indices: Cow<'i, [usize]>) -> Filter<'i, Self>
+    where
+        Self: Sized,
+    {
+        Filter::new(self, indices)
+    }
+}
+
+pub struct Filter<'i, F: Filterable> {
+    pos: usize,
+    list: &'i F,
+    indices: Cow<'i, [usize]>,
+}
+
+impl<'i, F> Filter<'i, F>
+where
+    F: Filterable,
+{
+    pub const fn new(list: &'i F, indices: Cow<'i, [usize]>) -> Self {
+        Self {
+            pos: 0,
+            list,
+            indices,
+        }
+    }
+}
+
+impl<'i, F> Iterator for Filter<'i, F>
+where
+    F: Filterable,
+{
+    type Item = &'i F::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.pos < self.indices.len() {
+            let idx = self.indices[self.pos];
+            self.pos += 1;
+            match self.list.item(idx) {
+                Some(item) => return Some(item),
+                // ignore deleted items
+                None => continue,
+            }
+        }
+        None
+    }
+}
 
 /// This `macro` is not a solution, it is more an POC (proof of concept)!
 /// The Problem with this macro is the visibility. This means, it can not hide internal fields,
@@ -139,8 +197,8 @@ macro_rules! fast {
             /// Panics if the positions are out of bound.
             ///
             #[allow(dead_code)]
-            fn filter<'i>(&'i self, filter: std::borrow::Cow<'i, [usize]>) -> $crate::list::FilterIter<'i, $item> {
-                use $crate::list::ListFilter;
+            fn filter<'i>(&'i self, filter: std::borrow::Cow<'i, [usize]>) -> $crate::Filter<'i, $crate::list::List<$item>> {
+                use $crate::Filterable;
 
                 self._items_.filter(filter)
             }
@@ -153,7 +211,7 @@ macro_rules! fast {
             $(
                 /// Create and get a Filter for the Store
                 #[allow(dead_code)]
-                fn $store(&self) -> <$store_type as $crate::index::Store>::Filter<'_, $item> {
+                fn $store(&self) -> <$store_type as $crate::index::Store>::Filter<'_, $item, $crate::list::List<$item>> {
                     use $crate::index::Store;
 
                     self.$store.create_filter(&self._items_)

@@ -1,4 +1,5 @@
-use std::{borrow::Cow, ops::Index};
+use crate::Filterable;
+use std::ops::Index;
 
 #[derive(Debug, Clone)]
 pub struct List<T> {
@@ -71,15 +72,6 @@ impl<T> List<T> {
         self.deleted_pos.contains(&pos)
     }
 
-    /// Get the Item on the given position in the List. If the Item was deleted, the return `get` -> `None`
-    pub fn get(&self, pos: usize) -> Option<&T> {
-        let item = self.items.get(pos)?;
-        if self.is_deleted(pos) {
-            return None;
-        }
-        Some(item)
-    }
-
     /// The number of not deleted Items in the List.
     pub fn count(&self) -> usize {
         self.items.len() - self.deleted_pos.len()
@@ -100,17 +92,15 @@ impl<T> List<T> {
     }
 }
 
-pub trait ListFilter {
-    type Item;
-
-    fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, Self::Item>;
-}
-
-impl<T> ListFilter for List<T> {
+impl<T> Filterable for List<T> {
     type Item = T;
 
-    fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, Self::Item> {
-        FilterIter::new(filter, self)
+    /// Get the Item on the given position in the List. If the Item was deleted, the return is `None`
+    fn item(&self, index: usize) -> Option<&Self::Item> {
+        if self.is_deleted(index) {
+            return None;
+        }
+        self.items.get(index)
     }
 }
 
@@ -159,7 +149,7 @@ impl<'i, T> Iterator for Iter<'i, T> {
     type Item = &'i T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.list.get(self.pos) {
+        match self.list.item(self.pos) {
             Some(item) => {
                 self.pos += 1;
                 Some(item)
@@ -174,7 +164,7 @@ impl<'i, T> Iterator for Iter<'i, T> {
                     continue;
                 }
 
-                let ret = self.list.get(self.pos);
+                let ret = self.list.item(self.pos);
                 self.pos += 1;
                 return ret;
             },
@@ -182,41 +172,10 @@ impl<'i, T> Iterator for Iter<'i, T> {
     }
 }
 
-pub struct FilterIter<'i, T> {
-    pos: usize,
-    filter: Cow<'i, [usize]>,
-    list: &'i List<T>,
-}
-
-impl<'i, T> FilterIter<'i, T> {
-    pub const fn new(filter: Cow<'i, [usize]>, list: &'i List<T>) -> Self {
-        Self {
-            pos: 0,
-            filter,
-            list,
-        }
-    }
-}
-
-impl<'i, T> Iterator for FilterIter<'i, T> {
-    type Item = &'i T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while self.pos < self.filter.len() {
-            let idx = self.filter[self.pos];
-            self.pos += 1;
-            if self.list.is_deleted(idx) {
-                continue;
-            }
-            return Some(&self.list[idx]);
-        }
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::borrow::Cow;
 
     #[test]
     fn insert() {
@@ -279,7 +238,7 @@ mod tests {
         assert_eq!(3, l.count());
 
         assert_eq!(Some(&1), l.iter().next());
-        assert_eq!(Some(&2), l.get(1));
+        assert_eq!(Some(&2), l.item(1));
         assert_eq!(3, l[2]); // get with Index
     }
 

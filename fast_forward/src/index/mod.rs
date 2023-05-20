@@ -27,16 +27,17 @@
 pub mod map;
 pub mod uint;
 
-use crate::{list::ListFilter, EMPTY_IDXS};
+use crate::{Filterable, EMPTY_IDXS};
 use std::borrow::Cow;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Default {
     type Key;
-    type Filter<'a, I>
+    type Filter<'a, I, F>
     where
         Self: 'a,
-        I: 'a;
+        I: 'a,
+        F: Filterable<Item = I> + 'a;
 
     /// Insert an `Key` for a given `Index`.
     ///
@@ -121,7 +122,10 @@ pub trait Store: Default {
     fn with_capacity(capacity: usize) -> Self;
 
     /// Create a new (Filter) instance, to provide Store specific read operations.
-    fn create_filter<'a, I>(&'a self, list: &'a dyn ListFilter<Item = I>) -> Self::Filter<'a, I>;
+    fn create_filter<'a, I, F>(&'a self, list: &'a F) -> Self::Filter<'a, I, F>
+    where
+        I: 'a,
+        F: Filterable<Item = I> + 'a;
 }
 
 pub trait Equals<K> {
@@ -217,13 +221,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pos_unique() {
+    fn index_unique() {
         let u = Index::new(0);
         assert_eq!([0], *u.get());
     }
 
     #[test]
-    fn pos_multi() {
+    fn index_multi() {
         let mut m = Index::new(2);
         assert_eq!([2], *m.get());
 
@@ -232,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn pos_multi_duplicate() {
+    fn index_multi_duplicate() {
         let mut m = Index::new(1);
         assert_eq!([1], *m.get());
 
@@ -242,7 +246,7 @@ mod tests {
     }
 
     #[test]
-    fn pos_multi_ordered() {
+    fn index_multi_ordered() {
         let mut m = Index::new(5);
         assert_eq!([5], *m.get());
 
@@ -254,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn pos_container_multi() {
+    fn index_container_multi() {
         let mut lhs = Index::new(5);
         lhs.add(3);
         lhs.add(2);
@@ -268,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn pos_container_unique() {
+    fn index_container_unique() {
         let mut lhs = Index::new(5);
 
         let rhs = Index::new(5);
@@ -279,7 +283,7 @@ mod tests {
     }
 
     #[test]
-    fn pos_remove() {
+    fn index_remove() {
         let mut pos = Index::new(5);
         assert_eq!([5], *pos.get());
 

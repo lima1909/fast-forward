@@ -32,8 +32,7 @@
 //! ```
 use crate::{
     index::{Index, Store},
-    list::{FilterIter, ListFilter},
-    EMPTY_IDXS,
+    Filter, Filterable, EMPTY_IDXS,
 };
 use std::{borrow::Cow, marker::PhantomData};
 
@@ -62,7 +61,7 @@ where
     K: Default + Into<usize>,
 {
     type Key = K;
-    type Filter<'a, I> = Filter<'a, K, I> where K:'a, I:'a;
+    type Filter<'a, I, F> = UIntFilter<'a, K, I,F> where K:'a, I:'a, F: Filterable<Item = I>+'a;
 
     fn insert(&mut self, k: K, i: usize) {
         let k = k.into();
@@ -105,22 +104,27 @@ where
         }
     }
 
-    fn create_filter<'a, I>(&'a self, list: &'a dyn ListFilter<Item = I>) -> Self::Filter<'a, I> {
-        Filter {
-            store: self,
-            items: list,
-        }
+    fn create_filter<'a, I, F>(&'a self, list: &'a F) -> Self::Filter<'a, I, F>
+    where
+        I: 'a,
+        F: Filterable<Item = I> + 'a,
+    {
+        UIntFilter { store: self, list }
     }
 }
 
-pub struct Filter<'a, K: Default, I> {
+pub struct UIntFilter<'a, K: Default, I, F>
+where
+    F: Filterable<Item = I>,
+{
     store: &'a UIntIndex<K>,
-    items: &'a dyn ListFilter<Item = I>,
+    list: &'a F,
 }
 
-impl<'a, K, I> Equals<K> for Filter<'a, K, I>
+impl<'a, K, I, F> Equals<K> for UIntFilter<'a, K, I, F>
 where
     K: Default + Into<usize>,
+    F: Filterable<Item = I>,
 {
     #[inline]
     fn eq(&self, key: K) -> Cow<[usize]> {
@@ -131,12 +135,13 @@ where
     }
 }
 
-impl<'a, K, I> Filter<'a, K, I>
+impl<'a, K, I, F> UIntFilter<'a, K, I, F>
 where
     K: Default + Into<usize>,
+    F: Filterable<Item = I>,
 {
-    pub fn get(&'a self, key: K) -> FilterIter<'a, I> {
-        self.items.filter(self.eq(key))
+    pub fn get(&'a self, key: K) -> Filter<'a, F> {
+        self.list.filter(self.eq(key))
     }
 }
 
