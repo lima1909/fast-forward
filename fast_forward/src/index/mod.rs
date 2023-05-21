@@ -27,7 +27,7 @@
 pub mod map;
 pub mod uint;
 
-use crate::{Filterable, EMPTY_IDXS};
+use crate::{Filter, Filterable, EMPTY_IDXS};
 use std::borrow::Cow;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
@@ -126,6 +126,17 @@ pub trait Store: Default {
     where
         I: 'a,
         F: Filterable<Item = I> + 'a;
+}
+
+pub trait Select {
+    type Filter<'f>
+    where
+        Self: 'f;
+
+    fn filter<'s, I, P>(&'s self, items: &'s I, predicate: P) -> Filter<'s, I>
+    where
+        I: Filterable,
+        P: Fn(<Self as Select>::Filter<'s>) -> Cow<'s, [usize]>;
 }
 
 pub trait Equals<K> {

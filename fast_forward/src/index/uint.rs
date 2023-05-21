@@ -36,7 +36,7 @@ use crate::{
 };
 use std::{borrow::Cow, marker::PhantomData};
 
-use super::{Equals, MinMax};
+use super::{Equals, MinMax, Select};
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
@@ -110,6 +110,34 @@ where
         F: Filterable<Item = I> + 'a,
     {
         UIntFilter { store: self, list }
+    }
+}
+
+pub struct NewFilter<'s, K: Default + 's>(&'s UIntIndex<K>);
+
+impl<'s, K> NewFilter<'s, K>
+where
+    K: Default + Into<usize> + 's,
+{
+    pub fn eq(&self, key: K) -> Cow<'s, [usize]> {
+        self.0.eq(key)
+    }
+}
+
+impl<K> Select for UIntIndex<K>
+where
+    K: Default + Into<usize>,
+{
+    type Filter<'f> = NewFilter<'f, K> where K:'f;
+
+    fn filter<'s, I, P>(&'s self, items: &'s I, predicate: P) -> Filter<'s, I>
+    where
+        I: Filterable,
+        K: 's,
+        P: Fn(<Self as Select>::Filter<'s>) -> Cow<'s, [usize]>,
+    {
+        let idxs = predicate(NewFilter(self));
+        items.filter(idxs)
     }
 }
 
@@ -195,6 +223,34 @@ where
 mod tests {
     use super::*;
     use crate::query::query;
+
+    impl<T> Filterable for Vec<T> {
+        type Item = T;
+
+        fn item(&self, index: usize) -> Option<&Self::Item> {
+            self.get(index)
+        }
+    }
+
+    #[test]
+    fn select() {
+        let mut i = UIntIndex::new();
+        i.insert(2, 4);
+
+        let items = vec!["a", "b", "c", "d", "e", "f"];
+        let mut it = i.filter(&items, |f| f.eq(2));
+        assert_eq!(it.next(), Some(&"e"));
+        assert_eq!(it.next(), None);
+
+        i.insert(1, 3);
+        let mut it = i.filter(&items, |f| query(f.eq(2)).or(f.eq(1)).exec());
+        assert_eq!(it.next(), Some(&"d"));
+        assert_eq!(it.next(), Some(&"e"));
+        assert_eq!(it.next(), None);
+
+        // let mut it = i.select(&items, |f| f.min());
+        // assert_eq!(it.next(), Some(&"b"));
+    }
 
     mod unique {
         use super::*;
