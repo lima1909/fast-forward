@@ -129,6 +129,12 @@ pub trait Store: Default {
 }
 
 pub trait Select {
+    type Selector<'f>
+    where
+        Self: 'f;
+
+    fn select(&self) -> Self::Selector<'_>;
+
     type Filter<'f>
     where
         Self: 'f;

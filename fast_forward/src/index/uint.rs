@@ -124,10 +124,33 @@ where
     }
 }
 
+pub struct NewSelector<'s, K: Default + 's>(&'s UIntIndex<K>);
+
+impl<'s, K> NewSelector<'s, K>
+where
+    K: Default + 's,
+{
+    /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
+    pub fn min(&self) -> usize {
+        self.0.min_max_cache.min
+    }
+
+    /// Filter for get the highest (`max`) `Key` which is stored in `UIntIndex`.
+    pub fn max(&self) -> usize {
+        self.0.min_max_cache.max
+    }
+}
+
 impl<K> Select for UIntIndex<K>
 where
     K: Default + Into<usize>,
 {
+    type Selector<'f> = NewSelector<'f, K> where K:'f;
+
+    fn select(&self) -> Self::Selector<'_> {
+        NewSelector(self)
+    }
+
     type Filter<'f> = NewFilter<'f, K> where K:'f;
 
     fn filter<'s, I, P>(&'s self, items: &'s I, predicate: P) -> Iter<'s, I>
@@ -212,9 +235,10 @@ where
 
     /// Find `max` key. _Importand_ if the max value was removed, to find the new valid `max Key`.
     fn _find_max(&self) -> usize {
-        match self.data.last() {
-            Some(Some(_)) => self.data.len() - 1,
-            _ => 0,
+        if self.data.is_empty() {
+            0
+        } else {
+            self.data.len() - 1
         }
     }
 }
@@ -233,7 +257,7 @@ mod tests {
     }
 
     #[test]
-    fn select() {
+    fn filter() {
         let mut i = UIntIndex::new();
         i.insert(2, 4);
 
@@ -249,9 +273,19 @@ mod tests {
         assert_eq!(it.next(), Some(&"e"));
         assert_eq!(it.next(), None);
         assert_eq!(2, it.len());
+    }
 
-        // let mut it = i.select(&items, |f| f.min());
-        // assert_eq!(it.next(), Some(&"b"));
+    #[test]
+    fn select() {
+        let mut i = UIntIndex::new();
+        i.insert(2, 4);
+
+        assert_eq!(2, i.select().min());
+        assert_eq!(2, i.select().max());
+
+        i.insert(1, 3);
+        assert_eq!(1, i.select().min());
+        assert_eq!(2, i.select().max());
     }
 
     mod unique {
