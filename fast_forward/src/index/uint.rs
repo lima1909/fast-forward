@@ -36,7 +36,7 @@ use crate::{
 };
 use std::{borrow::Cow, marker::PhantomData};
 
-use super::{Equals, MinMax, Select};
+use super::{Equals, MinMax, Retrieve};
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
@@ -124,9 +124,9 @@ where
     }
 }
 
-pub struct NewSelector<'s, K: Default + 's>(&'s UIntIndex<K>);
+pub struct NewMeta<'s, K: Default + 's>(&'s UIntIndex<K>);
 
-impl<'s, K> NewSelector<'s, K>
+impl<'s, K> NewMeta<'s, K>
 where
     K: Default + 's,
 {
@@ -141,26 +141,23 @@ where
     }
 }
 
-impl<K> Select for UIntIndex<K>
+impl<K> Retrieve for UIntIndex<K>
 where
     K: Default + Into<usize>,
 {
-    type Selector<'f> = NewSelector<'f, K> where K:'f;
+    type Meta<'f> = NewMeta<'f, K> where K:'f;
 
-    fn select(&self) -> Self::Selector<'_> {
-        NewSelector(self)
+    fn meta(&self) -> Self::Meta<'_> {
+        NewMeta(self)
     }
 
     type Filter<'f> = NewFilter<'f, K> where K:'f;
 
-    fn filter<'s, I, P>(&'s self, items: &'s I, predicate: P) -> Iter<'s, I>
+    fn filter<'s, P>(&'s self, predicate: P) -> Cow<[usize]>
     where
-        I: ListIndexFilter,
-        K: 's,
-        P: Fn(<Self as Select>::Filter<'s>) -> Cow<'s, [usize]>,
+        P: Fn(<Self as Retrieve>::Filter<'s>) -> Cow<[usize]>,
     {
-        let idxs = predicate(NewFilter(self));
-        items.filter(idxs)
+        predicate(NewFilter(self))
     }
 }
 
@@ -261,31 +258,25 @@ mod tests {
         let mut i = UIntIndex::new();
         i.insert(2, 4);
 
-        let items = vec!["a", "b", "c", "d", "e", "f"];
-        let mut it = i.filter(&items, |f| f.eq(2));
-        assert_eq!(it.next(), Some(&"e"));
-        assert_eq!(it.next(), None);
-        assert_eq!(1, it.len());
+        let r = i.filter(|f| f.eq(2));
+        assert_eq!(*r, [4]);
 
         i.insert(1, 3);
-        let mut it = i.filter(&items, |f| query(f.eq(2)).or(f.eq(1)).exec());
-        assert_eq!(it.next(), Some(&"d"));
-        assert_eq!(it.next(), Some(&"e"));
-        assert_eq!(it.next(), None);
-        assert_eq!(2, it.len());
+        let r = i.filter(|f| query(f.eq(2)).or(f.eq(1)).exec());
+        assert_eq!(*r, [3, 4]);
     }
 
     #[test]
-    fn select() {
+    fn meta() {
         let mut i = UIntIndex::new();
         i.insert(2, 4);
 
-        assert_eq!(2, i.select().min());
-        assert_eq!(2, i.select().max());
+        assert_eq!(2, i.meta().min());
+        assert_eq!(2, i.meta().max());
 
         i.insert(1, 3);
-        assert_eq!(1, i.select().min());
-        assert_eq!(2, i.select().max());
+        assert_eq!(1, i.meta().min());
+        assert_eq!(2, i.meta().max());
     }
 
     mod unique {

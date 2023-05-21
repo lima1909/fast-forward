@@ -27,7 +27,7 @@
 pub mod map;
 pub mod uint;
 
-use crate::{Iter, ListIndexFilter, EMPTY_IDXS};
+use crate::{ListIndexFilter, EMPTY_IDXS};
 use std::borrow::Cow;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
@@ -128,21 +128,20 @@ pub trait Store: Default {
         F: ListIndexFilter<Item = I> + 'a;
 }
 
-pub trait Select {
-    type Selector<'f>
+pub trait Retrieve {
+    type Meta<'f>
     where
         Self: 'f;
 
-    fn select(&self) -> Self::Selector<'_>;
+    fn meta(&self) -> Self::Meta<'_>;
 
     type Filter<'f>
     where
         Self: 'f;
 
-    fn filter<'s, I, P>(&'s self, items: &'s I, predicate: P) -> Iter<'s, I>
+    fn filter<'s, P>(&'s self, predicate: P) -> Cow<[usize]>
     where
-        I: ListIndexFilter,
-        P: Fn(<Self as Select>::Filter<'s>) -> Cow<'s, [usize]>;
+        P: Fn(<Self as Retrieve>::Filter<'s>) -> Cow<[usize]>;
 }
 
 pub trait Equals<K> {
