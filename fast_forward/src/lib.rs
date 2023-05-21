@@ -34,31 +34,31 @@ pub mod query;
 /// Empty array of `Idx`
 pub const EMPTY_IDXS: &[usize] = &[];
 
-/// `Filterable` means, that you get an `Iterator` over all `Items` which exists for a given list of indices.
-pub trait Filterable {
+/// `ListIndexFilter` means, that you get an `Iterator` over all `Items` which exists for a given list of indices.
+pub trait ListIndexFilter {
     type Item;
 
     /// Returns `Some(Item)` from the given index (position) if it exist, otherwise `None`
     fn item(&self, index: usize) -> Option<&Self::Item>;
 
     /// Returns a `Iterator` over all `Items` with the given index list.
-    fn filter<'i>(&'i self, indices: Cow<'i, [usize]>) -> Filter<'i, Self>
+    fn filter<'i>(&'i self, indices: Cow<'i, [usize]>) -> Iter<'i, Self>
     where
         Self: Sized,
     {
-        Filter::new(self, indices)
+        Iter::new(self, indices)
     }
 }
 
-pub struct Filter<'i, F: Filterable> {
+pub struct Iter<'i, F: ListIndexFilter> {
     pos: usize,
     list: &'i F,
     indices: Cow<'i, [usize]>,
 }
 
-impl<'i, F> Filter<'i, F>
+impl<'i, F> Iter<'i, F>
 where
-    F: Filterable,
+    F: ListIndexFilter,
 {
     pub const fn new(list: &'i F, indices: Cow<'i, [usize]>) -> Self {
         Self {
@@ -69,9 +69,9 @@ where
     }
 }
 
-impl<'i, F> Iterator for Filter<'i, F>
+impl<'i, F> Iterator for Iter<'i, F>
 where
-    F: Filterable,
+    F: ListIndexFilter,
 {
     type Item = &'i F::Item;
 
@@ -86,6 +86,18 @@ where
             }
         }
         None
+    }
+}
+
+impl<'i, F> ExactSizeIterator for Iter<'i, F>
+where
+    F: ListIndexFilter,
+{
+    fn len(&self) -> usize {
+        self.indices
+            .iter()
+            .filter(|i| self.list.item(**i).is_some())
+            .count()
     }
 }
 
@@ -197,8 +209,8 @@ macro_rules! fast {
             /// Panics if the positions are out of bound.
             ///
             #[allow(dead_code)]
-            fn filter<'i>(&'i self, filter: std::borrow::Cow<'i, [usize]>) -> $crate::Filter<'i, $crate::list::List<$item>> {
-                use $crate::Filterable;
+            fn filter<'i>(&'i self, filter: std::borrow::Cow<'i, [usize]>) -> $crate::Iter<'i, $crate::list::List<$item>> {
+                use $crate::ListIndexFilter;
 
                 self._items_.filter(filter)
             }

@@ -28,7 +28,7 @@
 //! ```
 use crate::{
     index::{Equals, Index, Store},
-    Filter, Filterable, EMPTY_IDXS,
+    Iter, ListIndexFilter, EMPTY_IDXS,
 };
 use std::{borrow::Cow, collections::HashMap, fmt::Debug, hash::Hash};
 
@@ -41,7 +41,7 @@ where
     K: Default + Eq + Hash,
 {
     type Key = K;
-    type Filter<'a, I, F> = MapFilter<'a, K, I,F> where K:'a, I:'a, F: Filterable<Item = I>+'a;
+    type Filter<'a, I, F> = MapFilter<'a, K, I,F> where K:'a, I:'a, F: ListIndexFilter<Item = I>+'a;
 
     fn insert(&mut self, key: K, i: usize) {
         match self.0.get_mut(&key) {
@@ -67,7 +67,7 @@ where
     fn create_filter<'a, I, F>(&'a self, list: &'a F) -> Self::Filter<'a, I, F>
     where
         I: 'a,
-        F: Filterable<Item = I> + 'a,
+        F: ListIndexFilter<Item = I> + 'a,
     {
         MapFilter { store: self, list }
     }
@@ -75,7 +75,7 @@ where
 
 pub struct MapFilter<'a, K: Default, I, F>
 where
-    F: Filterable<Item = I>,
+    F: ListIndexFilter<Item = I>,
 {
     store: &'a MapIndex<K>,
     list: &'a F,
@@ -84,7 +84,7 @@ where
 impl<'a, K, I, F> Equals<&K> for MapFilter<'a, K, I, F>
 where
     K: Default + Eq + Hash,
-    F: Filterable<Item = I>,
+    F: ListIndexFilter<Item = I>,
 {
     #[inline]
     fn eq(&self, key: &K) -> Cow<[usize]> {
@@ -98,9 +98,9 @@ where
 impl<'a, K, I, F> MapFilter<'a, K, I, F>
 where
     K: Default + Eq + Hash,
-    F: Filterable<Item = I>,
+    F: ListIndexFilter<Item = I>,
 {
-    pub fn get(&'a self, key: K) -> Filter<'a, F> {
+    pub fn get(&'a self, key: K) -> Iter<'a, F> {
         self.list.filter(self.eq(&key))
     }
 }

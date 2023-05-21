@@ -32,7 +32,7 @@
 //! ```
 use crate::{
     index::{Index, Store},
-    Filter, Filterable, EMPTY_IDXS,
+    Iter, ListIndexFilter, EMPTY_IDXS,
 };
 use std::{borrow::Cow, marker::PhantomData};
 
@@ -61,7 +61,7 @@ where
     K: Default + Into<usize>,
 {
     type Key = K;
-    type Filter<'a, I, F> = UIntFilter<'a, K, I,F> where K:'a, I:'a, F: Filterable<Item = I>+'a;
+    type Filter<'a, I, F> = UIntFilter<'a, K, I,F> where K:'a, I:'a, F: ListIndexFilter<Item = I>+'a;
 
     fn insert(&mut self, k: K, i: usize) {
         let k = k.into();
@@ -107,7 +107,7 @@ where
     fn create_filter<'a, I, F>(&'a self, list: &'a F) -> Self::Filter<'a, I, F>
     where
         I: 'a,
-        F: Filterable<Item = I> + 'a,
+        F: ListIndexFilter<Item = I> + 'a,
     {
         UIntFilter { store: self, list }
     }
@@ -130,9 +130,9 @@ where
 {
     type Filter<'f> = NewFilter<'f, K> where K:'f;
 
-    fn filter<'s, I, P>(&'s self, items: &'s I, predicate: P) -> Filter<'s, I>
+    fn filter<'s, I, P>(&'s self, items: &'s I, predicate: P) -> Iter<'s, I>
     where
-        I: Filterable,
+        I: ListIndexFilter,
         K: 's,
         P: Fn(<Self as Select>::Filter<'s>) -> Cow<'s, [usize]>,
     {
@@ -143,7 +143,7 @@ where
 
 pub struct UIntFilter<'a, K: Default, I, F>
 where
-    F: Filterable<Item = I>,
+    F: ListIndexFilter<Item = I>,
 {
     store: &'a UIntIndex<K>,
     list: &'a F,
@@ -152,7 +152,7 @@ where
 impl<'a, K, I, F> Equals<K> for UIntFilter<'a, K, I, F>
 where
     K: Default + Into<usize>,
-    F: Filterable<Item = I>,
+    F: ListIndexFilter<Item = I>,
 {
     #[inline]
     fn eq(&self, key: K) -> Cow<[usize]> {
@@ -166,9 +166,9 @@ where
 impl<'a, K, I, F> UIntFilter<'a, K, I, F>
 where
     K: Default + Into<usize>,
-    F: Filterable<Item = I>,
+    F: ListIndexFilter<Item = I>,
 {
-    pub fn get(&'a self, key: K) -> Filter<'a, F> {
+    pub fn get(&'a self, key: K) -> Iter<'a, F> {
         self.list.filter(self.eq(key))
     }
 }
@@ -224,7 +224,7 @@ mod tests {
     use super::*;
     use crate::query::query;
 
-    impl<T> Filterable for Vec<T> {
+    impl<T> ListIndexFilter for Vec<T> {
         type Item = T;
 
         fn item(&self, index: usize) -> Option<&Self::Item> {
@@ -241,12 +241,14 @@ mod tests {
         let mut it = i.filter(&items, |f| f.eq(2));
         assert_eq!(it.next(), Some(&"e"));
         assert_eq!(it.next(), None);
+        assert_eq!(1, it.len());
 
         i.insert(1, 3);
         let mut it = i.filter(&items, |f| query(f.eq(2)).or(f.eq(1)).exec());
         assert_eq!(it.next(), Some(&"d"));
         assert_eq!(it.next(), Some(&"e"));
         assert_eq!(it.next(), None);
+        assert_eq!(2, it.len());
 
         // let mut it = i.select(&items, |f| f.min());
         // assert_eq!(it.next(), Some(&"b"));

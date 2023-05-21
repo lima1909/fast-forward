@@ -1,4 +1,4 @@
-use crate::Filterable;
+use crate::ListIndexFilter;
 use std::ops::Index;
 
 #[derive(Debug, Clone)]
@@ -92,7 +92,7 @@ impl<T> List<T> {
     }
 }
 
-impl<T> Filterable for List<T> {
+impl<T> ListIndexFilter for List<T> {
     type Item = T;
 
     /// Get the Item on the given position in the List. If the Item was deleted, the return is `None`
