@@ -32,7 +32,7 @@
 //! ```
 use crate::{
     index::{Index, ItemRetriever, MinMax, Retriever, Store},
-    Iter, ListIndexFilter, EMPTY_IDXS,
+    ListIndexFilter, EMPTY_IDXS,
 };
 use std::{borrow::Cow, marker::PhantomData};
 
@@ -101,16 +101,6 @@ where
         }
     }
 
-    type Filter<'a, I, F> = UIntFilter<'a, K, I,F> where K:'a, I:'a, F: ListIndexFilter<Item = I>+'a;
-
-    fn create_filter<'a, I, F>(&'a self, list: &'a F) -> Self::Filter<'a, I, F>
-    where
-        I: 'a,
-        F: ListIndexFilter<Item = I> + 'a,
-    {
-        UIntFilter { store: self, list }
-    }
-
     type Retriever<'a> = UIntIndex<K> where K:'a;
 
     fn retrieve<'a, I, L>(&'a self, items: &'a L) -> ItemRetriever<'a, Self::Retriever<'a>, L>
@@ -128,8 +118,8 @@ impl<'s, K> NewFilter<'s, K>
 where
     K: Default + Into<usize> + Copy + 's,
 {
-    pub fn eq(&self, key: K) -> Cow<'s, [usize]> {
-        self.0.get(&key)
+    pub fn eq(&self, key: &K) -> Cow<'s, [usize]> {
+        self.0.get(key)
     }
 
     pub fn eq_many<I>(&self, keys: I) -> Cow<[usize]>
@@ -139,7 +129,7 @@ where
         self.0.get_many(keys)
     }
 
-    pub fn contains(&self, key: K) -> bool {
+    pub fn contains(&self, key: &K) -> bool {
         self.0.contains(key)
     }
 }
@@ -188,24 +178,6 @@ where
         P: Fn(<Self as Retriever>::Filter<'s>) -> Cow<[usize]>,
     {
         predicate(NewFilter(self))
-    }
-}
-
-pub struct UIntFilter<'a, K: Default, I, F>
-where
-    F: ListIndexFilter<Item = I>,
-{
-    store: &'a UIntIndex<K>,
-    list: &'a F,
-}
-
-impl<'a, K, I, F> UIntFilter<'a, K, I, F>
-where
-    K: Default + Into<usize> + Copy,
-    F: ListIndexFilter<Item = I>,
-{
-    pub fn get(&'a self, key: K) -> Iter<'a, F> {
-        self.list.filter(self.store.get(&key))
     }
 }
 
@@ -264,7 +236,7 @@ mod tests {
 
         let items = vec!["a", "b", "c", "d", "e"];
         let r = i.retrieve(&items);
-        let mut it = r.filter(|f| f.eq(2));
+        let mut it = r.filter(|f| f.eq(&2));
         assert_eq!(Some(&"e"), it.next());
 
         assert_eq!(1, r.meta().min());
@@ -276,11 +248,11 @@ mod tests {
         let mut i = UIntIndex::new();
         i.insert(2, 4);
 
-        let r = i.filter(|f| f.eq(2));
+        let r = i.filter(|f| f.eq(&2));
         assert_eq!(*r, [4]);
 
         i.insert(1, 3);
-        let r = i.filter(|f| query(f.eq(2)).or(f.eq(1)).exec());
+        let r = i.filter(|f| query(f.eq(&2)).or(f.eq(&1)).exec());
         assert_eq!(*r, [3, 4]);
     }
 
@@ -420,8 +392,8 @@ mod tests {
             i.insert(5, 5);
             i.insert(2, 2);
 
-            assert!(i.contains(5));
-            assert!(!i.contains(55));
+            assert!(i.contains(&5));
+            assert!(!i.contains(&55));
         }
 
         #[test]
@@ -578,8 +550,8 @@ mod tests {
             i.insert(2, 2);
             i.insert(2, 1);
 
-            assert!(i.contains(2));
-            assert!(!i.contains(55));
+            assert!(i.contains(&2));
+            assert!(!i.contains(&55));
         }
     }
 }

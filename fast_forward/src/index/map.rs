@@ -28,7 +28,7 @@
 //! ```
 use crate::{
     index::{Index, ItemRetriever, Retriever, Store},
-    Iter, ListIndexFilter, EMPTY_IDXS,
+    ListIndexFilter, EMPTY_IDXS,
 };
 use std::{borrow::Cow, collections::HashMap, fmt::Debug, hash::Hash};
 
@@ -63,16 +63,6 @@ where
         MapIndex(HashMap::with_capacity(capacity))
     }
 
-    type Filter<'a, I, F> = MapFilter<'a, K, I,F> where K:'a, I:'a, F: ListIndexFilter<Item = I>+'a;
-
-    fn create_filter<'a, I, F>(&'a self, list: &'a F) -> Self::Filter<'a, I, F>
-    where
-        I: 'a,
-        F: ListIndexFilter<Item = I> + 'a,
-    {
-        MapFilter { store: self, list }
-    }
-
     type Retriever<'a> = MapIndex<K> where K:'a;
 
     fn retrieve<'a, I, L>(&'a self, items: &'a L) -> ItemRetriever<'a, Self::Retriever<'a>, L>
@@ -84,25 +74,6 @@ where
     }
 }
 
-pub struct MapFilter<'a, K: Default, I, F>
-where
-    F: ListIndexFilter<Item = I>,
-{
-    store: &'a MapIndex<K>,
-    list: &'a F,
-}
-
-impl<'a, K, I, F> MapFilter<'a, K, I, F>
-where
-    K: Default + Eq + Hash,
-    F: ListIndexFilter<Item = I>,
-{
-    pub fn get(&'a self, key: K) -> Iter<'a, F> {
-        self.list.filter(self.store.get(&key))
-    }
-}
-
-// ------------------------
 pub struct NewFilter<'s, K: Default + Eq + Hash + 's>(&'s MapIndex<K>);
 
 pub struct NewMeta<'s, K: Default + Eq + Hash + 's>(&'s MapIndex<K>);
@@ -225,8 +196,8 @@ mod tests {
             idx.insert("Jasmin", 5);
             idx.insert("Mario", 2);
 
-            assert!(idx.contains("Jasmin"));
-            assert!(!idx.contains("Paul"));
+            assert!(idx.contains(&"Jasmin"));
+            assert!(!idx.contains(&"Paul"));
         }
 
         #[test]
@@ -303,8 +274,8 @@ mod tests {
             idx.insert("Jasmin", 5);
             idx.insert("Jasmin", 2);
 
-            assert!(idx.contains("Jasmin"));
-            assert!(!idx.contains("Paul"));
+            assert!(idx.contains(&"Jasmin"));
+            assert!(!idx.contains(&"Paul"));
         }
     }
 }

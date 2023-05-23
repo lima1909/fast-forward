@@ -116,22 +116,11 @@ pub trait Store: Default {
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
 
-    type Filter<'a, I, F>
-    where
-        Self: 'a,
-        I: 'a,
-        F: ListIndexFilter<Item = I> + 'a;
-
-    /// Create a new (Filter) instance, to provide Store specific read operations.
-    fn create_filter<'a, I, F>(&'a self, list: &'a F) -> Self::Filter<'a, I, F>
-    where
-        I: 'a,
-        F: ListIndexFilter<Item = I> + 'a;
-
     type Retriever<'a>
     where
         Self: 'a;
 
+    /// Get instances, to provide Store specific read/select operations.
     fn retrieve<'a, I, L>(&'a self, items: &'a L) -> ItemRetriever<'a, Self::Retriever<'a>, L>
     where
         I: 'a,
@@ -171,8 +160,8 @@ pub trait Retriever {
     }
 
     /// Checks whether the `Key` exists.
-    fn contains(&self, key: Self::Key) -> bool {
-        !self.get(&key).is_empty()
+    fn contains(&self, key: &Self::Key) -> bool {
+        !self.get(key).is_empty()
     }
 
     type Meta<'m>

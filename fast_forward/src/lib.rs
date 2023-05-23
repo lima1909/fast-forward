@@ -223,10 +223,10 @@ macro_rules! fast {
             $(
                 /// Create and get a Filter for the Store
                 #[allow(dead_code)]
-                fn $store(&self) -> <$store_type as $crate::index::Store>::Filter<'_, $item, $crate::list::List<$item>> {
+                fn $store(&self) -> $crate::index::ItemRetriever<'_, <$store_type as $crate::index::Store>::Retriever<'_>, $crate::list::List<$item>> {
                     use $crate::index::Store;
 
-                    self.$store.create_filter(&self._items_)
+                    self.$store.retrieve(&self._items_)
                 }
             )+
         }
@@ -259,12 +259,25 @@ mod tests {
         cars.insert(Car(99, "Porsche".into()));
 
         let id_filter = cars.id();
-        let r = id_filter.get(2).collect::<Vec<_>>();
+
+        assert!(id_filter.contains(2));
+
+        let r = id_filter.get(&2).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
 
-        let mut it = id_filter.get(5);
+        let mut it = id_filter.get(&5);
         assert_eq!(it.next(), Some(&Car(5, "Audi".into())));
         assert_eq!(it.next(), None);
+
+        let mut it = id_filter.filter(|f| f.eq(&5));
+        assert_eq!(it.next(), Some(&Car(5, "Audi".into())));
+        assert_eq!(it.next(), None);
+
+        let mut it = id_filter.get(&1000);
+        assert_eq!(it.next(), None);
+
+        assert_eq!(2, id_filter.meta().min());
+        assert_eq!(99, id_filter.meta().max());
     }
 
     #[test]
