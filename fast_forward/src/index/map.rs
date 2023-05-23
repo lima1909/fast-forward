@@ -27,7 +27,7 @@
 //!
 //! ```
 use crate::{
-    index::{Equals, Index, Store},
+    index::{Equals, Index, ItemRetriever, Retriever, Store},
     Iter, ListIndexFilter, EMPTY_IDXS,
 };
 use std::{borrow::Cow, collections::HashMap, fmt::Debug, hash::Hash};
@@ -41,7 +41,6 @@ where
     K: Default + Eq + Hash,
 {
     type Key = K;
-    type Filter<'a, I, F> = MapFilter<'a, K, I,F> where K:'a, I:'a, F: ListIndexFilter<Item = I>+'a;
 
     fn insert(&mut self, key: K, i: usize) {
         match self.0.get_mut(&key) {
@@ -64,12 +63,24 @@ where
         MapIndex(HashMap::with_capacity(capacity))
     }
 
+    type Filter<'a, I, F> = MapFilter<'a, K, I,F> where K:'a, I:'a, F: ListIndexFilter<Item = I>+'a;
+
     fn create_filter<'a, I, F>(&'a self, list: &'a F) -> Self::Filter<'a, I, F>
     where
         I: 'a,
         F: ListIndexFilter<Item = I> + 'a,
     {
         MapFilter { store: self, list }
+    }
+
+    type Retriever<'a> = MapIndex<K> where K:'a;
+
+    fn retrieve<'a, I, L>(&'a self, items: &'a L) -> ItemRetriever<'a, Self::Retriever<'a>, L>
+    where
+        I: 'a,
+        L: ListIndexFilter<Item = I> + 'a,
+    {
+        ItemRetriever { inner: self, items }
     }
 }
 
@@ -115,6 +126,31 @@ where
             Some(i) => i.get(),
             None => Cow::Borrowed(EMPTY_IDXS),
         }
+    }
+}
+
+// ------------------------
+pub struct NewFilter<'s, K: Default + Eq + Hash + 's>(&'s MapIndex<K>);
+
+pub struct NewMeta<'s, K: Default + Eq + Hash + 's>(&'s MapIndex<K>);
+
+impl<K> Retriever for MapIndex<K>
+where
+    K: Default + Eq + Hash,
+{
+    type Meta<'f> = NewMeta<'f, K> where K:'f;
+
+    fn meta(&self) -> Self::Meta<'_> {
+        NewMeta(self)
+    }
+
+    type Filter<'f> = NewFilter<'f, K> where K:'f;
+
+    fn filter<'s, P>(&'s self, predicate: P) -> Cow<[usize]>
+    where
+        P: Fn(<Self as Retriever>::Filter<'s>) -> Cow<[usize]>,
+    {
+        predicate(NewFilter(self))
     }
 }
 

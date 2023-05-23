@@ -31,12 +31,10 @@
 //! ...  | ...
 //! ```
 use crate::{
-    index::{Index, Store},
+    index::{Equals, Index, ItemRetriever, MinMax, Retriever, Store},
     Iter, ListIndexFilter, EMPTY_IDXS,
 };
 use std::{borrow::Cow, marker::PhantomData};
-
-use super::{Equals, MinMax, Retrieve};
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
@@ -61,7 +59,6 @@ where
     K: Default + Into<usize>,
 {
     type Key = K;
-    type Filter<'a, I, F> = UIntFilter<'a, K, I,F> where K:'a, I:'a, F: ListIndexFilter<Item = I>+'a;
 
     fn insert(&mut self, k: K, i: usize) {
         let k = k.into();
@@ -104,12 +101,24 @@ where
         }
     }
 
+    type Filter<'a, I, F> = UIntFilter<'a, K, I,F> where K:'a, I:'a, F: ListIndexFilter<Item = I>+'a;
+
     fn create_filter<'a, I, F>(&'a self, list: &'a F) -> Self::Filter<'a, I, F>
     where
         I: 'a,
         F: ListIndexFilter<Item = I> + 'a,
     {
         UIntFilter { store: self, list }
+    }
+
+    type Retriever<'a> = UIntIndex<K> where K:'a;
+
+    fn retrieve<'a, I, L>(&'a self, items: &'a L) -> ItemRetriever<'a, Self::Retriever<'a>, L>
+    where
+        I: 'a,
+        L: ListIndexFilter<Item = I> + 'a,
+    {
+        ItemRetriever { inner: self, items }
     }
 }
 
@@ -141,7 +150,7 @@ where
     }
 }
 
-impl<K> Retrieve for UIntIndex<K>
+impl<K> Retriever for UIntIndex<K>
 where
     K: Default + Into<usize>,
 {
@@ -155,7 +164,7 @@ where
 
     fn filter<'s, P>(&'s self, predicate: P) -> Cow<[usize]>
     where
-        P: Fn(<Self as Retrieve>::Filter<'s>) -> Cow<[usize]>,
+        P: Fn(<Self as Retriever>::Filter<'s>) -> Cow<[usize]>,
     {
         predicate(NewFilter(self))
     }
@@ -251,6 +260,21 @@ mod tests {
         fn item(&self, index: usize) -> Option<&Self::Item> {
             self.get(index)
         }
+    }
+
+    #[test]
+    fn retrieve() {
+        let mut i = UIntIndex::new();
+        i.insert(1, 3);
+        i.insert(2, 4);
+
+        let items = vec!["a", "b", "c", "d", "e"];
+        let r = i.retrieve(&items);
+        let mut it = r.filter(|f| f.eq(2));
+        assert_eq!(Some(&"e"), it.next());
+
+        assert_eq!(1, r.meta().min());
+        assert_eq!(2, r.meta().max());
     }
 
     #[test]

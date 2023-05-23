@@ -27,17 +27,12 @@
 pub mod map;
 pub mod uint;
 
-use crate::{ListIndexFilter, EMPTY_IDXS};
+use crate::{Iter, ListIndexFilter, EMPTY_IDXS};
 use std::borrow::Cow;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Default {
     type Key;
-    type Filter<'a, I, F>
-    where
-        Self: 'a,
-        I: 'a,
-        F: ListIndexFilter<Item = I> + 'a;
 
     /// Insert an `Key` for a given `Index`.
     ///
@@ -121,17 +116,33 @@ pub trait Store: Default {
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
 
+    type Filter<'a, I, F>
+    where
+        Self: 'a,
+        I: 'a,
+        F: ListIndexFilter<Item = I> + 'a;
+
     /// Create a new (Filter) instance, to provide Store specific read operations.
     fn create_filter<'a, I, F>(&'a self, list: &'a F) -> Self::Filter<'a, I, F>
     where
         I: 'a,
         F: ListIndexFilter<Item = I> + 'a;
+
+    type Retriever<'a>
+    where
+        Self: 'a;
+
+    fn retrieve<'a, I, L>(&'a self, items: &'a L) -> ItemRetriever<'a, Self::Retriever<'a>, L>
+    where
+        I: 'a,
+        L: ListIndexFilter<Item = I> + 'a,
+        <Self as Store>::Retriever<'a>: Retriever;
 }
 
-pub trait Retrieve {
-    type Meta<'f>
+pub trait Retriever {
+    type Meta<'m>
     where
-        Self: 'f;
+        Self: 'm;
 
     fn meta(&self) -> Self::Meta<'_>;
 
@@ -139,9 +150,32 @@ pub trait Retrieve {
     where
         Self: 'f;
 
-    fn filter<'s, P>(&'s self, predicate: P) -> Cow<[usize]>
+    fn filter<'r, P>(&'r self, predicate: P) -> Cow<[usize]>
     where
-        P: Fn(<Self as Retrieve>::Filter<'s>) -> Cow<[usize]>;
+        P: Fn(<Self as Retriever>::Filter<'r>) -> Cow<[usize]>;
+}
+
+pub struct ItemRetriever<'a, R, L> {
+    inner: &'a R,
+    items: &'a L,
+}
+
+impl<'a, R, L> ItemRetriever<'a, R, L>
+where
+    R: Retriever,
+    L: ListIndexFilter,
+{
+    pub fn meta(&self) -> R::Meta<'_> {
+        self.inner.meta()
+    }
+
+    pub fn filter<P>(&self, predicate: P) -> Iter<'a, L>
+    where
+        P: Fn(R::Filter<'a>) -> Cow<[usize]>,
+    {
+        let indices = self.inner.filter(predicate);
+        self.items.filter(indices)
+    }
 }
 
 pub trait Equals<K> {
