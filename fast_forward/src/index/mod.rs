@@ -128,6 +128,34 @@ pub trait Store: Default {
         <Self as Store>::Retriever<'a>: Retriever;
 }
 
+/// Empty Meta, if the `Retriever` no meta data supported.
+pub struct NoMeta;
+
+impl NoMeta {
+    pub const fn has_no_meta_data(&self) -> bool {
+        true
+    }
+}
+
+pub struct EqFilter<'s, R: Retriever>(&'s R);
+
+impl<'s, R: Retriever> EqFilter<'s, R> {
+    pub fn eq(&self, key: &R::Key) -> Cow<'s, [usize]> {
+        self.0.get(key)
+    }
+
+    pub fn eq_many<I>(&self, keys: I) -> Cow<[usize]>
+    where
+        I: IntoIterator<Item = R::Key>,
+    {
+        self.0.get_many(keys)
+    }
+
+    pub fn contains(&self, key: &R::Key) -> bool {
+        self.0.contains(key)
+    }
+}
+
 /// Trait for read/select method from a `Store`.
 pub trait Retriever {
     type Key;

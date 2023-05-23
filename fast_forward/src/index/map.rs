@@ -27,7 +27,7 @@
 //!
 //! ```
 use crate::{
-    index::{Index, ItemRetriever, Retriever, Store},
+    index::{EqFilter, Index, ItemRetriever, NoMeta, Retriever, Store},
     ListIndexFilter, EMPTY_IDXS,
 };
 use std::{borrow::Cow, collections::HashMap, fmt::Debug, hash::Hash};
@@ -74,10 +74,6 @@ where
     }
 }
 
-pub struct NewFilter<'s, K: Default + Eq + Hash + 's>(&'s MapIndex<K>);
-
-pub struct NewMeta<'s, K: Default + Eq + Hash + 's>(&'s MapIndex<K>);
-
 impl<K> Retriever for MapIndex<K>
 where
     K: Default + Eq + Hash,
@@ -91,19 +87,19 @@ where
         }
     }
 
-    type Meta<'f> = NewMeta<'f, K> where K:'f;
+    type Meta<'f> = NoMeta where K:'f;
 
     fn meta(&self) -> Self::Meta<'_> {
-        NewMeta(self)
+        NoMeta
     }
 
-    type Filter<'f> = NewFilter<'f, K> where K:'f;
+    type Filter<'f> = EqFilter<'f, Self> where K:'f;
 
     fn filter<'s, P>(&'s self, predicate: P) -> Cow<[usize]>
     where
         P: Fn(<Self as Retriever>::Filter<'s>) -> Cow<[usize]>,
     {
-        predicate(NewFilter(self))
+        predicate(EqFilter(self))
     }
 }
 
@@ -111,6 +107,25 @@ where
 mod tests {
     use super::*;
     use crate::query::query;
+
+    #[test]
+    fn retrieve() {
+        let mut i = MapIndex::default();
+        i.insert("Jasmin", 4);
+        i.insert("Mario", 8);
+        i.insert("Paul", 6);
+
+        assert!(i.contains(&"Paul"));
+
+        let items = vec!["a", "b", "c", "d", "e"];
+
+        let r = i.retrieve(&items);
+        let mut it = r.filter(|f| f.eq(&"Jasmin"));
+        assert_eq!(Some(&"e"), it.next());
+        assert_eq!(None, it.next());
+
+        assert!(i.meta().has_no_meta_data());
+    }
 
     mod unique {
         use super::*;

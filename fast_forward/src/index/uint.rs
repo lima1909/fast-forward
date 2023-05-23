@@ -31,7 +31,7 @@
 //! ...  | ...
 //! ```
 use crate::{
-    index::{Index, ItemRetriever, MinMax, Retriever, Store},
+    index::{EqFilter, Index, ItemRetriever, MinMax, Retriever, Store},
     ListIndexFilter, EMPTY_IDXS,
 };
 use std::{borrow::Cow, marker::PhantomData};
@@ -112,28 +112,6 @@ where
     }
 }
 
-pub struct NewFilter<'s, K: Default + 's>(&'s UIntIndex<K>);
-
-impl<'s, K> NewFilter<'s, K>
-where
-    K: Default + Into<usize> + Copy + 's,
-{
-    pub fn eq(&self, key: &K) -> Cow<'s, [usize]> {
-        self.0.get(key)
-    }
-
-    pub fn eq_many<I>(&self, keys: I) -> Cow<[usize]>
-    where
-        I: IntoIterator<Item = K>,
-    {
-        self.0.get_many(keys)
-    }
-
-    pub fn contains(&self, key: &K) -> bool {
-        self.0.contains(key)
-    }
-}
-
 pub struct NewMeta<'s, K: Default + 's>(&'s UIntIndex<K>);
 
 impl<'s, K> NewMeta<'s, K>
@@ -171,13 +149,13 @@ where
         NewMeta(self)
     }
 
-    type Filter<'f> = NewFilter<'f, K> where K:'f;
+    type Filter<'f> = EqFilter<'f, Self> where K:'f;
 
     fn filter<'s, P>(&'s self, predicate: P) -> Cow<[usize]>
     where
         P: Fn(<Self as Retriever>::Filter<'s>) -> Cow<[usize]>,
     {
-        predicate(NewFilter(self))
+        predicate(EqFilter(self))
     }
 }
 
