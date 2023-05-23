@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use fast_forward::index::Equals;
+use fast_forward::index::Retriever;
 use fast_forward_derive::Indexed;
 
 #[derive(Indexed)]
@@ -25,12 +25,12 @@ fn main() {
     };
 
     let l = FirstList::default();
-    let r = l.new_id.eq(5);
+    let r = l.new_id.get(&5);
     println!("Result FirstList: {r:?}");
     assert!(r.is_empty());
 
     let l = SecondList::default();
-    let r = l.id.eq(5);
+    let r = l.id.get(&5);
     println!("Result SecondList: {r:?}");
     assert!(r.is_empty());
 }

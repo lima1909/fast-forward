@@ -5,7 +5,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 use fast_forward::index::map::MapIndex;
 use fast_forward::index::uint::UIntIndex;
-use fast_forward::index::{Equals, Store};
+use fast_forward::index::{Retriever, Store};
 use fast_forward::query::{and, or, query};
 
 const HOW_MUCH_PERSON: usize = 100_000;
@@ -47,13 +47,13 @@ fn list_index(c: &mut Criterion) {
     let mut group = c.benchmark_group("index");
     group.bench_function("ff: query pk", |b| {
         b.iter(|| {
-            let i = query(idx.pk.eq(FIND_ID)).exec()[0];
+            let i = query(idx.pk.get(&FIND_ID)).exec()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
     group.bench_function("ff: filter pk", |b| {
         b.iter(|| {
-            let i = idx.pk.eq(FIND_ID)[0];
+            let i = idx.pk.get(&FIND_ID)[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
@@ -67,8 +67,8 @@ fn list_index(c: &mut Criterion) {
 
     group.bench_function("ff: pk and name", |b| {
         b.iter(|| {
-            let i = query(idx.pk.eq(FIND_ID))
-                .and(idx.name.eq(&FIND_PERSON.1))
+            let i = query(idx.pk.get(&FIND_ID))
+                .and(idx.name.get(&FIND_PERSON.1))
                 .exec()[0];
             assert_eq!(&FIND_PERSON, &v[i]);
         })

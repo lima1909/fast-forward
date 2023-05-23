@@ -243,7 +243,7 @@ macro_rules! fast {
 mod tests {
     use crate::{
         fast,
-        index::{map::MapIndex, uint::UIntIndex, Equals},
+        index::{map::MapIndex, uint::UIntIndex, Retriever},
         query::query,
     };
 
@@ -306,7 +306,7 @@ mod tests {
 
         // idx [1,3,5]
         // del [3]
-        let r = cars.filter(cars.id.eq_iter([1, 3, 5])).collect::<Vec<_>>();
+        let r = cars.filter(cars.id.get_many([1, 3, 5])).collect::<Vec<_>>();
         assert_eq!(vec![&Car(1, "BMW".into()), &Car(5, "VW".into())], r);
     }
 
@@ -319,11 +319,11 @@ mod tests {
         cars.insert(Car(99, "Porsche".into()));
 
         // simple equals filter
-        let r = cars.filter(cars.id.eq(2)).collect::<Vec<_>>();
+        let r = cars.filter(cars.id.get(&2)).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
 
         // many/iter equals filter
-        let mut r = cars.filter(cars.id.eq_iter(2..6));
+        let mut r = cars.filter(cars.id.get_many(2..6));
         assert_eq!(Some(&Car(2, "BMW".into())), r.next());
         assert_eq!(Some(&Car(5, "Audi".into())), r.next());
         assert_eq!(Some(&Car(2, "VW".into())), r.next());
@@ -331,20 +331,20 @@ mod tests {
 
         // or equals query
         let r = cars
-            .filter(query(cars.id.eq(2)).or(cars.id.eq(100)).exec())
+            .filter(query(cars.id.get(&2)).or(cars.id.get(&100)).exec())
             .collect::<Vec<_>>();
         assert_eq!(&[&Car(2, "BMW".into()), &Car(2, "VW".into())], &r[..]);
 
         // update one Car
-        assert_eq!(None, cars.filter(cars.id.eq(100)).next());
-        cars.update(cars.id.eq(99)[0], |c: &Car| Car(c.0 + 1, c.1.clone()));
-        let r = cars.filter(cars.id.eq(100)).collect::<Vec<_>>();
+        assert_eq!(None, cars.filter(cars.id.get(&100)).next());
+        cars.update(cars.id.get(&99)[0], |c: &Car| Car(c.0 + 1, c.1.clone()));
+        let r = cars.filter(cars.id.get(&100)).collect::<Vec<_>>();
         assert_eq!(vec![&Car(100, "Porsche".into())], r);
 
         // remove one Car
-        assert!(cars.filter(cars.id.eq(100)).next().is_some());
-        cars.delete(cars.id.eq(100)[0]);
-        assert_eq!(None, cars.filter(cars.id.eq(100)).next());
+        assert!(cars.filter(cars.id.get(&100)).next().is_some());
+        cars.delete(cars.id.get(&100)[0]);
+        assert_eq!(None, cars.filter(cars.id.get(&100)).next());
     }
 
     #[test]
@@ -356,7 +356,7 @@ mod tests {
         cars.insert(Car(99, "Porsche".into()));
 
         // simple equals filter
-        let r = cars.filter(cars.id.eq(2)).collect::<Vec<_>>();
+        let r = cars.filter(cars.id.get(&2)).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
 
         // min and max
@@ -373,14 +373,14 @@ mod tests {
         cars.insert(Car(99, "Porsche".into()));
 
         // simple equals filter
-        let r: Vec<&Car> = cars.filter(cars.name.eq(&"vw".into())).collect();
+        let r: Vec<&Car> = cars.filter(cars.name.get(&"vw".into())).collect();
         assert_eq!(vec![&Car(2, "VW".into())], r);
 
         // many/iter equals filter
         let r: Vec<&Car> = cars
             .filter(
                 cars.name
-                    .eq_iter([&"vw".into(), &"audi".into(), &"bmw".into()]),
+                    .get_many(["vw".into(), "audi".into(), "bmw".into()]),
             )
             .collect();
         assert_eq!(
@@ -395,30 +395,30 @@ mod tests {
         // or equals query
         let r: Vec<&Car> = cars
             .filter(
-                query(cars.name.eq(&"vw".into()))
-                    .or(cars.name.eq(&"audi".into()))
+                query(cars.name.get(&"vw".into()))
+                    .or(cars.name.get(&"audi".into()))
                     .exec(),
             )
             .collect();
         assert_eq!(vec![&Car(5, "Audi".into()), &Car(2, "VW".into())], r);
 
         // update one Car
-        assert_eq!(None, cars.filter(cars.name.eq(&"mercedes".into())).next());
-        cars.update(cars.name.eq(&"porsche".into())[0], |c: &Car| {
+        assert_eq!(None, cars.filter(cars.name.get(&"mercedes".into())).next());
+        cars.update(cars.name.get(&"porsche".into())[0], |c: &Car| {
             Car(c.0, "Mercedes".into())
         });
         let r = cars
-            .filter(cars.name.eq(&"mercedes".into()))
+            .filter(cars.name.get(&"mercedes".into()))
             .collect::<Vec<_>>();
         assert_eq!(vec![&Car(99, "Mercedes".into())], r);
 
         // remove one Car
         assert!(cars
-            .filter(cars.name.eq(&"mercedes".into()))
+            .filter(cars.name.get(&"mercedes".into()))
             .next()
             .is_some());
-        cars.delete(cars.name.eq(&"mercedes".into())[0]);
-        assert_eq!(None, cars.filter(cars.name.eq(&"mercedes".into())).next());
+        cars.delete(cars.name.get(&"mercedes".into())[0]);
+        assert_eq!(None, cars.filter(cars.name.get(&"mercedes".into())).next());
     }
 
     #[test]
@@ -433,17 +433,17 @@ mod tests {
         fast_cars.insert(Car(1, "Mercedes".into()));
         fast_cars.insert(Car(4, "Porsche".into()));
 
-        assert_eq!([0], *query(fast_cars.id_map.eq(&1)).exec());
+        assert_eq!([0], *query(fast_cars.id_map.get(&1)).exec());
         assert_eq!(
             [1],
-            *query(fast_cars.id.eq(4))
-                .or(fast_cars.name.eq(&"Porsche".into()))
+            *query(fast_cars.id.get(&4))
+                .or(fast_cars.name.get(&"Porsche".into()))
                 .exec()
         );
 
         let r = fast_cars.filter(
-            query(fast_cars.id.eq(4))
-                .and(fast_cars.name.eq(&"Porsche".into()))
+            query(fast_cars.id.get(&4))
+                .and(fast_cars.name.get(&"Porsche".into()))
                 .exec(),
         );
         assert_eq!(vec![&Car(4, "Porsche".into())], r.collect::<Vec<_>>())
@@ -504,28 +504,30 @@ mod tests {
         persons.insert(Person::new(41, 7, "Mario", Male));
         persons.insert(Person::new(111, 234, "Paul", Male));
 
-        assert_eq!([1], *query(persons.pk.eq(41)).exec());
-        assert_eq!([0], *query(persons.pk.eq(3)).exec());
-        assert!(query(persons.pk.eq(101)).exec().is_empty());
+        assert_eq!([1], *query(persons.pk.get(&41)).exec());
+        assert_eq!([0], *query(persons.pk.get(&3)).exec());
+        assert!(query(persons.pk.get(&101)).exec().is_empty());
 
-        let r = query(persons.multi.eq(7)).exec();
+        let r = query(persons.multi.get(&7)).exec();
         assert_eq!(*r, [0, 1]);
 
-        let r = query(persons.multi.eq(3)).or(persons.multi.eq(7)).exec();
-        assert_eq!(*r, [0, 1]);
-
-        let r = query(persons.name.eq(&"Jasmin".into())).exec();
-        assert_eq!(*r, [0]);
-
-        let r = query(persons.name.eq(&"Jasmin".into()))
-            .or(persons.name.eq(&"Mario".into()))
+        let r = query(persons.multi.get(&3))
+            .or(persons.multi.get(&7))
             .exec();
         assert_eq!(*r, [0, 1]);
 
-        let r = query(persons.gender.eq(Male)).exec();
+        let r = query(persons.name.get(&"Jasmin".into())).exec();
+        assert_eq!(*r, [0]);
+
+        let r = query(persons.name.get(&"Jasmin".into()))
+            .or(persons.name.get(&"Mario".into()))
+            .exec();
+        assert_eq!(*r, [0, 1]);
+
+        let r = query(persons.gender.get(&Male)).exec();
         assert_eq!(*r, [1, 2]);
 
-        let r = query(persons.gender.eq(Female)).exec();
+        let r = query(persons.gender.get(&Female)).exec();
         assert_eq!(*r, [0]);
     }
 
@@ -546,12 +548,12 @@ mod tests {
         name.insert("b", 2);
         name.insert("z", 0);
 
-        let r = query(gender.eq(Female)).and(name.eq(&"Julia")).exec();
+        let r = query(gender.get(&Female)).and(name.get(&"Julia")).exec();
         assert_eq!(*r, [1]);
 
-        let r = query(name.eq(&"z"))
-            .or(gender.eq(Female))
-            .and(name.eq(&"Julia"))
+        let r = query(name.get(&"z"))
+            .or(gender.get(&Female))
+            .and(name.get(&"Julia"))
             .exec();
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
         assert_eq!(*r, [0, 1]);

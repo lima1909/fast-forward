@@ -1,13 +1,8 @@
-use fast_forward::{
-    fast,
-    index::{uint::UIntIndex, Equals},
-    query::or,
-    EMPTY_IDXS,
-};
+use fast_forward::{fast, index::uint::UIntIndex, index::Retriever, query::or, EMPTY_IDXS};
 
 use std::{borrow::Cow, ops::Index};
 
-trait Tree: Equals<usize> {
+trait Tree: Retriever<Key = usize> {
     fn parents<I>(&self, key: usize, stop: usize, nodes: &I) -> Cow<[usize]>
     where
         I: Index<usize, Output = Node>,
@@ -18,9 +13,9 @@ trait Tree: Equals<usize> {
             return result;
         }
 
-        for i in self.eq(key).iter() {
+        for i in self.get(&key).iter() {
             let n = &nodes[*i];
-            result = or(self.eq(n.parent), self.parents(n.parent, stop, nodes));
+            result = or(self.get(&n.parent), self.parents(n.parent, stop, nodes));
         }
 
         result

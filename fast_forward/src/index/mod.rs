@@ -171,9 +171,9 @@ pub trait Retriever {
     }
 
     /// Checks whether the `Key` exists.
-    // fn contains(&self, key: Self::Key) -> bool {
-    //     !self.get(&key).is_empty()
-    // }
+    fn contains(&self, key: Self::Key) -> bool {
+        !self.get(&key).is_empty()
+    }
 
     type Meta<'m>
     where
@@ -208,6 +208,26 @@ where
         self.items.filter(indices)
     }
 
+    /// Combined all given `keys` with an logical `OR`.
+    ///
+    /// ## Example:
+    ///```text
+    /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
+    /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
+    /// ```
+    pub fn get_many<I>(&self, keys: I) -> Iter<'a, L>
+    where
+        I: IntoIterator<Item = R::Key>,
+    {
+        let indices = self.inner.get_many(keys);
+        self.items.filter(indices)
+    }
+
+    /// Checks whether the `Key` exists.
+    pub fn contains(&self, key: R::Key) -> bool {
+        !self.inner.get(&key).is_empty()
+    }
+
     /// Return meta data from the `Store`.
     pub fn meta(&self) -> R::Meta<'_> {
         self.inner.meta()
@@ -220,40 +240,6 @@ where
     {
         let indices = self.inner.filter(predicate);
         self.items.filter(indices)
-    }
-}
-
-pub trait Equals<K> {
-    /// Find all `Idx` with the given `Key`.
-    fn eq(&self, key: K) -> Cow<[usize]>;
-
-    /// Combined all given `keys` with an logical `OR`.
-    ///
-    /// ## Example:
-    ///```text
-    /// eq_iter([2, 5, 6]) => eq(2) OR eq(5) OR eq(6)
-    /// eq_iter(2..6]) => eq(2) OR eq(3) OR eq(4) OR eq(5)
-    /// ```
-    fn eq_iter<I>(&self, keys: I) -> Cow<[usize]>
-    where
-        I: IntoIterator<Item = K>,
-    {
-        let mut it = keys.into_iter();
-        match it.next() {
-            Some(key) => {
-                let mut c = self.eq(key);
-                for k in it {
-                    c = crate::query::or(c, self.eq(k))
-                }
-                c
-            }
-            None => Cow::Borrowed(EMPTY_IDXS),
-        }
-    }
-
-    /// Checks whether the `Key` exists.
-    fn contains(&self, key: K) -> bool {
-        !self.eq(key).is_empty()
     }
 }
 

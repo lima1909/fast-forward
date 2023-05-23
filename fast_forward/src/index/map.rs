@@ -27,7 +27,7 @@
 //!
 //! ```
 use crate::{
-    index::{Equals, Index, ItemRetriever, Retriever, Store},
+    index::{Index, ItemRetriever, Retriever, Store},
     Iter, ListIndexFilter, EMPTY_IDXS,
 };
 use std::{borrow::Cow, collections::HashMap, fmt::Debug, hash::Hash};
@@ -92,40 +92,13 @@ where
     list: &'a F,
 }
 
-impl<'a, K, I, F> Equals<&K> for MapFilter<'a, K, I, F>
-where
-    K: Default + Eq + Hash,
-    F: ListIndexFilter<Item = I>,
-{
-    #[inline]
-    fn eq(&self, key: &K) -> Cow<[usize]> {
-        match self.store.0.get(key) {
-            Some(i) => i.get(),
-            None => Cow::Borrowed(EMPTY_IDXS),
-        }
-    }
-}
-
 impl<'a, K, I, F> MapFilter<'a, K, I, F>
 where
     K: Default + Eq + Hash,
     F: ListIndexFilter<Item = I>,
 {
     pub fn get(&'a self, key: K) -> Iter<'a, F> {
-        self.list.filter(self.eq(&key))
-    }
-}
-
-impl<K> Equals<&K> for MapIndex<K>
-where
-    K: Default + Eq + Hash,
-{
-    #[inline]
-    fn eq(&self, key: &K) -> Cow<[usize]> {
-        match self.0.get(key) {
-            Some(i) => i.get(),
-            None => Cow::Borrowed(EMPTY_IDXS),
-        }
+        self.list.filter(self.store.get(&key))
     }
 }
 
@@ -174,7 +147,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = MapIndex::default();
-            assert_eq!(0, i.eq(&"Jasmin").len());
+            assert_eq!(0, i.get(&"Jasmin").len());
             assert!(i.0.is_empty());
         }
 
@@ -183,7 +156,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert("Jasmin", 4);
 
-            assert_eq!(*i.eq(&"Jasmin"), [4]);
+            assert_eq!(*i.get(&"Jasmin"), [4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -192,7 +165,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert(5, 4);
 
-            assert_eq!(*i.eq(&5), [4]);
+            assert_eq!(*i.get(&5), [4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -201,7 +174,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert('x', 4);
 
-            assert_eq!(*i.eq(&'x'), [4]);
+            assert_eq!(*i.get(&'x'), [4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -212,20 +185,20 @@ mod tests {
             idx.insert("Mario", 8);
             idx.insert("Paul", 6);
 
-            let r = query(idx.eq(&"Mario")).or(idx.eq(&"Paul")).exec();
+            let r = query(idx.get(&"Mario")).or(idx.get(&"Paul")).exec();
             assert_eq!(*r, [6, 8]);
 
-            let r = query(idx.eq(&"Paul")).or(idx.eq(&"Blub")).exec();
+            let r = query(idx.get(&"Paul")).or(idx.get(&"Blub")).exec();
             assert_eq!(*r, [6]);
 
-            let r = query(idx.eq(&"Blub")).or(idx.eq(&"Mario")).exec();
+            let r = query(idx.get(&"Blub")).or(idx.get(&"Mario")).exec();
             assert_eq!(*r, [8]);
         }
 
         #[test]
         fn out_of_bound() {
             let i = MapIndex::default();
-            assert_eq!(0, i.eq(&"Jasmin").len());
+            assert_eq!(0, i.get(&"Jasmin").len());
         }
 
         #[test]
@@ -235,14 +208,14 @@ mod tests {
             idx.insert("Mario", 2);
             idx.insert("Paul", 6);
 
-            assert_eq!(0, idx.eq_iter([]).iter().len());
-            assert_eq!(0, idx.eq_iter([&"NotFound"]).iter().len());
-            assert_eq!([2], *idx.eq_iter([&"Mario"]));
-            assert_eq!([2, 6], *idx.eq_iter([&"Paul", &"Mario"]));
-            assert_eq!([2, 6], *idx.eq_iter([&"NotFound", &"Paul", &"Mario"]));
+            assert_eq!(0, idx.get_many([]).iter().len());
+            assert_eq!(0, idx.get_many(["NotFound"]).iter().len());
+            assert_eq!([2], *idx.get_many(["Mario"]));
+            assert_eq!([2, 6], *idx.get_many(["Paul", "Mario"]));
+            assert_eq!([2, 6], *idx.get_many(["NotFound", "Paul", "Mario"]));
             assert_eq!(
                 [2, 5, 6],
-                *idx.eq_iter([&"Jasmin", &"NotFound", &"Mario", &"Paul"])
+                *idx.get_many(["Jasmin", "NotFound", "Mario", "Paul"])
             );
         }
 
@@ -252,8 +225,8 @@ mod tests {
             idx.insert("Jasmin", 5);
             idx.insert("Mario", 2);
 
-            assert!(idx.contains(&"Jasmin"));
-            assert!(!idx.contains(&"Paul"));
+            assert!(idx.contains("Jasmin"));
+            assert!(!idx.contains("Paul"));
         }
 
         #[test]
@@ -263,16 +236,16 @@ mod tests {
 
             // (old) Key: Jasmin do not exist, insert a (new) Key Jasmin NEW?
             idx.update("Jasmin", 4, "Jasmin NEW");
-            assert_eq!([4], *idx.eq(&"Jasmin NEW"));
+            assert_eq!([4], *idx.get(&"Jasmin NEW"));
 
             // (old) Key 2 exist, but not with Index: 8, insert known Key: 2 with add new Index 8
             idx.update("Jasmin NEW", 8, "Jasmin NEW");
-            assert_eq!([4, 8], *idx.eq(&"Jasmin NEW"));
+            assert_eq!([4, 8], *idx.get(&"Jasmin NEW"));
 
             // old Key 2 with Index 8 was removed and (new) Key 4 was added with Index 8
             idx.update("Jasmin NEW", 8, "Jasmin NEW NEW");
-            assert_eq!([8], *idx.eq(&"Jasmin NEW NEW"));
-            assert_eq!([4], *idx.eq(&"Jasmin NEW"));
+            assert_eq!([8], *idx.get(&"Jasmin NEW NEW"));
+            assert_eq!([4], *idx.get(&"Jasmin NEW"));
         }
 
         #[test]
@@ -284,15 +257,15 @@ mod tests {
 
             // delete correct Key with wrong Index, nothing happens
             idx.delete("Jasmin", 100);
-            assert_eq!([3, 4], *idx.eq(&"Jasmin"));
+            assert_eq!([3, 4], *idx.get(&"Jasmin"));
 
             // delete correct Key with correct Index
             idx.delete("Jasmin", 3);
-            assert_eq!([4], *idx.eq(&"Jasmin"));
+            assert_eq!([4], *idx.get(&"Jasmin"));
 
             // delete correct Key with last correct Index, Key now longer exist
             idx.delete("Jasmin", 4);
-            assert!(idx.eq(&"Jasmin").is_empty());
+            assert!(idx.get(&"Jasmin").is_empty());
         }
     }
 
@@ -302,7 +275,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = MapIndex::default();
-            assert_eq!(0, i.eq(&"Jasmin").len());
+            assert_eq!(0, i.get(&"Jasmin").len());
             assert!(i.0.is_empty());
         }
 
@@ -311,7 +284,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert("Jasmin", 2);
 
-            assert_eq!(*i.eq(&"Jasmin"), [2]);
+            assert_eq!(*i.get(&"Jasmin"), [2]);
             assert_eq!(1, i.0.len());
         }
 
@@ -321,7 +294,7 @@ mod tests {
             i.insert("Jasmin", 2);
             i.insert("Jasmin", 1);
 
-            assert_eq!(*i.eq(&"Jasmin"), [1, 2]);
+            assert_eq!(*i.get(&"Jasmin"), [1, 2]);
         }
 
         #[test]
@@ -330,8 +303,8 @@ mod tests {
             idx.insert("Jasmin", 5);
             idx.insert("Jasmin", 2);
 
-            assert!(idx.contains(&"Jasmin"));
-            assert!(!idx.contains(&"Paul"));
+            assert!(idx.contains("Jasmin"));
+            assert!(!idx.contains("Paul"));
         }
     }
 }
