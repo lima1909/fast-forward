@@ -139,17 +139,54 @@ pub trait Store: Default {
         <Self as Store>::Retriever<'a>: Retriever;
 }
 
+/// Trait for read/select method from a `Store`.
 pub trait Retriever {
+    type Key;
+
+    /// Get all indices for a given `Key`.
+    fn get(&self, key: &Self::Key) -> Cow<[usize]>;
+
+    /// Combined all given `keys` with an logical `OR`.
+    ///
+    /// ## Example:
+    ///```text
+    /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
+    /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
+    /// ```
+    fn get_many<I>(&self, keys: I) -> Cow<[usize]>
+    where
+        I: IntoIterator<Item = Self::Key>,
+    {
+        let mut it = keys.into_iter();
+        match it.next() {
+            Some(key) => {
+                let mut c = self.get(&key);
+                for k in it {
+                    c = crate::query::or(c, self.get(&k))
+                }
+                c
+            }
+            None => Cow::Borrowed(EMPTY_IDXS),
+        }
+    }
+
+    /// Checks whether the `Key` exists.
+    // fn contains(&self, key: Self::Key) -> bool {
+    //     !self.get(&key).is_empty()
+    // }
+
     type Meta<'m>
     where
         Self: 'm;
 
+    /// Return meta data from the `Store`.
     fn meta(&self) -> Self::Meta<'_>;
 
     type Filter<'f>
     where
         Self: 'f;
 
+    /// Return filter methods from the `Store`.
     fn filter<'r, P>(&'r self, predicate: P) -> Cow<[usize]>
     where
         P: Fn(<Self as Retriever>::Filter<'r>) -> Cow<[usize]>;
@@ -165,10 +202,18 @@ where
     R: Retriever,
     L: ListIndexFilter,
 {
+    /// Get all items for a given `Key`.
+    pub fn get(&self, key: &R::Key) -> Iter<'a, L> {
+        let indices = self.inner.get(key);
+        self.items.filter(indices)
+    }
+
+    /// Return meta data from the `Store`.
     pub fn meta(&self) -> R::Meta<'_> {
         self.inner.meta()
     }
 
+    /// Return filter methods from the `Store`.
     pub fn filter<P>(&self, predicate: P) -> Iter<'a, L>
     where
         P: Fn(R::Filter<'a>) -> Cow<[usize]>,

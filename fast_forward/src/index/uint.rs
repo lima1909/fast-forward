@@ -126,10 +126,10 @@ pub struct NewFilter<'s, K: Default + 's>(&'s UIntIndex<K>);
 
 impl<'s, K> NewFilter<'s, K>
 where
-    K: Default + Into<usize> + 's,
+    K: Default + Into<usize> + Copy + 's,
 {
     pub fn eq(&self, key: K) -> Cow<'s, [usize]> {
-        self.0.eq(key)
+        self.0.get(&key)
     }
 }
 
@@ -152,8 +152,18 @@ where
 
 impl<K> Retriever for UIntIndex<K>
 where
-    K: Default + Into<usize>,
+    K: Default + Into<usize> + Copy,
 {
+    type Key = K;
+
+    fn get(&self, key: &Self::Key) -> Cow<[usize]> {
+        let i: usize = (*key).into();
+        match self.data.get(i) {
+            Some(Some(idx)) => idx.get(),
+            _ => Cow::Borrowed(EMPTY_IDXS),
+        }
+    }
+
     type Meta<'f> = NewMeta<'f, K> where K:'f;
 
     fn meta(&self) -> Self::Meta<'_> {
@@ -185,7 +195,9 @@ where
 {
     #[inline]
     fn eq(&self, key: K) -> Cow<[usize]> {
-        match &self.store.data.get(key.into()) {
+        let i: usize = key.into();
+        let indices = &self.store.data.get(i);
+        match indices {
             Some(Some(idx)) => idx.get(),
             _ => Cow::Borrowed(EMPTY_IDXS),
         }
@@ -204,14 +216,15 @@ where
 
 impl<K> Equals<K> for UIntIndex<K>
 where
-    K: Default + Into<usize>,
+    K: Default + Into<usize> + Copy,
 {
     #[inline]
     fn eq(&self, key: K) -> Cow<[usize]> {
-        match &self.data.get(key.into()) {
-            Some(Some(idx)) => idx.get(),
-            _ => Cow::Borrowed(EMPTY_IDXS),
-        }
+        self.get(&key)
+        // match &self.data.get(key.into()) {
+        //     Some(Some(idx)) => idx.get(),
+        //     _ => Cow::Borrowed(EMPTY_IDXS),
+        // }
     }
 }
 

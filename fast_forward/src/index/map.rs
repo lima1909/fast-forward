@@ -138,6 +138,15 @@ impl<K> Retriever for MapIndex<K>
 where
     K: Default + Eq + Hash,
 {
+    type Key = K;
+
+    fn get(&self, key: &Self::Key) -> Cow<[usize]> {
+        match self.0.get(key) {
+            Some(i) => i.get(),
+            None => Cow::Borrowed(EMPTY_IDXS),
+        }
+    }
+
     type Meta<'f> = NewMeta<'f, K> where K:'f;
 
     fn meta(&self) -> Self::Meta<'_> {
