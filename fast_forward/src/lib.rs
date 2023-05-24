@@ -25,7 +25,7 @@
 //! To Find the `Key`: "Jon" with the `operation equals` is only one step necessary.
 //!
 
-use std::borrow::Cow;
+use std::{borrow::Cow, cmp::Ordering::*, ops::BitOr};
 
 pub mod index;
 pub mod list;
@@ -33,6 +33,83 @@ pub mod query;
 
 /// Empty array of `Idx`
 pub const EMPTY_IDXS: &[usize] = &[];
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Indices(Vec<usize>);
+
+impl Indices {
+    #[inline]
+    pub fn new(idx: usize) -> Self {
+        Self(vec![idx])
+    }
+
+    #[inline]
+    pub fn add(&mut self, idx: usize) {
+        if let Err(pos) = self.0.binary_search(&idx) {
+            self.0.insert(pos, idx);
+        }
+    }
+
+    #[inline]
+    pub fn iter(&self) -> std::slice::Iter<'_, usize> {
+        self.0.iter()
+    }
+
+    #[inline]
+    pub fn remove(&mut self, idx: usize) -> std::slice::Iter<'_, usize> {
+        self.0.retain(|v| v != &idx);
+        self.iter()
+    }
+}
+
+impl BitOr for Indices {
+    type Output = Self;
+
+    fn bitor(self, other: Self) -> Self::Output {
+        let lhs = &self.0;
+        let rhs = &other.0;
+
+        match (lhs.is_empty(), rhs.is_empty()) {
+            (false, false) => {
+                let (ll, lr) = (lhs.len(), rhs.len());
+                let mut v = Vec::with_capacity(ll + lr);
+
+                let (mut li, mut ri) = (0, 0);
+
+                loop {
+                    let (l, r) = (lhs[li], rhs[ri]);
+
+                    match l.cmp(&r) {
+                        Equal => {
+                            v.push(l);
+                            li += 1;
+                            ri += 1;
+                        }
+                        Less => {
+                            v.push(l);
+                            li += 1;
+                        }
+                        Greater => {
+                            v.push(r);
+                            ri += 1;
+                        }
+                    }
+
+                    if ll == li {
+                        v.extend(rhs[ri..].iter());
+                        return Indices(v);
+                    } else if lr == ri {
+                        v.extend(lhs[li..].iter());
+                        return Indices(v);
+                    }
+                }
+            }
+            (true, false) => other,
+            (false, true) => self,
+            (true, true) => Indices(vec![]),
+        }
+    }
+}
 
 /// `ListIndexFilter` means, that you get an `Iterator` over all `Items` which exists for a given list of indices.
 pub trait ListIndexFilter {
@@ -246,6 +323,72 @@ mod tests {
         index::{map::MapIndex, uint::UIntIndex, Retriever},
         query::query,
     };
+
+    mod indices_or {
+        use crate::Indices;
+
+        #[test]
+        fn both_empty() {
+            assert_eq!(Indices::default(), Indices::default() | Indices::default());
+        }
+
+        #[test]
+        fn only_left() {
+            assert_eq!(
+                Indices([1, 2].into()),
+                Indices([1, 2].into()) | Indices::default()
+            );
+        }
+
+        #[test]
+        fn only_right() {
+            assert_eq!(
+                Indices([1, 2].into()),
+                Indices::default() | Indices([1, 2].into())
+            );
+        }
+
+        #[test]
+        fn diff_len() {
+            assert_eq!(
+                Indices([1, 2, 3].into()),
+                Indices::new(1) | Indices([2, 3].into()),
+            );
+            assert_eq!(
+                Indices([1, 2, 3].into()),
+                Indices([2, 3].into()) | Indices::new(1)
+            );
+        }
+
+        #[test]
+        fn overlapping_simple() {
+            assert_eq!(
+                Indices([1, 2, 3].into()),
+                Indices([1, 2].into()) | Indices([2, 3].into())
+            );
+            assert_eq!(
+                Indices([1, 2, 3].into()),
+                Indices([2, 3].into()) | Indices([1, 2].into())
+            );
+        }
+
+        #[test]
+        fn overlapping_diff_len() {
+            // 1, 2, 8, 9, 12
+            // 2, 5, 6, 10
+            assert_eq!(
+                Indices([1, 2, 5, 6, 8, 9, 10, 12].into()),
+                Indices([1, 2, 8, 9, 12].into()) | Indices([2, 5, 6, 10].into())
+            );
+
+            // 2, 5, 6, 10
+            // 1, 2, 8, 9, 12
+            assert_eq!(
+                Indices([1, 2, 5, 6, 8, 9, 10, 12].into()),
+                Indices([2, 5, 6, 10].into()) | Indices([1, 2, 8, 9, 12].into())
+            );
+        }
+    }
 
     #[derive(Debug, Eq, PartialEq, Clone)]
     struct Car(usize, String);
