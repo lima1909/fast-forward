@@ -1,6 +1,6 @@
 use fast_forward::{
     fast,
-    index::{map::MapIndex, uint::UIntIndex, Retriever},
+    index::{map::MapIndex, uint::UIntIndex},
     query::query,
 };
 
@@ -29,11 +29,12 @@ fn main() {
     cars.insert(Car::new(2, "VW"));
     cars.insert(Car::new(99, "Porsche"));
 
-    let r = cars.filter(cars.id.get(&2)).collect::<Vec<_>>();
+    let r = cars.id().get(&2).collect::<Vec<_>>();
     assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
 
     let r = cars
-        .filter(query(cars.id.get(&2)).or(cars.id.get(&100)).exec())
+        .id()
+        .filter(|f| query(f.eq(&2)).or(f.eq(&100)).exec())
         .collect::<Vec<_>>();
     assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
 
@@ -46,15 +47,12 @@ fn main() {
     cars.insert(Car::new(2, "VW"));
     cars.insert(Car::new(99, "Porsche"));
 
-    let r: Vec<&Car> = cars.filter(cars.name.get(&"VW".into())).collect();
+    let r: Vec<&Car> = cars.name().get(&"VW".into()).collect();
     assert_eq!(vec![&Car::new(2, "VW")], r);
 
     let r: Vec<&Car> = cars
-        .filter(
-            query(cars.name.get(&"VW".into()))
-                .or(cars.name.get(&"Audi".into()))
-                .exec(),
-        )
+        .name()
+        .filter(|f| query(f.eq(&"VW".into())).or(f.eq(&"Audi".into())).exec())
         .collect();
     assert_eq!(vec![&Car::new(5, "Audi"), &Car::new(2, "VW")], r);
 }

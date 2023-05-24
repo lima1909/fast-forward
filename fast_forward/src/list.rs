@@ -44,13 +44,6 @@ impl<T> List<T> {
         }
     }
 
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            items: Vec::with_capacity(capacity),
-            deleted_pos: Vec::new(),
-        }
-    }
-
     /// The Item in the list will not be delteted. It will be marked as deleted.
     ///
     /// # Panics
@@ -89,6 +82,13 @@ impl<T> List<T> {
 
     pub const fn iter(&self) -> Iter<'_, T> {
         Iter::new(self)
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+            deleted_pos: Vec::new(),
+        }
     }
 }
 

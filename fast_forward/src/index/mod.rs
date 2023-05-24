@@ -192,13 +192,6 @@ pub trait Retriever {
         !self.get(key).is_empty()
     }
 
-    type Meta<'m>
-    where
-        Self: 'm;
-
-    /// Return meta data from the `Store`.
-    fn meta(&self) -> Self::Meta<'_>;
-
     type Filter<'f>
     where
         Self: 'f;
@@ -207,6 +200,13 @@ pub trait Retriever {
     fn filter<'r, P>(&'r self, predicate: P) -> Cow<[usize]>
     where
         P: Fn(<Self as Retriever>::Filter<'r>) -> Cow<[usize]>;
+
+    type Meta<'m>
+    where
+        Self: 'm;
+
+    /// Return meta data from the `Store`.
+    fn meta(&self) -> Self::Meta<'_>;
 }
 
 pub struct ItemRetriever<'a, R, L> {
@@ -245,11 +245,6 @@ where
         !self.inner.get(&key).is_empty()
     }
 
-    /// Return meta data from the `Store`.
-    pub fn meta(&self) -> R::Meta<'_> {
-        self.inner.meta()
-    }
-
     /// Return filter methods from the `Store`.
     pub fn filter<P>(&self, predicate: P) -> Iter<'a, L>
     where
@@ -257,6 +252,11 @@ where
     {
         let indices = self.inner.filter(predicate);
         self.items.filter(indices)
+    }
+
+    /// Return meta data from the `Store`.
+    pub fn meta(&self) -> R::Meta<'_> {
+        self.inner.meta()
     }
 }
 
