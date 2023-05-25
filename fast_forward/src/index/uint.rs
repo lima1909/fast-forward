@@ -108,7 +108,10 @@ where
         I: 'a,
         L: ListIndexFilter<Item = I> + 'a,
     {
-        ItemRetriever { inner: self, items }
+        ItemRetriever {
+            retrieve: self,
+            items,
+        }
     }
 }
 

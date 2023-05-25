@@ -209,7 +209,7 @@ pub trait Retriever {
 }
 
 pub struct ItemRetriever<'a, R, L> {
-    inner: &'a R,
+    retrieve: &'a R,
     items: &'a L,
 }
 
@@ -220,7 +220,7 @@ where
 {
     /// Get all items for a given `Key`.
     pub fn get(&self, key: &R::Key) -> Iter<'a, L> {
-        let indices = self.inner.get(key);
+        let indices = self.retrieve.get(key);
         self.items.filter(indices)
     }
 
@@ -235,13 +235,13 @@ where
     where
         I: IntoIterator<Item = R::Key>,
     {
-        let indices = self.inner.get_many(keys);
+        let indices = self.retrieve.get_many(keys);
         self.items.filter(indices)
     }
 
     /// Checks whether the `Key` exists.
     pub fn contains(&self, key: R::Key) -> bool {
-        !self.inner.get(&key).is_empty()
+        !self.retrieve.get(&key).is_empty()
     }
 
     /// Return filter methods from the `Store`.
@@ -249,13 +249,13 @@ where
     where
         P: Fn(R::Filter<'a>) -> SelIdx<'_>,
     {
-        let indices = self.inner.filter(predicate);
+        let indices = self.retrieve.filter(predicate);
         self.items.filter(indices)
     }
 
     /// Return meta data from the `Store`.
     pub fn meta(&self) -> R::Meta<'_> {
-        self.inner.meta()
+        self.retrieve.meta()
     }
 }
 
@@ -299,7 +299,7 @@ impl Index {
 
     #[inline]
     pub fn get(&self) -> SelIdx<'_> {
-        SelIdx::from_vec(&self.0)
+        (&self.0).into()
     }
 
     #[inline]

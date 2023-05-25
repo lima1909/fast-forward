@@ -34,44 +34,34 @@ use std::{
 
 pub mod index;
 pub mod list;
-pub mod query;
-
-/// Empty array of `Idx`
-pub const EMPTY_IDXS: &[usize] = &[];
 
 #[derive(Debug, Default, Clone)]
 pub struct SelIdx<'i>(Cow<'i, [usize]>);
 
 /// `SelIdx` (Selected Indices) is the result from quering (filter) a list.
 impl<'i> SelIdx<'i> {
+    #[inline]
     pub fn new(i: usize) -> Self {
         Self(Cow::Owned(vec![i]))
     }
 
-    pub fn from_vec(v: &'i Vec<usize>) -> Self {
-        Self(Cow::Borrowed(v))
-    }
-
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self(Cow::Owned(Vec::new()))
     }
 
+    #[inline]
     pub fn iter(&'i self) -> slice::Iter<'i, usize> {
         self.0.iter()
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
-    }
-}
-
-impl<'i> From<Vec<usize>> for SelIdx<'i> {
-    fn from(v: Vec<usize>) -> Self {
-        Self(Cow::Owned(v))
     }
 }
 
@@ -83,15 +73,15 @@ impl<'i> Index<usize> for SelIdx<'i> {
     }
 }
 
-impl<'i> PartialEq<Vec<usize>> for SelIdx<'i> {
-    fn eq(&self, other: &Vec<usize>) -> bool {
-        &*self.0 == other
+impl<'i> From<Vec<usize>> for SelIdx<'i> {
+    fn from(v: Vec<usize>) -> Self {
+        Self(Cow::Owned(v))
     }
 }
 
-impl<'i> PartialEq<SelIdx<'i>> for Vec<usize> {
-    fn eq(&self, other: &SelIdx<'i>) -> bool {
-        self == other
+impl<'i> From<&'i Vec<usize>> for SelIdx<'i> {
+    fn from(v: &'i Vec<usize>) -> Self {
+        Self(Cow::Borrowed(v))
     }
 }
 
@@ -104,12 +94,6 @@ impl<'i, const N: usize> PartialEq<[usize; N]> for SelIdx<'i> {
 impl<'i, const N: usize> PartialEq<SelIdx<'i>> for [usize; N] {
     fn eq(&self, other: &SelIdx) -> bool {
         (self).eq(&*other.0)
-    }
-}
-
-impl<'i> PartialEq<&[usize]> for SelIdx<'i> {
-    fn eq(&self, other: &&[usize]) -> bool {
-        &self.0 == other
     }
 }
 
@@ -415,17 +399,18 @@ mod tests {
     use crate::{
         fast,
         index::{map::MapIndex, uint::UIntIndex, Retriever},
+        SelIdx,
     };
+    use std::borrow::Cow;
+
+    impl<'i> SelIdx<'i> {
+        fn from_slice(s: &'i [usize]) -> Self {
+            Self(Cow::Borrowed(s))
+        }
+    }
 
     mod indices_or {
-        use crate::SelIdx;
-        use std::borrow::Cow;
-
-        impl<'i> SelIdx<'i> {
-            fn from_slice(s: &'i [usize]) -> Self {
-                Self(Cow::Borrowed(s))
-            }
-        }
+        use super::*;
 
         #[test]
         fn both_empty() {
@@ -487,6 +472,183 @@ mod tests {
                 SelIdx::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
                 SelIdx::from_slice(&[2, 5, 6, 10]) | SelIdx::from_slice(&[1, 2, 8, 9, 12])
             );
+        }
+    }
+
+    mod indices_and {
+        use super::*;
+
+        #[test]
+        fn both_empty() {
+            assert_eq!(SelIdx::empty(), SelIdx::empty() & SelIdx::empty());
+        }
+
+        #[test]
+        fn only_left() {
+            assert_eq!(
+                SelIdx::empty(),
+                SelIdx::from_slice(&[1, 2]) & SelIdx::empty()
+            );
+        }
+
+        #[test]
+        fn only_right() {
+            assert_eq!(
+                SelIdx::empty(),
+                SelIdx::empty() & SelIdx::from_slice(&[1, 2])
+            );
+        }
+
+        #[test]
+        fn diff_len() {
+            assert_eq!(
+                SelIdx::empty(),
+                SelIdx::from_slice(&[1]) & SelIdx::from_slice(&[2, 3])
+            );
+            assert_eq!(
+                SelIdx::empty(),
+                SelIdx::from_slice(&[2, 3]) & SelIdx::from_slice(&[1])
+            );
+
+            assert_eq!([2], SelIdx::from_slice(&[2]) & SelIdx::from_slice(&[2, 5]));
+            assert_eq!(
+                [2],
+                SelIdx::from_slice(&[2]) & SelIdx::from_slice(&[1, 2, 3])
+            );
+            assert_eq!(
+                [2],
+                SelIdx::from_slice(&[2]) & SelIdx::from_slice(&[0, 1, 2])
+            );
+
+            assert_eq!([2], SelIdx::from_slice(&[2, 5]) & SelIdx::from_slice(&[2]));
+            assert_eq!(
+                [2],
+                SelIdx::from_slice(&[1, 2, 3]) & SelIdx::from_slice(&[2])
+            );
+            assert_eq!(
+                [2],
+                SelIdx::from_slice(&[0, 1, 2]) & SelIdx::from_slice(&[2])
+            );
+        }
+
+        #[test]
+        fn overlapping_simple() {
+            assert_eq!(
+                [2],
+                SelIdx::from_slice(&[1, 2]) & SelIdx::from_slice(&[2, 3]),
+            );
+            assert_eq!(
+                [2],
+                SelIdx::from_slice(&[2, 3]) & SelIdx::from_slice(&[1, 2]),
+            );
+
+            assert_eq!(
+                [1],
+                SelIdx::from_slice(&[1, 2]) & SelIdx::from_slice(&[1, 3]),
+            );
+            assert_eq!(
+                [1],
+                SelIdx::from_slice(&[1, 3]) & SelIdx::from_slice(&[1, 2]),
+            );
+        }
+
+        #[test]
+        fn overlapping_diff_len() {
+            // 1, 2, 8, 9, 12
+            // 2, 5, 6, 10
+            assert_eq!(
+                [2, 12],
+                SelIdx::from_slice(&[1, 2, 8, 9, 12])
+                    & SelIdx::from_slice(&[2, 5, 6, 10, 12, 13, 15])
+            );
+
+            // 2, 5, 6, 10
+            // 1, 2, 8, 9, 12
+            assert_eq!(
+                [2, 12],
+                SelIdx::from_slice(&[2, 5, 6, 10, 12, 13, 15])
+                    & SelIdx::from_slice(&[1, 2, 8, 9, 12])
+            );
+        }
+    }
+
+    mod query {
+        use super::*;
+
+        struct List(Vec<usize>);
+
+        impl List {
+            fn eq(&self, i: usize) -> SelIdx<'_> {
+                match self.0.binary_search(&i) {
+                    Ok(pos) => vec![pos].into(),
+                    Err(_) => SelIdx::empty(),
+                }
+            }
+        }
+
+        fn values() -> List {
+            List(vec![0, 1, 2, 3])
+        }
+
+        #[test]
+        fn filter() {
+            let l = values();
+            assert_eq!(1, l.eq(1)[0]);
+            assert_eq!(SelIdx::empty(), values().eq(99));
+        }
+
+        #[test]
+        fn and() {
+            let l = values();
+            assert_eq!(1, (l.eq(1) & l.eq(1))[0]);
+            assert_eq!(SelIdx::empty(), (l.eq(1) & l.eq(2)));
+        }
+
+        #[test]
+        fn or() {
+            let l = values();
+            assert_eq!([1, 2], l.eq(1) | l.eq(2));
+            assert_eq!([1], l.eq(1) | l.eq(99));
+            assert_eq!([1], l.eq(99) | l.eq(1));
+        }
+
+        #[test]
+        fn and_or() {
+            let l = values();
+            // (1 and 1) or 2 => [1, 2]
+            assert_eq!([1, 2], l.eq(1) & l.eq(1) | l.eq(2));
+            // (1 and 2) or 3 => [3]
+            assert_eq!([3], l.eq(1) & l.eq(2) | l.eq(3));
+        }
+
+        #[test]
+        fn or_and_12() {
+            let l = values();
+            // 1 or (2 and 2) => [1, 2]
+            assert_eq!([1, 2], l.eq(1) | l.eq(2) & l.eq(2));
+            // 1 or (3 and 2) => [1]
+            assert_eq!([1], l.eq(1) | l.eq(3) & l.eq(2));
+        }
+
+        #[test]
+        fn or_and_3() {
+            let l = values();
+            // 3 or (2 and 1) => [3]
+            assert_eq!([3], l.eq(3) | l.eq(2) & l.eq(1));
+        }
+
+        #[test]
+        fn and_or_and_2() {
+            let l = values();
+            // (2 and 2) or (2 and 1) => [2]
+            assert_eq!([2], l.eq(2) & l.eq(2) | l.eq(2) & l.eq(1));
+        }
+
+        #[test]
+        fn and_or_and_03() {
+            let l = values();
+            // 0 or (1 and 2) or 3) => [0, 3]
+            assert_eq!([0, 3], l.eq(0) | l.eq(1) & l.eq(2) | l.eq(3));
         }
     }
 
