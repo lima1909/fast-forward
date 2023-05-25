@@ -32,9 +32,9 @@
 //! ```
 use crate::{
     index::{EqFilter, Index, ItemRetriever, MinMax, Retriever, Store},
-    ListIndexFilter, EMPTY_IDXS,
+    ListIndexFilter, SelIdx,
 };
-use std::{borrow::Cow, marker::PhantomData};
+use std::marker::PhantomData;
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
@@ -135,11 +135,11 @@ where
 {
     type Key = K;
 
-    fn get(&self, key: &Self::Key) -> Cow<[usize]> {
+    fn get(&self, key: &Self::Key) -> SelIdx<'_> {
         let i: usize = (*key).into();
         match self.data.get(i) {
             Some(Some(idx)) => idx.get(),
-            _ => Cow::Borrowed(EMPTY_IDXS),
+            _ => SelIdx::empty(),
         }
     }
 
@@ -151,9 +151,9 @@ where
 
     type Filter<'f> = EqFilter<'f, Self> where K:'f;
 
-    fn filter<'s, P>(&'s self, predicate: P) -> Cow<[usize]>
+    fn filter<'s, P>(&'s self, predicate: P) -> SelIdx<'_>
     where
-        P: Fn(<Self as Retriever>::Filter<'s>) -> Cow<[usize]>,
+        P: Fn(<Self as Retriever>::Filter<'s>) -> SelIdx<'_>,
     {
         predicate(EqFilter(self))
     }
@@ -196,7 +196,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::query;
 
     impl<T> ListIndexFilter for Vec<T> {
         type Item = T;
@@ -227,11 +226,11 @@ mod tests {
         i.insert(2, 4);
 
         let r = i.filter(|f| f.eq(&2));
-        assert_eq!(*r, [4]);
+        assert_eq!(r, [4]);
 
         i.insert(1, 3);
-        let r = i.filter(|f| query(f.eq(&2)).or(f.eq(&1)).exec());
-        assert_eq!(*r, [3, 4]);
+        let r = i.filter(|f| f.eq(&2) | f.eq(&1));
+        assert_eq!(r, [3, 4]);
     }
 
     #[test]
@@ -262,7 +261,7 @@ mod tests {
             let mut i = UIntIndex::new();
             i.insert(2, 4);
 
-            assert_eq!(*i.get(&2), [4]);
+            assert_eq!(i.get(&2), [4]);
             assert_eq!(3, i.data.len());
         }
 
@@ -271,7 +270,7 @@ mod tests {
             let mut i = UIntIndex::<bool>::default();
             i.insert(true, 4);
 
-            assert_eq!(*i.get(&true), [4]);
+            assert_eq!(i.get(&true), [4]);
             assert_eq!(2, i.data.len());
         }
 
@@ -280,7 +279,7 @@ mod tests {
             let mut i = UIntIndex::<u16>::default();
             i.insert(2, 4);
 
-            assert_eq!(*i.get(&2), [4]);
+            assert_eq!(i.get(&2), [4]);
             assert_eq!(3, i.data.len());
         }
 
@@ -291,25 +290,16 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            let r = query(idx.get(&3)).or(idx.get(&4)).exec();
-            assert_eq!(*r, [6, 8]);
+            let r = idx.get(&3) | idx.get(&4);
+            assert_eq!(r, [6, 8]);
 
-            let q = query(idx.get(&3));
-            let r = q.and(idx.get(&3)).exec();
-            assert_eq!(*r, [6]);
-
-            let r = query(idx.get(&3)).or(idx.get(&99)).exec();
-            assert_eq!(*r, [6]);
-
-            let r = query(idx.get(&99)).or(idx.get(&4)).exec();
-            assert_eq!(*r, [8]);
-
-            let r = query(idx.get(&3)).and(idx.get(&4)).exec();
-            assert_eq!(&*r, EMPTY_IDXS);
+            assert_eq!([6], idx.get(&3) & idx.get(&3));
+            assert_eq!([6], idx.get(&3) | idx.get(&99));
+            assert_eq!([8], idx.get(&99) | idx.get(&4));
+            assert_eq!(SelIdx::empty(), idx.get(&3) & idx.get(&4));
 
             idx.insert(99, 0);
-            let r = query(idx.get(&99)).exec();
-            assert_eq!(*r, [0]);
+            assert_eq!([0], idx.get(&99));
         }
 
         #[test]
@@ -319,17 +309,15 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            let r = query(idx.get(&3)).and(idx.get(&2)).exec();
-            assert_eq!(&*r, EMPTY_IDXS);
+            assert_eq!(SelIdx::empty(), idx.get(&3) & idx.get(&2));
 
-            let r = query(idx.get(&3)).or(idx.get(&4)).and(idx.get(&2)).exec();
             // =3 or =4 and =2 =>
             // (
             // (4 and 2 = false) // `and` has higher prio than `or`
             //  or 3 = true
             // )
             // => 3 -> 6
-            assert_eq!(*r, [6]);
+            assert_eq!([6], idx.get(&3) | idx.get(&4) & idx.get(&2));
         }
 
         #[test]
@@ -355,13 +343,13 @@ mod tests {
 
             assert_eq!(0, i.get_many([]).iter().len());
             assert_eq!(0, i.get_many([9]).iter().len());
-            assert_eq!([2], *i.get_many([2]));
-            assert_eq!([2, 6], *i.get_many([6, 2]));
-            assert_eq!([2, 6], *i.get_many([9, 6, 2]));
-            assert_eq!([2, 5, 6], *i.get_many([5, 9, 6, 2]));
+            assert_eq!([2], i.get_many([2]));
+            assert_eq!([2, 6], i.get_many([6, 2]));
+            assert_eq!([2, 6], i.get_many([9, 6, 2]));
+            assert_eq!([2, 5, 6], i.get_many([5, 9, 6, 2]));
 
-            assert_eq!([2, 5, 6], *i.get_many(2..=6));
-            assert_eq!([2, 5, 6], *i.get_many(2..9));
+            assert_eq!([2, 5, 6], i.get_many(2..=6));
+            assert_eq!([2, 5, 6], i.get_many(2..9));
         }
 
         #[test]
@@ -436,16 +424,16 @@ mod tests {
             // (old) Key: 99 do not exist, insert a (new) Key 100?
             idx.update(99, 4, 100);
             assert_eq!(101, idx.data.len());
-            assert_eq!([4], *idx.get(&100));
+            assert_eq!([4], idx.get(&100));
 
             // (old) Key 2 exist, but not with Index: 8, insert known Key: 2 with add new Index 8
             idx.update(2, 8, 2);
-            assert_eq!([4, 8], *idx.get(&2));
+            assert_eq!([4, 8], idx.get(&2));
 
             // old Key 2 with Index 8 was removed and (new) Key 4 was added with Index 8
             idx.update(2, 8, 4);
-            assert_eq!([8], *idx.get(&4));
-            assert_eq!([4], *idx.get(&2));
+            assert_eq!([8], idx.get(&4));
+            assert_eq!([4], idx.get(&2));
 
             assert_eq!(2, idx.min());
             assert_eq!(100, idx.max());
@@ -463,11 +451,11 @@ mod tests {
 
             // delete correct Key with wrong Index, nothing happens
             idx.delete(2, 100);
-            assert_eq!([3, 4], *idx.get(&2));
+            assert_eq!([3, 4], idx.get(&2));
 
             // delete correct Key with correct Index
             idx.delete(2, 3);
-            assert_eq!([4], *idx.get(&2));
+            assert_eq!([4], idx.get(&2));
 
             // delete correct Key with last correct Index, Key now longer exist
             idx.delete(2, 4);
@@ -493,7 +481,7 @@ mod tests {
             let mut i = UIntIndex::<u8>::default();
             i.insert(2, 2);
 
-            assert_eq!(*i.get(&2), [2]);
+            assert_eq!(i.get(&2), [2]);
             assert_eq!(3, i.data.len());
         }
 
@@ -503,7 +491,7 @@ mod tests {
             i.insert(2, 2);
             i.insert(2, 1);
 
-            assert_eq!(*i.get(&2), [1, 2]);
+            assert_eq!(i.get(&2), [1, 2]);
         }
 
         #[test]
@@ -516,10 +504,10 @@ mod tests {
 
             assert_eq!(0, i.get_many([]).iter().len());
             assert_eq!(0, i.get_many([9]).iter().len());
-            assert_eq!([1, 2], *i.get_many([2]));
-            assert_eq!([1, 2, 6], *i.get_many([6, 2]));
-            assert_eq!([1, 2, 6], *i.get_many([9, 6, 2]));
-            assert_eq!([1, 2, 5, 6], *i.get_many([5, 9, 6, 2]));
+            assert_eq!([1, 2], i.get_many([2]));
+            assert_eq!([1, 2, 6], i.get_many([6, 2]));
+            assert_eq!([1, 2, 6], i.get_many([9, 6, 2]));
+            assert_eq!([1, 2, 5, 6], i.get_many([5, 9, 6, 2]));
         }
 
         #[test]

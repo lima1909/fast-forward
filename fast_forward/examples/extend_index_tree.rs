@@ -1,13 +1,13 @@
-use fast_forward::{fast, index::uint::UIntIndex, index::Retriever, query::or, EMPTY_IDXS};
+use fast_forward::{fast, index::uint::UIntIndex, index::Retriever, SelIdx};
 
-use std::{borrow::Cow, ops::Index};
+use std::ops::Index;
 
 trait Tree: Retriever<Key = usize> {
-    fn parents<I>(&self, key: usize, stop: usize, nodes: &I) -> Cow<[usize]>
+    fn parents<I>(&self, key: usize, stop: usize, nodes: &I) -> SelIdx<'_>
     where
         I: Index<usize, Output = Node>,
     {
-        let mut result = Cow::Borrowed(EMPTY_IDXS);
+        let mut result = SelIdx::empty();
 
         if key == stop {
             return result;
@@ -15,7 +15,7 @@ trait Tree: Retriever<Key = usize> {
 
         for i in self.get(&key).iter() {
             let n = &nodes[*i];
-            result = or(self.get(&n.parent), self.parents(n.parent, stop, nodes));
+            result = self.get(&n.parent) | self.parents(n.parent, stop, nodes);
         }
 
         result
@@ -59,13 +59,13 @@ fn main() {
     assert!(fast_nodes.id.parents(9, 0, nodes).is_empty());
     assert!(fast_nodes.id.parents(0, 0, nodes).is_empty());
 
-    assert_eq!(&[0], &fast_nodes.id.parents(1, 0, nodes)[..]);
-    assert_eq!(&[0], &fast_nodes.id.parents(4, 0, nodes)[..]);
-    assert_eq!(&[0, 1], &fast_nodes.id.parents(2, 0, nodes)[..]);
-    assert_eq!(&[0, 1], &fast_nodes.id.parents(3, 0, nodes)[..]);
-    assert_eq!(&[0, 1, 2], &fast_nodes.id.parents(5, 0, nodes)[..]);
-    assert_eq!(&[0, 1, 2, 5], &fast_nodes.id.parents(6, 0, nodes)[..]);
+    assert_eq!([0], fast_nodes.id.parents(1, 0, nodes));
+    assert_eq!([0], fast_nodes.id.parents(4, 0, nodes));
+    assert_eq!([0, 1], fast_nodes.id.parents(2, 0, nodes));
+    assert_eq!([0, 1], fast_nodes.id.parents(3, 0, nodes));
+    assert_eq!([0, 1, 2], fast_nodes.id.parents(5, 0, nodes));
+    assert_eq!([0, 1, 2, 5], fast_nodes.id.parents(6, 0, nodes));
 
     // PARENTS-SUBTREE: NOT up to the root node
-    assert_eq!(&[2, 5], &fast_nodes.id.parents(6, 2, nodes)[..]);
+    assert_eq!([2, 5], fast_nodes.id.parents(6, 2, nodes));
 }

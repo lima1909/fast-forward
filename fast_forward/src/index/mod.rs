@@ -27,8 +27,7 @@
 pub mod map;
 pub mod uint;
 
-use crate::{Iter, ListIndexFilter, EMPTY_IDXS};
-use std::borrow::Cow;
+use crate::{Iter, ListIndexFilter, SelIdx};
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Default {
@@ -140,11 +139,11 @@ impl NoMeta {
 pub struct EqFilter<'s, R: Retriever>(&'s R);
 
 impl<'s, R: Retriever> EqFilter<'s, R> {
-    pub fn eq(&self, key: &R::Key) -> Cow<'s, [usize]> {
+    pub fn eq(&self, key: &R::Key) -> SelIdx<'s> {
         self.0.get(key)
     }
 
-    pub fn eq_many<I>(&self, keys: I) -> Cow<[usize]>
+    pub fn eq_many<I>(&self, keys: I) -> SelIdx<'_>
     where
         I: IntoIterator<Item = R::Key>,
     {
@@ -161,7 +160,7 @@ pub trait Retriever {
     type Key;
 
     /// Get all indices for a given `Key`.
-    fn get(&self, key: &Self::Key) -> Cow<[usize]>;
+    fn get(&self, key: &Self::Key) -> SelIdx<'_>;
 
     /// Combined all given `keys` with an logical `OR`.
     ///
@@ -170,7 +169,7 @@ pub trait Retriever {
     /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
     /// ```
-    fn get_many<I>(&self, keys: I) -> Cow<[usize]>
+    fn get_many<I>(&self, keys: I) -> SelIdx<'_>
     where
         I: IntoIterator<Item = Self::Key>,
     {
@@ -179,11 +178,11 @@ pub trait Retriever {
             Some(key) => {
                 let mut c = self.get(&key);
                 for k in it {
-                    c = crate::query::or(c, self.get(&k))
+                    c = c | self.get(&k)
                 }
                 c
             }
-            None => Cow::Borrowed(EMPTY_IDXS),
+            None => SelIdx::empty(),
         }
     }
 
@@ -197,9 +196,9 @@ pub trait Retriever {
         Self: 'f;
 
     /// Return filter methods from the `Store`.
-    fn filter<'r, P>(&'r self, predicate: P) -> Cow<[usize]>
+    fn filter<'r, P>(&'r self, predicate: P) -> SelIdx<'_>
     where
-        P: Fn(<Self as Retriever>::Filter<'r>) -> Cow<[usize]>;
+        P: Fn(<Self as Retriever>::Filter<'r>) -> SelIdx<'_>;
 
     type Meta<'m>
     where
@@ -248,7 +247,7 @@ where
     /// Return filter methods from the `Store`.
     pub fn filter<P>(&self, predicate: P) -> Iter<'a, L>
     where
-        P: Fn(R::Filter<'a>) -> Cow<[usize]>,
+        P: Fn(R::Filter<'a>) -> SelIdx<'_>,
     {
         let indices = self.inner.filter(predicate);
         self.items.filter(indices)
@@ -299,18 +298,14 @@ impl Index {
     }
 
     #[inline]
-    pub fn get(&self) -> Cow<[usize]> {
-        Cow::Borrowed(&self.0)
+    pub fn get(&self) -> SelIdx<'_> {
+        SelIdx::from_vec(&self.0)
     }
 
     #[inline]
-    pub fn remove(&mut self, idx: usize) -> Cow<[usize]> {
+    pub fn remove(&mut self, idx: usize) -> SelIdx<'_> {
         self.0.retain(|v| v != &idx);
         self.get()
-    }
-
-    pub fn or<'a>(&'a self, rhs: Cow<'a, [usize]>) -> Cow<'a, [usize]> {
-        crate::query::or(self.get(), rhs)
     }
 }
 
@@ -321,38 +316,38 @@ mod tests {
     #[test]
     fn index_unique() {
         let u = Index::new(0);
-        assert_eq!([0], *u.get());
+        assert_eq!([0], u.get());
     }
 
     #[test]
     fn index_multi() {
         let mut m = Index::new(2);
-        assert_eq!([2], *m.get());
+        assert_eq!([2], m.get());
 
         m.add(1);
-        assert_eq!([1, 2], *m.get());
+        assert_eq!([1, 2], m.get());
     }
 
     #[test]
     fn index_multi_duplicate() {
         let mut m = Index::new(1);
-        assert_eq!([1], *m.get());
+        assert_eq!([1], m.get());
 
         // ignore add: 1, 1 exists already
         m.add(1);
-        assert_eq!([1], *m.get());
+        assert_eq!([1], m.get());
     }
 
     #[test]
     fn index_multi_ordered() {
         let mut m = Index::new(5);
-        assert_eq!([5], *m.get());
+        assert_eq!([5], m.get());
 
         m.add(3);
         m.add(1);
         m.add(4);
 
-        assert_eq!([1, 3, 4, 5], *m.get());
+        assert_eq!([1, 3, 4, 5], m.get());
     }
 
     #[test]
@@ -366,7 +361,7 @@ mod tests {
         rhs.add(2);
         rhs.add(9);
 
-        assert_eq!([2, 3, 4, 5, 9], *lhs.or(rhs.get()));
+        assert_eq!([2, 3, 4, 5, 9], lhs.get() | rhs.get());
     }
 
     #[test]
@@ -374,16 +369,16 @@ mod tests {
         let mut lhs = Index::new(5);
 
         let rhs = Index::new(5);
-        assert_eq!([5], *lhs.or(rhs.get()));
+        assert_eq!([5], lhs.get() | rhs.get());
 
         lhs.add(0);
-        assert_eq!([0, 5], *lhs.or(rhs.get()));
+        assert_eq!([0, 5], lhs.get() | rhs.get());
     }
 
     #[test]
     fn index_remove() {
         let mut pos = Index::new(5);
-        assert_eq!([5], *pos.get());
+        assert_eq!([5], pos.get());
 
         assert!(pos.remove(5).is_empty());
         // double remove
@@ -391,11 +386,11 @@ mod tests {
 
         let mut pos = Index::new(5);
         pos.add(2);
-        assert_eq!([2], *pos.remove(5));
+        assert_eq!([2], pos.remove(5));
 
         let mut pos = Index::new(5);
         pos.add(2);
-        assert_eq!([5], *pos.remove(2));
+        assert_eq!([5], pos.remove(2));
     }
 
     #[test]

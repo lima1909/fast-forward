@@ -1,7 +1,6 @@
 use fast_forward::{
     fast,
     index::{map::MapIndex, uint::UIntIndex},
-    query::query,
 };
 
 #[derive(Debug, Eq, PartialEq)]
@@ -34,8 +33,9 @@ fn main() {
 
     let r = cars
         .id()
-        .filter(|f| query(f.eq(&2)).or(f.eq(&100)).exec())
+        .filter(|f| f.eq(&2) | f.eq(&100))
         .collect::<Vec<_>>();
+
     assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
 
     // ------------------------------
@@ -52,7 +52,7 @@ fn main() {
 
     let r: Vec<&Car> = cars
         .name()
-        .filter(|f| query(f.eq(&"VW".into())).or(f.eq(&"Audi".into())).exec())
+        .filter(|f| f.eq(&"VW".into()) | f.eq(&"Audi".into()))
         .collect();
     assert_eq!(vec![&Car::new(5, "Audi"), &Car::new(2, "VW")], r);
 }

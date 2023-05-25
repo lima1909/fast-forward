@@ -25,7 +25,12 @@
 //! To Find the `Key`: "Jon" with the `operation equals` is only one step necessary.
 //!
 
-use std::{borrow::Cow, cmp::Ordering::*, ops::BitOr};
+use std::{
+    borrow::Cow,
+    cmp::{min, Ordering::*},
+    ops::{BitAnd, BitOr, Index},
+    slice,
+};
 
 pub mod index;
 pub mod list;
@@ -34,35 +39,87 @@ pub mod query;
 /// Empty array of `Idx`
 pub const EMPTY_IDXS: &[usize] = &[];
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct Indices(Vec<usize>);
+#[derive(Debug, Default, Clone)]
+pub struct SelIdx<'i>(Cow<'i, [usize]>);
 
-impl Indices {
-    #[inline]
-    pub fn new(idx: usize) -> Self {
-        Self(vec![idx])
+/// `SelIdx` (Selected Indices) is the result from quering (filter) a list.
+impl<'i> SelIdx<'i> {
+    pub fn new(i: usize) -> Self {
+        Self(Cow::Owned(vec![i]))
     }
 
-    #[inline]
-    pub fn add(&mut self, idx: usize) {
-        if let Err(pos) = self.0.binary_search(&idx) {
-            self.0.insert(pos, idx);
-        }
+    pub fn from_vec(v: &'i Vec<usize>) -> Self {
+        Self(Cow::Borrowed(v))
     }
 
-    #[inline]
-    pub fn iter(&self) -> std::slice::Iter<'_, usize> {
+    pub fn empty() -> Self {
+        Self(Cow::Owned(Vec::new()))
+    }
+
+    pub fn iter(&'i self) -> slice::Iter<'i, usize> {
         self.0.iter()
     }
 
-    #[inline]
-    pub fn remove(&mut self, idx: usize) -> std::slice::Iter<'_, usize> {
-        self.0.retain(|v| v != &idx);
-        self.iter()
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
-impl BitOr for Indices {
+impl<'i> From<Vec<usize>> for SelIdx<'i> {
+    fn from(v: Vec<usize>) -> Self {
+        Self(Cow::Owned(v))
+    }
+}
+
+impl<'i> Index<usize> for SelIdx<'i> {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl<'i> PartialEq<Vec<usize>> for SelIdx<'i> {
+    fn eq(&self, other: &Vec<usize>) -> bool {
+        &*self.0 == other
+    }
+}
+
+impl<'i> PartialEq<SelIdx<'i>> for Vec<usize> {
+    fn eq(&self, other: &SelIdx<'i>) -> bool {
+        self == other
+    }
+}
+
+impl<'i, const N: usize> PartialEq<[usize; N]> for SelIdx<'i> {
+    fn eq(&self, other: &[usize; N]) -> bool {
+        (*self.0).eq(other)
+    }
+}
+
+impl<'i, const N: usize> PartialEq<SelIdx<'i>> for [usize; N] {
+    fn eq(&self, other: &SelIdx) -> bool {
+        (self).eq(&*other.0)
+    }
+}
+
+impl<'i> PartialEq<&[usize]> for SelIdx<'i> {
+    fn eq(&self, other: &&[usize]) -> bool {
+        &self.0 == other
+    }
+}
+
+impl<'i> PartialEq for SelIdx<'i> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<'i> BitOr for SelIdx<'i> {
     type Output = Self;
 
     fn bitor(self, other: Self) -> Self::Output {
@@ -97,16 +154,53 @@ impl BitOr for Indices {
 
                     if ll == li {
                         v.extend(rhs[ri..].iter());
-                        return Indices(v);
+                        return v.into();
                     } else if lr == ri {
                         v.extend(lhs[li..].iter());
-                        return Indices(v);
+                        return v.into();
                     }
                 }
             }
             (true, false) => other,
             (false, true) => self,
-            (true, true) => Indices(vec![]),
+            (true, true) => SelIdx::empty(),
+        }
+    }
+}
+
+impl<'i> BitAnd for SelIdx<'i> {
+    type Output = Self;
+
+    fn bitand(self, other: Self) -> Self::Output {
+        let lhs = &self.0;
+        let rhs = &other.0;
+
+        // pub fn and<'a>(lhs: &[usize], rhs: &[usize]) -> Cow<'a, [usize]> {
+        if lhs.is_empty() || rhs.is_empty() {
+            return SelIdx::empty();
+        }
+
+        let (ll, lr) = (lhs.len(), rhs.len());
+        let mut v = Vec::with_capacity(min(ll, lr));
+
+        let (mut li, mut ri) = (0, 0);
+
+        loop {
+            let l = lhs[li];
+
+            match l.cmp(&rhs[ri]) {
+                Equal => {
+                    v.push(l);
+                    li += 1;
+                    ri += 1;
+                }
+                Less => li += 1,
+                Greater => ri += 1,
+            }
+
+            if li == ll || ri == lr {
+                return v.into();
+            }
         }
     }
 }
@@ -119,7 +213,7 @@ pub trait ListIndexFilter {
     fn item(&self, index: usize) -> Option<&Self::Item>;
 
     /// Returns a `Iterator` over all `Items` with the given index list.
-    fn filter<'i>(&'i self, indices: Cow<'i, [usize]>) -> Iter<'i, Self>
+    fn filter<'i>(&'i self, indices: SelIdx<'i>) -> Iter<'i, Self>
     where
         Self: Sized,
     {
@@ -130,14 +224,14 @@ pub trait ListIndexFilter {
 pub struct Iter<'i, F: ListIndexFilter> {
     pos: usize,
     list: &'i F,
-    indices: Cow<'i, [usize]>,
+    indices: SelIdx<'i>,
 }
 
 impl<'i, F> Iter<'i, F>
 where
     F: ListIndexFilter,
 {
-    pub const fn new(list: &'i F, indices: Cow<'i, [usize]>) -> Self {
+    pub const fn new(list: &'i F, indices: SelIdx<'i>) -> Self {
         Self {
             pos: 0,
             list,
@@ -286,7 +380,7 @@ macro_rules! fast {
             /// Panics if the positions are out of bound.
             ///
             #[allow(dead_code)]
-            fn filter<'i>(&'i self, filter: std::borrow::Cow<'i, [usize]>) -> $crate::Iter<'i, $crate::list::List<$item>> {
+            fn filter<'i>(&'i self, filter: $crate::SelIdx<'i>) -> $crate::Iter<'i, $crate::list::List<$item>> {
                 use $crate::ListIndexFilter;
 
                 self._items_.filter(filter)
@@ -321,54 +415,60 @@ mod tests {
     use crate::{
         fast,
         index::{map::MapIndex, uint::UIntIndex, Retriever},
-        query::query,
     };
 
     mod indices_or {
-        use crate::Indices;
+        use crate::SelIdx;
+        use std::borrow::Cow;
+
+        impl<'i> SelIdx<'i> {
+            fn from_slice(s: &'i [usize]) -> Self {
+                Self(Cow::Borrowed(s))
+            }
+        }
 
         #[test]
         fn both_empty() {
-            assert_eq!(Indices::default(), Indices::default() | Indices::default());
+            assert_eq!(SelIdx::empty(), SelIdx::empty() | SelIdx::empty());
         }
 
         #[test]
         fn only_left() {
             assert_eq!(
-                Indices([1, 2].into()),
-                Indices([1, 2].into()) | Indices::default()
+                SelIdx::from_slice(&[1, 2]),
+                SelIdx::from_slice(&[1, 2]) | SelIdx::empty()
             );
         }
 
         #[test]
         fn only_right() {
             assert_eq!(
-                Indices([1, 2].into()),
-                Indices::default() | Indices([1, 2].into())
+                SelIdx::from_slice(&[1, 2]),
+                SelIdx::empty() | SelIdx::from_slice(&[1, 2])
             );
         }
 
         #[test]
         fn diff_len() {
             assert_eq!(
-                Indices([1, 2, 3].into()),
-                Indices::new(1) | Indices([2, 3].into()),
+                SelIdx::from_slice(&[1, 2, 3]),
+                SelIdx::new(1) | SelIdx::from_slice(&[2, 3]),
             );
             assert_eq!(
-                Indices([1, 2, 3].into()),
-                Indices([2, 3].into()) | Indices::new(1)
+                SelIdx::from_slice(&[1, 2, 3]),
+                SelIdx::from_slice(&[2, 3]) | SelIdx::new(1)
             );
         }
 
         #[test]
         fn overlapping_simple() {
             assert_eq!(
-                Indices([1, 2, 3].into()),
-                Indices([1, 2].into()) | Indices([2, 3].into())
+                SelIdx::from_slice(&[1, 2, 3]),
+                SelIdx::from_slice(&[1, 2]) | SelIdx::from_slice(&[2, 3])
             );
             assert_eq!(
-                Indices([1, 2, 3].into()),
-                Indices([2, 3].into()) | Indices([1, 2].into())
+                SelIdx::from_slice(&[1, 2, 3]),
+                SelIdx::from_slice(&[2, 3]) | SelIdx::from_slice(&[1, 2])
             );
         }
 
@@ -377,15 +477,15 @@ mod tests {
             // 1, 2, 8, 9, 12
             // 2, 5, 6, 10
             assert_eq!(
-                Indices([1, 2, 5, 6, 8, 9, 10, 12].into()),
-                Indices([1, 2, 8, 9, 12].into()) | Indices([2, 5, 6, 10].into())
+                SelIdx::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
+                SelIdx::from_slice(&[1, 2, 8, 9, 12]) | SelIdx::from_slice(&[2, 5, 6, 10])
             );
 
             // 2, 5, 6, 10
             // 1, 2, 8, 9, 12
             assert_eq!(
-                Indices([1, 2, 5, 6, 8, 9, 10, 12].into()),
-                Indices([2, 5, 6, 10].into()) | Indices([1, 2, 8, 9, 12].into())
+                SelIdx::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
+                SelIdx::from_slice(&[2, 5, 6, 10]) | SelIdx::from_slice(&[1, 2, 8, 9, 12])
             );
         }
     }
@@ -488,7 +588,7 @@ mod tests {
         // or equals query
         let r = cars
             .id()
-            .filter(|f| query(f.eq(&2)).or(f.eq(&100)).exec())
+            .filter(|f| f.eq(&2) | f.eq(&100))
             .collect::<Vec<_>>();
         assert_eq!(&[&Car(2, "BMW".into()), &Car(2, "VW".into())], &r[..]);
 
@@ -550,7 +650,7 @@ mod tests {
         // or equals query
         let r: Vec<&Car> = cars
             .name()
-            .filter(|f| query(f.eq(&"vw".into())).or(f.eq(&"audi".into())).exec())
+            .filter(|f| f.eq(&"vw".into()) | f.eq(&"audi".into()))
             .collect();
         assert_eq!(vec![&Car(5, "Audi".into()), &Car(2, "VW".into())], r);
 
@@ -590,19 +690,13 @@ mod tests {
         fast_cars.insert(Car(1, "Mercedes".into()));
         fast_cars.insert(Car(4, "Porsche".into()));
 
-        assert_eq!([0], *query(fast_cars.id_map.get(&1)).exec());
+        assert_eq!([0], fast_cars.id_map.get(&1));
         assert_eq!(
             [1],
-            *query(fast_cars.id.get(&4))
-                .or(fast_cars.name.get(&"Porsche".into()))
-                .exec()
+            fast_cars.id.get(&4) | fast_cars.name.get(&"Porsche".into())
         );
 
-        let r = fast_cars.filter(
-            query(fast_cars.id.get(&4))
-                .and(fast_cars.name.get(&"Porsche".into()))
-                .exec(),
-        );
+        let r = fast_cars.filter(fast_cars.id.get(&4) & fast_cars.name.get(&"Porsche".into()));
         assert_eq!(vec![&Car(4, "Porsche".into())], r.collect::<Vec<_>>())
     }
 
@@ -661,31 +755,22 @@ mod tests {
         persons.insert(Person::new(41, 7, "Mario", Male));
         persons.insert(Person::new(111, 234, "Paul", Male));
 
-        assert_eq!([1], *query(persons.pk.get(&41)).exec());
-        assert_eq!([0], *query(persons.pk.get(&3)).exec());
-        assert!(query(persons.pk.get(&101)).exec().is_empty());
+        assert_eq!([1], persons.pk.get(&41));
+        assert_eq!([0], persons.pk.get(&3));
+        assert!(persons.pk.get(&101).is_empty());
 
-        let r = query(persons.multi.get(&7)).exec();
-        assert_eq!(*r, [0, 1]);
+        assert_eq!([0, 1], persons.multi.get(&7));
 
-        let r = query(persons.multi.get(&3))
-            .or(persons.multi.get(&7))
-            .exec();
-        assert_eq!(*r, [0, 1]);
+        let r = persons.multi.get(&3) | persons.multi.get(&7);
+        assert_eq!([0, 1], r);
 
-        let r = query(persons.name.get(&"Jasmin".into())).exec();
-        assert_eq!(*r, [0]);
+        assert_eq!([0], persons.name.get(&"Jasmin".into()));
 
-        let r = query(persons.name.get(&"Jasmin".into()))
-            .or(persons.name.get(&"Mario".into()))
-            .exec();
-        assert_eq!(*r, [0, 1]);
+        let r = persons.name.get(&"Jasmin".into()) | persons.name.get(&"Mario".into());
+        assert_eq!([0, 1], r);
 
-        let r = query(persons.gender.get(&Male)).exec();
-        assert_eq!(*r, [1, 2]);
-
-        let r = query(persons.gender.get(&Female)).exec();
-        assert_eq!(*r, [0]);
+        assert_eq!([1, 2], persons.gender.get(&Male));
+        assert_eq!([0], persons.gender.get(&Female));
     }
 
     #[test]
@@ -705,14 +790,12 @@ mod tests {
         name.insert("b", 2);
         name.insert("z", 0);
 
-        let r = query(gender.get(&Female)).and(name.get(&"Julia")).exec();
-        assert_eq!(*r, [1]);
+        assert_eq!([1], gender.get(&Female) & name.get(&"Julia"));
 
-        let r = query(name.get(&"z"))
-            .or(gender.get(&Female))
-            .and(name.get(&"Julia"))
-            .exec();
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
-        assert_eq!(*r, [0, 1]);
+        assert_eq!(
+            [0, 1],
+            name.get(&"z") | gender.get(&Female) & name.get(&"Julia")
+        );
     }
 }

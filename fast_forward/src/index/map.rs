@@ -28,9 +28,9 @@
 //! ```
 use crate::{
     index::{EqFilter, Index, ItemRetriever, NoMeta, Retriever, Store},
-    ListIndexFilter, EMPTY_IDXS,
+    ListIndexFilter, SelIdx,
 };
-use std::{borrow::Cow, collections::HashMap, fmt::Debug, hash::Hash};
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
@@ -80,10 +80,10 @@ where
 {
     type Key = K;
 
-    fn get(&self, key: &Self::Key) -> Cow<[usize]> {
+    fn get(&self, key: &Self::Key) -> SelIdx<'_> {
         match self.0.get(key) {
             Some(i) => i.get(),
-            None => Cow::Borrowed(EMPTY_IDXS),
+            None => SelIdx::empty(),
         }
     }
 
@@ -95,9 +95,9 @@ where
 
     type Filter<'f> = EqFilter<'f, Self> where K:'f;
 
-    fn filter<'s, P>(&'s self, predicate: P) -> Cow<[usize]>
+    fn filter<'s, P>(&'s self, predicate: P) -> SelIdx<'_>
     where
-        P: Fn(<Self as Retriever>::Filter<'s>) -> Cow<[usize]>,
+        P: Fn(<Self as Retriever>::Filter<'s>) -> SelIdx<'_>,
     {
         predicate(EqFilter(self))
     }
@@ -106,7 +106,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::query;
 
     #[test]
     fn retrieve() {
@@ -142,7 +141,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert("Jasmin", 4);
 
-            assert_eq!(*i.get(&"Jasmin"), [4]);
+            assert_eq!(i.get(&"Jasmin"), [4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -151,7 +150,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert(5, 4);
 
-            assert_eq!(*i.get(&5), [4]);
+            assert_eq!(i.get(&5), [4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -160,7 +159,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert('x', 4);
 
-            assert_eq!(*i.get(&'x'), [4]);
+            assert_eq!(i.get(&'x'), [4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -171,14 +170,14 @@ mod tests {
             idx.insert("Mario", 8);
             idx.insert("Paul", 6);
 
-            let r = query(idx.get(&"Mario")).or(idx.get(&"Paul")).exec();
-            assert_eq!(*r, [6, 8]);
+            let r = idx.get(&"Mario") | idx.get(&"Paul");
+            assert_eq!(r, [6, 8]);
 
-            let r = query(idx.get(&"Paul")).or(idx.get(&"Blub")).exec();
-            assert_eq!(*r, [6]);
+            let r = idx.get(&"Paul") | idx.get(&"Blub");
+            assert_eq!(r, [6]);
 
-            let r = query(idx.get(&"Blub")).or(idx.get(&"Mario")).exec();
-            assert_eq!(*r, [8]);
+            let r = idx.get(&"Blub") | idx.get(&"Mario");
+            assert_eq!(r, [8]);
         }
 
         #[test]
@@ -196,12 +195,12 @@ mod tests {
 
             assert_eq!(0, idx.get_many([]).iter().len());
             assert_eq!(0, idx.get_many(["NotFound"]).iter().len());
-            assert_eq!([2], *idx.get_many(["Mario"]));
-            assert_eq!([2, 6], *idx.get_many(["Paul", "Mario"]));
-            assert_eq!([2, 6], *idx.get_many(["NotFound", "Paul", "Mario"]));
+            assert_eq!([2], idx.get_many(["Mario"]));
+            assert_eq!([2, 6], idx.get_many(["Paul", "Mario"]));
+            assert_eq!([2, 6], idx.get_many(["NotFound", "Paul", "Mario"]));
             assert_eq!(
                 [2, 5, 6],
-                *idx.get_many(["Jasmin", "NotFound", "Mario", "Paul"])
+                idx.get_many(["Jasmin", "NotFound", "Mario", "Paul"])
             );
         }
 
@@ -222,16 +221,16 @@ mod tests {
 
             // (old) Key: Jasmin do not exist, insert a (new) Key Jasmin NEW?
             idx.update("Jasmin", 4, "Jasmin NEW");
-            assert_eq!([4], *idx.get(&"Jasmin NEW"));
+            assert_eq!([4], idx.get(&"Jasmin NEW"));
 
             // (old) Key 2 exist, but not with Index: 8, insert known Key: 2 with add new Index 8
             idx.update("Jasmin NEW", 8, "Jasmin NEW");
-            assert_eq!([4, 8], *idx.get(&"Jasmin NEW"));
+            assert_eq!([4, 8], idx.get(&"Jasmin NEW"));
 
             // old Key 2 with Index 8 was removed and (new) Key 4 was added with Index 8
             idx.update("Jasmin NEW", 8, "Jasmin NEW NEW");
-            assert_eq!([8], *idx.get(&"Jasmin NEW NEW"));
-            assert_eq!([4], *idx.get(&"Jasmin NEW"));
+            assert_eq!([8], idx.get(&"Jasmin NEW NEW"));
+            assert_eq!([4], idx.get(&"Jasmin NEW"));
         }
 
         #[test]
@@ -243,11 +242,11 @@ mod tests {
 
             // delete correct Key with wrong Index, nothing happens
             idx.delete("Jasmin", 100);
-            assert_eq!([3, 4], *idx.get(&"Jasmin"));
+            assert_eq!([3, 4], idx.get(&"Jasmin"));
 
             // delete correct Key with correct Index
             idx.delete("Jasmin", 3);
-            assert_eq!([4], *idx.get(&"Jasmin"));
+            assert_eq!([4], idx.get(&"Jasmin"));
 
             // delete correct Key with last correct Index, Key now longer exist
             idx.delete("Jasmin", 4);
@@ -270,7 +269,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert("Jasmin", 2);
 
-            assert_eq!(*i.get(&"Jasmin"), [2]);
+            assert_eq!(i.get(&"Jasmin"), [2]);
             assert_eq!(1, i.0.len());
         }
 
@@ -280,7 +279,7 @@ mod tests {
             i.insert("Jasmin", 2);
             i.insert("Jasmin", 1);
 
-            assert_eq!(*i.get(&"Jasmin"), [1, 2]);
+            assert_eq!(i.get(&"Jasmin"), [1, 2]);
         }
 
         #[test]
