@@ -84,7 +84,7 @@ where
 mod tests {
     use crate::{
         collections::OneIndexList,
-        index::{uint::UIntIndex, Store},
+        index::{map::MapIndex, uint::UIntIndex, Store},
     };
     use rstest::{fixture, rstest};
 
@@ -102,7 +102,7 @@ mod tests {
     }
 
     #[rstest]
-    fn one_indexed_list_filter(cars: Vec<Car>) {
+    fn one_indexed_list_filter_uint(cars: Vec<Car>) {
         let cars =
             OneIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
@@ -124,6 +124,30 @@ mod tests {
 
         assert_eq!(2, cars.idx().meta().min());
         assert_eq!(99, cars.idx().meta().max());
+    }
+
+    #[rstest]
+    fn one_indexed_list_filter_map(cars: Vec<Car>) {
+        let cars = OneIndexList::from_vec(
+            MapIndex::with_capacity(cars.len()),
+            |c: &Car| c.1.clone(),
+            cars,
+        );
+
+        assert!(cars.idx().contains("BMW".into()));
+
+        let r = cars.idx().get(&"VW".into()).collect::<Vec<_>>();
+        assert_eq!(vec![&Car(2, "VW".into())], r);
+
+        let mut it = cars
+            .idx()
+            .filter(|f| f.eq(&"BMW".into()) | f.eq(&"VW".into()));
+        assert_eq!(it.next(), Some(&Car(2, "BMW".into())));
+        assert_eq!(it.next(), Some(&Car(2, "VW".into())));
+        assert_eq!(it.next(), None);
+
+        let mut it = cars.idx().get(&"NotFound".into());
+        assert_eq!(it.next(), None);
     }
 
     #[rstest]
