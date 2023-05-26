@@ -1,6 +1,8 @@
 pub mod list;
 pub mod one;
 
+pub use one::OneIndexList;
+
 use crate::SelectedIndices;
 
 /// `ListIndexFilter` means, that you get an `Iterator` over all `Items` which exists for a given list of indices.

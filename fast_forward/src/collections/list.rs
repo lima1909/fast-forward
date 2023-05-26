@@ -113,16 +113,6 @@ impl<T> Default for List<T> {
     }
 }
 
-impl<T> From<Vec<T>> for List<T> {
-    fn from(v: Vec<T>) -> Self {
-        let mut l = List::with_capacity(v.len());
-        for i in v {
-            l.insert(i, |_, _| {});
-        }
-        l
-    }
-}
-
 impl<T> Index<usize> for List<T> {
     type Output = T;
 
@@ -175,6 +165,16 @@ impl<'i, T> Iterator for Iter<'i, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    impl<T> From<Vec<T>> for List<T> {
+        fn from(v: Vec<T>) -> Self {
+            let mut l = List::with_capacity(v.len());
+            for i in v {
+                l.insert(i, |_, _| {});
+            }
+            l
+        }
+    }
 
     #[test]
     fn insert() {

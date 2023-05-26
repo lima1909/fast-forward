@@ -1,5 +1,5 @@
 use fast_forward::{
-    collections::one::ReadOnlyIndexList,
+    collections::OneIndexList,
     index::{map::MapIndex, uint::UIntIndex, Store},
 };
 
@@ -29,7 +29,7 @@ fn main() {
         Car::new(99, "Porsche"),
     ];
 
-    let cars = ReadOnlyIndexList::from_vec(
+    let cars = OneIndexList::from_vec(
         UIntIndex::with_capacity(cars.len()),
         |c: &Car| c.id,
         cars.clone(),
@@ -55,7 +55,7 @@ fn main() {
         Car::new(99, "Porsche"),
     ];
 
-    let cars = ReadOnlyIndexList::from_vec(
+    let cars = OneIndexList::from_vec(
         MapIndex::with_capacity(cars.len()),
         |c: &Car| c.name.clone(),
         cars,
