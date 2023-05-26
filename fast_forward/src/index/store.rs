@@ -1,4 +1,4 @@
-use crate::{Iter, ListIndexFilter, SelIdx};
+use crate::{Iter, ListIndexFilter, SelectedIndices};
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Default {
@@ -103,7 +103,7 @@ pub trait Retriever {
     type Key;
 
     /// Get all indices for a given `Key`.
-    fn get(&self, key: &Self::Key) -> SelIdx<'_>;
+    fn get(&self, key: &Self::Key) -> SelectedIndices<'_>;
 
     /// Combined all given `keys` with an logical `OR`.
     ///
@@ -112,7 +112,7 @@ pub trait Retriever {
     /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
     /// ```
-    fn get_many<I>(&self, keys: I) -> SelIdx<'_>
+    fn get_many<I>(&self, keys: I) -> SelectedIndices<'_>
     where
         I: IntoIterator<Item = Self::Key>,
     {
@@ -125,7 +125,7 @@ pub trait Retriever {
                 }
                 c
             }
-            None => SelIdx::empty(),
+            None => SelectedIndices::empty(),
         }
     }
 
@@ -139,9 +139,9 @@ pub trait Retriever {
         Self: 'f;
 
     /// Return filter methods from the `Store`.
-    fn filter<'r, P>(&'r self, predicate: P) -> SelIdx<'_>
+    fn filter<'r, P>(&'r self, predicate: P) -> SelectedIndices<'_>
     where
-        P: Fn(<Self as Retriever>::Filter<'r>) -> SelIdx<'_>;
+        P: Fn(<Self as Retriever>::Filter<'r>) -> SelectedIndices<'_>;
 
     type Meta<'m>
     where
@@ -194,7 +194,7 @@ where
     /// Return filter methods from the `Store`.
     pub fn filter<P>(&self, predicate: P) -> Iter<'a, L>
     where
-        P: Fn(R::Filter<'a>) -> SelIdx<'_>,
+        P: Fn(R::Filter<'a>) -> SelectedIndices<'_>,
     {
         let indices = self.retrieve.filter(predicate);
         self.items.filter(indices)
@@ -218,11 +218,11 @@ impl NoMeta {
 pub struct EqFilter<'s, R: Retriever>(pub &'s R);
 
 impl<'s, R: Retriever> EqFilter<'s, R> {
-    pub fn eq(&self, key: &R::Key) -> SelIdx<'s> {
+    pub fn eq(&self, key: &R::Key) -> SelectedIndices<'s> {
         self.0.get(key)
     }
 
-    pub fn eq_many<I>(&self, keys: I) -> SelIdx<'_>
+    pub fn eq_many<I>(&self, keys: I) -> SelectedIndices<'_>
     where
         I: IntoIterator<Item = R::Key>,
     {

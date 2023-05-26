@@ -28,7 +28,7 @@ pub mod map;
 pub mod store;
 pub mod uint;
 
-use crate::SelIdx;
+use crate::SelectedIndices;
 
 pub use store::{EqFilter, ItemRetriever, NoMeta, Retriever, Store};
 
@@ -53,13 +53,13 @@ impl Indices {
 
     /// Return all saved Indices and return as `SelIdx` object.
     #[inline]
-    pub fn get(&self) -> SelIdx<'_> {
+    pub fn get(&self) -> SelectedIndices<'_> {
         (&self.0).into()
     }
 
     /// Remove one Index and return left free Indices.
     #[inline]
-    pub fn remove(&mut self, idx: usize) -> SelIdx<'_> {
+    pub fn remove(&mut self, idx: usize) -> SelectedIndices<'_> {
         self.0.retain(|v| v != &idx);
         self.get()
     }

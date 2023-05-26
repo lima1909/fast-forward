@@ -32,14 +32,16 @@ use std::{
     slice,
 };
 
+pub mod collections;
 pub mod index;
-pub mod list;
+
+pub use collections::{Iter, ListIndexFilter};
 
 #[derive(Debug, Default, Clone)]
-pub struct SelIdx<'i>(Cow<'i, [usize]>);
+pub struct SelectedIndices<'i>(Cow<'i, [usize]>);
 
 /// `SelIdx` (Selected Indices) is the result from quering (filter) a list.
-impl<'i> SelIdx<'i> {
+impl<'i> SelectedIndices<'i> {
     #[inline]
     pub fn new(i: usize) -> Self {
         Self(Cow::Owned(vec![i]))
@@ -65,7 +67,7 @@ impl<'i> SelIdx<'i> {
     }
 }
 
-impl<'i> Index<usize> for SelIdx<'i> {
+impl<'i> Index<usize> for SelectedIndices<'i> {
     type Output = usize;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -73,37 +75,37 @@ impl<'i> Index<usize> for SelIdx<'i> {
     }
 }
 
-impl<'i> From<Vec<usize>> for SelIdx<'i> {
+impl<'i> From<Vec<usize>> for SelectedIndices<'i> {
     fn from(v: Vec<usize>) -> Self {
         Self(Cow::Owned(v))
     }
 }
 
-impl<'i> From<&'i Vec<usize>> for SelIdx<'i> {
+impl<'i> From<&'i Vec<usize>> for SelectedIndices<'i> {
     fn from(v: &'i Vec<usize>) -> Self {
         Self(Cow::Borrowed(v))
     }
 }
 
-impl<'i, const N: usize> PartialEq<[usize; N]> for SelIdx<'i> {
+impl<'i, const N: usize> PartialEq<[usize; N]> for SelectedIndices<'i> {
     fn eq(&self, other: &[usize; N]) -> bool {
         (*self.0).eq(other)
     }
 }
 
-impl<'i, const N: usize> PartialEq<SelIdx<'i>> for [usize; N] {
-    fn eq(&self, other: &SelIdx) -> bool {
+impl<'i, const N: usize> PartialEq<SelectedIndices<'i>> for [usize; N] {
+    fn eq(&self, other: &SelectedIndices) -> bool {
         (self).eq(&*other.0)
     }
 }
 
-impl<'i> PartialEq for SelIdx<'i> {
+impl<'i> PartialEq for SelectedIndices<'i> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
-impl<'i> BitOr for SelIdx<'i> {
+impl<'i> BitOr for SelectedIndices<'i> {
     type Output = Self;
 
     fn bitor(self, other: Self) -> Self::Output {
@@ -147,12 +149,12 @@ impl<'i> BitOr for SelIdx<'i> {
             }
             (true, false) => other,
             (false, true) => self,
-            (true, true) => SelIdx::empty(),
+            (true, true) => SelectedIndices::empty(),
         }
     }
 }
 
-impl<'i> BitAnd for SelIdx<'i> {
+impl<'i> BitAnd for SelectedIndices<'i> {
     type Output = Self;
 
     fn bitand(self, other: Self) -> Self::Output {
@@ -161,7 +163,7 @@ impl<'i> BitAnd for SelIdx<'i> {
 
         // pub fn and<'a>(lhs: &[usize], rhs: &[usize]) -> Cow<'a, [usize]> {
         if lhs.is_empty() || rhs.is_empty() {
-            return SelIdx::empty();
+            return SelectedIndices::empty();
         }
 
         let (ll, lr) = (lhs.len(), rhs.len());
@@ -186,73 +188,6 @@ impl<'i> BitAnd for SelIdx<'i> {
                 return v.into();
             }
         }
-    }
-}
-
-/// `ListIndexFilter` means, that you get an `Iterator` over all `Items` which exists for a given list of indices.
-pub trait ListIndexFilter {
-    type Item;
-
-    /// Returns `Some(Item)` from the given index (position) if it exist, otherwise `None`
-    fn item(&self, index: usize) -> Option<&Self::Item>;
-
-    /// Returns a `Iterator` over all `Items` with the given index list.
-    fn filter<'i>(&'i self, indices: SelIdx<'i>) -> Iter<'i, Self>
-    where
-        Self: Sized,
-    {
-        Iter::new(self, indices)
-    }
-}
-
-pub struct Iter<'i, F: ListIndexFilter> {
-    pos: usize,
-    list: &'i F,
-    indices: SelIdx<'i>,
-}
-
-impl<'i, F> Iter<'i, F>
-where
-    F: ListIndexFilter,
-{
-    pub const fn new(list: &'i F, indices: SelIdx<'i>) -> Self {
-        Self {
-            pos: 0,
-            list,
-            indices,
-        }
-    }
-}
-
-impl<'i, F> Iterator for Iter<'i, F>
-where
-    F: ListIndexFilter,
-{
-    type Item = &'i F::Item;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while self.pos < self.indices.len() {
-            let idx = self.indices[self.pos];
-            self.pos += 1;
-            match self.list.item(idx) {
-                Some(item) => return Some(item),
-                // ignore deleted items
-                None => continue,
-            }
-        }
-        None
-    }
-}
-
-impl<'i, F> ExactSizeIterator for Iter<'i, F>
-where
-    F: ListIndexFilter,
-{
-    fn len(&self) -> usize {
-        self.indices
-            .iter()
-            .filter(|i| self.list.item(**i).is_some())
-            .count()
     }
 }
 
@@ -293,7 +228,7 @@ macro_rules! fast {
             $(
                 $store: $store_type,
             )+
-            _items_: $crate::list::List<$item>,
+            _items_: $crate::collections::list::List<$item>,
         }
 
         ///
@@ -364,21 +299,21 @@ macro_rules! fast {
             /// Panics if the positions are out of bound.
             ///
             #[allow(dead_code)]
-            fn filter<'i>(&'i self, filter: $crate::SelIdx<'i>) -> $crate::Iter<'i, $crate::list::List<$item>> {
+            fn filter<'i>(&'i self, filter: $crate::SelectedIndices<'i>) -> $crate::Iter<'i, $crate::collections::list::List<$item>> {
                 use $crate::ListIndexFilter;
 
                 self._items_.filter(filter)
             }
 
             #[allow(dead_code)]
-            fn iter(&self) -> $crate::list::Iter<'_, $item> {
+            fn iter(&self) -> $crate::collections::list::Iter<'_, $item> {
                 self._items_.iter()
             }
 
             $(
                 /// Create and get a Filter for the Store
                 #[allow(dead_code)]
-                fn $store(&self) -> $crate::index::ItemRetriever<'_, <$store_type as $crate::index::Store>::Retriever<'_>, $crate::list::List<$item>> {
+                fn $store(&self) -> $crate::index::ItemRetriever<'_, <$store_type as $crate::index::Store>::Retriever<'_>, $crate::collections::list::List<$item>> {
                     use $crate::index::Store;
 
                     self.$store.retrieve(&self._items_)
@@ -399,11 +334,11 @@ mod tests {
     use crate::{
         fast,
         index::{map::MapIndex, uint::UIntIndex, Retriever},
-        SelIdx,
+        SelectedIndices,
     };
     use std::borrow::Cow;
 
-    impl<'i> SelIdx<'i> {
+    impl<'i> SelectedIndices<'i> {
         fn from_slice(s: &'i [usize]) -> Self {
             Self(Cow::Borrowed(s))
         }
@@ -414,46 +349,49 @@ mod tests {
 
         #[test]
         fn both_empty() {
-            assert_eq!(SelIdx::empty(), SelIdx::empty() | SelIdx::empty());
+            assert_eq!(
+                SelectedIndices::empty(),
+                SelectedIndices::empty() | SelectedIndices::empty()
+            );
         }
 
         #[test]
         fn only_left() {
             assert_eq!(
-                SelIdx::from_slice(&[1, 2]),
-                SelIdx::from_slice(&[1, 2]) | SelIdx::empty()
+                SelectedIndices::from_slice(&[1, 2]),
+                SelectedIndices::from_slice(&[1, 2]) | SelectedIndices::empty()
             );
         }
 
         #[test]
         fn only_right() {
             assert_eq!(
-                SelIdx::from_slice(&[1, 2]),
-                SelIdx::empty() | SelIdx::from_slice(&[1, 2])
+                SelectedIndices::from_slice(&[1, 2]),
+                SelectedIndices::empty() | SelectedIndices::from_slice(&[1, 2])
             );
         }
 
         #[test]
         fn diff_len() {
             assert_eq!(
-                SelIdx::from_slice(&[1, 2, 3]),
-                SelIdx::new(1) | SelIdx::from_slice(&[2, 3]),
+                SelectedIndices::from_slice(&[1, 2, 3]),
+                SelectedIndices::new(1) | SelectedIndices::from_slice(&[2, 3]),
             );
             assert_eq!(
-                SelIdx::from_slice(&[1, 2, 3]),
-                SelIdx::from_slice(&[2, 3]) | SelIdx::new(1)
+                SelectedIndices::from_slice(&[1, 2, 3]),
+                SelectedIndices::from_slice(&[2, 3]) | SelectedIndices::new(1)
             );
         }
 
         #[test]
         fn overlapping_simple() {
             assert_eq!(
-                SelIdx::from_slice(&[1, 2, 3]),
-                SelIdx::from_slice(&[1, 2]) | SelIdx::from_slice(&[2, 3])
+                SelectedIndices::from_slice(&[1, 2, 3]),
+                SelectedIndices::from_slice(&[1, 2]) | SelectedIndices::from_slice(&[2, 3])
             );
             assert_eq!(
-                SelIdx::from_slice(&[1, 2, 3]),
-                SelIdx::from_slice(&[2, 3]) | SelIdx::from_slice(&[1, 2])
+                SelectedIndices::from_slice(&[1, 2, 3]),
+                SelectedIndices::from_slice(&[2, 3]) | SelectedIndices::from_slice(&[1, 2])
             );
         }
 
@@ -462,15 +400,17 @@ mod tests {
             // 1, 2, 8, 9, 12
             // 2, 5, 6, 10
             assert_eq!(
-                SelIdx::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
-                SelIdx::from_slice(&[1, 2, 8, 9, 12]) | SelIdx::from_slice(&[2, 5, 6, 10])
+                SelectedIndices::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
+                SelectedIndices::from_slice(&[1, 2, 8, 9, 12])
+                    | SelectedIndices::from_slice(&[2, 5, 6, 10])
             );
 
             // 2, 5, 6, 10
             // 1, 2, 8, 9, 12
             assert_eq!(
-                SelIdx::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
-                SelIdx::from_slice(&[2, 5, 6, 10]) | SelIdx::from_slice(&[1, 2, 8, 9, 12])
+                SelectedIndices::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
+                SelectedIndices::from_slice(&[2, 5, 6, 10])
+                    | SelectedIndices::from_slice(&[1, 2, 8, 9, 12])
             );
         }
     }
@@ -480,54 +420,63 @@ mod tests {
 
         #[test]
         fn both_empty() {
-            assert_eq!(SelIdx::empty(), SelIdx::empty() & SelIdx::empty());
+            assert_eq!(
+                SelectedIndices::empty(),
+                SelectedIndices::empty() & SelectedIndices::empty()
+            );
         }
 
         #[test]
         fn only_left() {
             assert_eq!(
-                SelIdx::empty(),
-                SelIdx::from_slice(&[1, 2]) & SelIdx::empty()
+                SelectedIndices::empty(),
+                SelectedIndices::from_slice(&[1, 2]) & SelectedIndices::empty()
             );
         }
 
         #[test]
         fn only_right() {
             assert_eq!(
-                SelIdx::empty(),
-                SelIdx::empty() & SelIdx::from_slice(&[1, 2])
+                SelectedIndices::empty(),
+                SelectedIndices::empty() & SelectedIndices::from_slice(&[1, 2])
             );
         }
 
         #[test]
         fn diff_len() {
             assert_eq!(
-                SelIdx::empty(),
-                SelIdx::from_slice(&[1]) & SelIdx::from_slice(&[2, 3])
+                SelectedIndices::empty(),
+                SelectedIndices::from_slice(&[1]) & SelectedIndices::from_slice(&[2, 3])
             );
             assert_eq!(
-                SelIdx::empty(),
-                SelIdx::from_slice(&[2, 3]) & SelIdx::from_slice(&[1])
-            );
-
-            assert_eq!([2], SelIdx::from_slice(&[2]) & SelIdx::from_slice(&[2, 5]));
-            assert_eq!(
-                [2],
-                SelIdx::from_slice(&[2]) & SelIdx::from_slice(&[1, 2, 3])
-            );
-            assert_eq!(
-                [2],
-                SelIdx::from_slice(&[2]) & SelIdx::from_slice(&[0, 1, 2])
+                SelectedIndices::empty(),
+                SelectedIndices::from_slice(&[2, 3]) & SelectedIndices::from_slice(&[1])
             );
 
-            assert_eq!([2], SelIdx::from_slice(&[2, 5]) & SelIdx::from_slice(&[2]));
             assert_eq!(
                 [2],
-                SelIdx::from_slice(&[1, 2, 3]) & SelIdx::from_slice(&[2])
+                SelectedIndices::from_slice(&[2]) & SelectedIndices::from_slice(&[2, 5])
             );
             assert_eq!(
                 [2],
-                SelIdx::from_slice(&[0, 1, 2]) & SelIdx::from_slice(&[2])
+                SelectedIndices::from_slice(&[2]) & SelectedIndices::from_slice(&[1, 2, 3])
+            );
+            assert_eq!(
+                [2],
+                SelectedIndices::from_slice(&[2]) & SelectedIndices::from_slice(&[0, 1, 2])
+            );
+
+            assert_eq!(
+                [2],
+                SelectedIndices::from_slice(&[2, 5]) & SelectedIndices::from_slice(&[2])
+            );
+            assert_eq!(
+                [2],
+                SelectedIndices::from_slice(&[1, 2, 3]) & SelectedIndices::from_slice(&[2])
+            );
+            assert_eq!(
+                [2],
+                SelectedIndices::from_slice(&[0, 1, 2]) & SelectedIndices::from_slice(&[2])
             );
         }
 
@@ -535,20 +484,20 @@ mod tests {
         fn overlapping_simple() {
             assert_eq!(
                 [2],
-                SelIdx::from_slice(&[1, 2]) & SelIdx::from_slice(&[2, 3]),
+                SelectedIndices::from_slice(&[1, 2]) & SelectedIndices::from_slice(&[2, 3]),
             );
             assert_eq!(
                 [2],
-                SelIdx::from_slice(&[2, 3]) & SelIdx::from_slice(&[1, 2]),
+                SelectedIndices::from_slice(&[2, 3]) & SelectedIndices::from_slice(&[1, 2]),
             );
 
             assert_eq!(
                 [1],
-                SelIdx::from_slice(&[1, 2]) & SelIdx::from_slice(&[1, 3]),
+                SelectedIndices::from_slice(&[1, 2]) & SelectedIndices::from_slice(&[1, 3]),
             );
             assert_eq!(
                 [1],
-                SelIdx::from_slice(&[1, 3]) & SelIdx::from_slice(&[1, 2]),
+                SelectedIndices::from_slice(&[1, 3]) & SelectedIndices::from_slice(&[1, 2]),
             );
         }
 
@@ -558,16 +507,16 @@ mod tests {
             // 2, 5, 6, 10
             assert_eq!(
                 [2, 12],
-                SelIdx::from_slice(&[1, 2, 8, 9, 12])
-                    & SelIdx::from_slice(&[2, 5, 6, 10, 12, 13, 15])
+                SelectedIndices::from_slice(&[1, 2, 8, 9, 12])
+                    & SelectedIndices::from_slice(&[2, 5, 6, 10, 12, 13, 15])
             );
 
             // 2, 5, 6, 10
             // 1, 2, 8, 9, 12
             assert_eq!(
                 [2, 12],
-                SelIdx::from_slice(&[2, 5, 6, 10, 12, 13, 15])
-                    & SelIdx::from_slice(&[1, 2, 8, 9, 12])
+                SelectedIndices::from_slice(&[2, 5, 6, 10, 12, 13, 15])
+                    & SelectedIndices::from_slice(&[1, 2, 8, 9, 12])
             );
         }
     }
@@ -578,10 +527,10 @@ mod tests {
         struct List(Vec<usize>);
 
         impl List {
-            fn eq(&self, i: usize) -> SelIdx<'_> {
+            fn eq(&self, i: usize) -> SelectedIndices<'_> {
                 match self.0.binary_search(&i) {
                     Ok(pos) => vec![pos].into(),
-                    Err(_) => SelIdx::empty(),
+                    Err(_) => SelectedIndices::empty(),
                 }
             }
         }
@@ -594,14 +543,14 @@ mod tests {
         fn filter() {
             let l = values();
             assert_eq!(1, l.eq(1)[0]);
-            assert_eq!(SelIdx::empty(), values().eq(99));
+            assert_eq!(SelectedIndices::empty(), values().eq(99));
         }
 
         #[test]
         fn and() {
             let l = values();
             assert_eq!(1, (l.eq(1) & l.eq(1))[0]);
-            assert_eq!(SelIdx::empty(), (l.eq(1) & l.eq(2)));
+            assert_eq!(SelectedIndices::empty(), (l.eq(1) & l.eq(2)));
         }
 
         #[test]

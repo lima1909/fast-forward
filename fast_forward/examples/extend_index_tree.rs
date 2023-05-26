@@ -1,13 +1,13 @@
-use fast_forward::{fast, index::uint::UIntIndex, index::Retriever, SelIdx};
+use fast_forward::{fast, index::uint::UIntIndex, index::Retriever, SelectedIndices};
 
 use std::ops::Index;
 
 trait Tree: Retriever<Key = usize> {
-    fn parents<I>(&self, key: usize, stop: usize, nodes: &I) -> SelIdx<'_>
+    fn parents<I>(&self, key: usize, stop: usize, nodes: &I) -> SelectedIndices<'_>
     where
         I: Index<usize, Output = Node>,
     {
-        let mut result = SelIdx::empty();
+        let mut result = SelectedIndices::empty();
 
         if key == stop {
             return result;

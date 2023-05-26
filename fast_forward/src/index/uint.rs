@@ -32,7 +32,7 @@
 //! ```
 use crate::{
     index::{EqFilter, Indices, ItemRetriever, MinMax, Retriever, Store},
-    ListIndexFilter, SelIdx,
+    ListIndexFilter, SelectedIndices,
 };
 use std::marker::PhantomData;
 
@@ -135,11 +135,11 @@ where
 {
     type Key = K;
 
-    fn get(&self, key: &Self::Key) -> SelIdx<'_> {
+    fn get(&self, key: &Self::Key) -> SelectedIndices<'_> {
         let i: usize = (*key).into();
         match self.data.get(i) {
             Some(Some(idx)) => idx.get(),
-            _ => SelIdx::empty(),
+            _ => SelectedIndices::empty(),
         }
     }
 
@@ -151,9 +151,9 @@ where
 
     type Filter<'f> = EqFilter<'f, Self> where K:'f;
 
-    fn filter<'s, P>(&'s self, predicate: P) -> SelIdx<'_>
+    fn filter<'s, P>(&'s self, predicate: P) -> SelectedIndices<'_>
     where
-        P: Fn(<Self as Retriever>::Filter<'s>) -> SelIdx<'_>,
+        P: Fn(<Self as Retriever>::Filter<'s>) -> SelectedIndices<'_>,
     {
         predicate(EqFilter(self))
     }
@@ -296,7 +296,7 @@ mod tests {
             assert_eq!([6], idx.get(&3) & idx.get(&3));
             assert_eq!([6], idx.get(&3) | idx.get(&99));
             assert_eq!([8], idx.get(&99) | idx.get(&4));
-            assert_eq!(SelIdx::empty(), idx.get(&3) & idx.get(&4));
+            assert_eq!(SelectedIndices::empty(), idx.get(&3) & idx.get(&4));
 
             idx.insert(99, 0);
             assert_eq!([0], idx.get(&99));
@@ -309,7 +309,7 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            assert_eq!(SelIdx::empty(), idx.get(&3) & idx.get(&2));
+            assert_eq!(SelectedIndices::empty(), idx.get(&3) & idx.get(&2));
 
             // =3 or =4 and =2 =>
             // (

@@ -28,7 +28,7 @@
 //! ```
 use crate::{
     index::{EqFilter, Indices, ItemRetriever, NoMeta, Retriever, Store},
-    ListIndexFilter, SelIdx,
+    ListIndexFilter, SelectedIndices,
 };
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
@@ -80,10 +80,10 @@ where
 {
     type Key = K;
 
-    fn get(&self, key: &Self::Key) -> SelIdx<'_> {
+    fn get(&self, key: &Self::Key) -> SelectedIndices<'_> {
         match self.0.get(key) {
             Some(i) => i.get(),
-            None => SelIdx::empty(),
+            None => SelectedIndices::empty(),
         }
     }
 
@@ -95,9 +95,9 @@ where
 
     type Filter<'f> = EqFilter<'f, Self> where K:'f;
 
-    fn filter<'s, P>(&'s self, predicate: P) -> SelIdx<'_>
+    fn filter<'s, P>(&'s self, predicate: P) -> SelectedIndices<'_>
     where
-        P: Fn(<Self as Retriever>::Filter<'s>) -> SelIdx<'_>,
+        P: Fn(<Self as Retriever>::Filter<'s>) -> SelectedIndices<'_>,
     {
         predicate(EqFilter(self))
     }
