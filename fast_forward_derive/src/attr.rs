@@ -193,8 +193,8 @@ mod tests {
     fn not_expr() {
         let result = syn::parse_str::<Attr>("name = =");
         assert!(result.is_err());
-        let _err_string = result.err().unwrap().to_string();
-        // TODO: assert!(err_string.starts_with("unsupported expression"));
+        let err_string = result.err().unwrap().to_string();
+        assert_eq!("expected expression", err_string);
     }
 
     fn create_field() -> Field {
