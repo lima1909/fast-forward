@@ -185,6 +185,14 @@ mod tests {
         let r = cars.idx().get(&2).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "VW".into())], r);
         assert_eq!(3, cars.count());
-        // assert!(cars.is_deleted(1));
+        assert_eq!(4, cars.len());
+        assert!(cars.is_deleted(0));
+
+        // delete a second Car
+        let deleted_car = cars.delete(3);
+        assert_eq!(&Car(99, "Porsche".into()), deleted_car);
+        assert_eq!(2, cars.count());
+        assert_eq!(4, cars.len());
+        assert!(cars.is_deleted(3));
     }
 }
