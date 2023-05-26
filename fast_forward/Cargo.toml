@@ -20,7 +20,8 @@ include = [
 [dependencies]
 
 [dev-dependencies]
-criterion = "0.4"
+rstest = "0.17.0"
+criterion = "0.5"
 
 [lib]
 bench = false

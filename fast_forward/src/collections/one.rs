@@ -86,19 +86,23 @@ mod tests {
         collections::OneIndexList,
         index::{uint::UIntIndex, Store},
     };
+    use rstest::{fixture, rstest};
 
     #[derive(Debug, Eq, PartialEq, Clone)]
-    struct Car(usize, String);
+    pub struct Car(usize, String);
 
-    #[test]
-    fn one_indexed_list_filter() {
-        let cars = vec![
+    #[fixture]
+    pub fn cars() -> Vec<Car> {
+        vec![
             Car(2, "BMW".into()),
             Car(5, "Audi".into()),
             Car(2, "VW".into()),
             Car(99, "Porsche".into()),
-        ];
+        ]
+    }
 
+    #[rstest]
+    fn one_indexed_list_filter(cars: Vec<Car>) {
         let cars =
             OneIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
@@ -122,15 +126,8 @@ mod tests {
         assert_eq!(99, cars.idx().meta().max());
     }
 
-    #[test]
-    fn one_indexed_list_update() {
-        let cars = vec![
-            Car(2, "BMW".into()),
-            Car(5, "Audi".into()),
-            Car(2, "VW".into()),
-            Car(99, "Porsche".into()),
-        ];
-
+    #[rstest]
+    fn one_indexed_list_update(cars: Vec<Car>) {
         let mut cars =
             OneIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
@@ -147,15 +144,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn one_indexed_list_delete() {
-        let cars = vec![
-            Car(2, "BMW".into()),
-            Car(5, "Audi".into()),
-            Car(2, "VW".into()),
-            Car(99, "Porsche".into()),
-        ];
-
+    #[rstest]
+    fn one_indexed_list_delete(cars: Vec<Car>) {
         let mut cars =
             OneIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
