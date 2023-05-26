@@ -31,7 +31,7 @@
 //! ...  | ...
 //! ```
 use crate::{
-    index::{EqFilter, Index, ItemRetriever, MinMax, Retriever, Store},
+    index::{EqFilter, Indices, ItemRetriever, MinMax, Retriever, Store},
     ListIndexFilter, SelIdx,
 };
 use std::marker::PhantomData;
@@ -39,7 +39,7 @@ use std::marker::PhantomData;
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
 pub struct UIntIndex<K: Default = usize> {
-    data: Vec<Option<Index>>,
+    data: Vec<Option<Indices>>,
     min_max_cache: MinMax<usize>,
     _key: PhantomData<K>,
 }
@@ -56,7 +56,7 @@ impl UIntIndex<usize> {
 
 impl<K> Store for UIntIndex<K>
 where
-    K: Default + Into<usize>,
+    K: Default + Into<usize> + Copy,
 {
     type Key = K;
 
@@ -69,11 +69,11 @@ where
 
         match self.data[k].as_mut() {
             Some(idx) => idx.add(i),
-            None => self.data[k] = Some(Index::new(i)),
+            None => self.data[k] = Some(Indices::new(i)),
         }
 
-        self.min_max_cache.new_min(k);
-        self.min_max_cache.new_max(k);
+        self.min_max_cache.new_min_value(k);
+        self.min_max_cache.new_max_value(k);
     }
 
     fn delete(&mut self, key: K, idx: usize) {
@@ -108,10 +108,7 @@ where
         I: 'a,
         L: ListIndexFilter<Item = I> + 'a,
     {
-        ItemRetriever {
-            retrieve: self,
-            items,
-        }
+        ItemRetriever::new(self, items)
     }
 }
 

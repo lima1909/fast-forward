@@ -27,14 +27,14 @@
 //!
 //! ```
 use crate::{
-    index::{EqFilter, Index, ItemRetriever, NoMeta, Retriever, Store},
+    index::{EqFilter, Indices, ItemRetriever, NoMeta, Retriever, Store},
     ListIndexFilter, SelIdx,
 };
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
-pub struct MapIndex<K: Default = String>(HashMap<K, Index>);
+pub struct MapIndex<K: Default = String>(HashMap<K, Indices>);
 
 impl<K> Store for MapIndex<K>
 where
@@ -46,7 +46,7 @@ where
         match self.0.get_mut(&key) {
             Some(v) => v.add(i),
             None => {
-                self.0.insert(key, Index::new(i));
+                self.0.insert(key, Indices::new(i));
             }
         }
     }
@@ -70,10 +70,7 @@ where
         I: 'a,
         L: ListIndexFilter<Item = I> + 'a,
     {
-        ItemRetriever {
-            retrieve: self,
-            items,
-        }
+        ItemRetriever::new(self, items)
     }
 }
 
