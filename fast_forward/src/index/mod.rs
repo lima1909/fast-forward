@@ -54,7 +54,7 @@ impl Indices {
     /// Return all saved Indices and return as `SelIdx` object.
     #[inline]
     pub fn get(&self) -> SelectedIndices<'_> {
-        (&self.0).into()
+        SelectedIndices::borrowed(&self.0)
     }
 
     /// Remove one Index and return left free Indices.

@@ -164,6 +164,8 @@ impl<'i, T> Iterator for Iter<'i, T> {
 
 #[cfg(test)]
 mod tests {
+    use crate::SelectedIndices;
+
     use super::*;
 
     impl<T> From<Vec<T>> for List<T> {
@@ -330,7 +332,7 @@ mod tests {
         let mut l: List<_> = vec![1, 2, 3].into();
         l.delete(1, |_, _| {});
 
-        let mut it = l.filter(vec![0, 1, 2].into());
+        let mut it = l.filter(SelectedIndices::owned(vec![0, 1, 2]));
 
         assert_eq!(Some(&1), it.next());
         assert_eq!(Some(&3), it.next());
@@ -340,7 +342,7 @@ mod tests {
     #[test]
     fn filter_first() {
         let l: List<_> = vec![1, 2, 3].into();
-        let mut it = l.filter(vec![0, 1].into());
+        let mut it = l.filter(SelectedIndices::owned(vec![0, 1]));
 
         assert_eq!(Some(&1), it.next());
         assert_eq!(Some(&2), it.next());
@@ -350,7 +352,7 @@ mod tests {
     #[test]
     fn filter_last() {
         let l: List<_> = vec![1, 2, 3].into();
-        let mut it = l.filter(vec![1, 2].into());
+        let mut it = l.filter(SelectedIndices::owned(vec![1, 2]));
 
         assert_eq!(Some(&2), it.next());
         assert_eq!(Some(&3), it.next());

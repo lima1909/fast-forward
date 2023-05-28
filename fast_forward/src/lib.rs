@@ -52,6 +52,14 @@ impl<'i> SelectedIndices<'i> {
         Self(Cow::Owned(Vec::new()))
     }
 
+    pub const fn borrowed(s: &'i [usize]) -> Self {
+        Self(Cow::Borrowed(s))
+    }
+
+    pub const fn owned(v: Vec<usize>) -> Self {
+        Self(Cow::Owned(v))
+    }
+
     #[inline]
     pub fn iter(&'i self) -> slice::Iter<'i, usize> {
         self.0.iter()
@@ -73,18 +81,6 @@ impl<'i> Index<usize> for SelectedIndices<'i> {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
-    }
-}
-
-impl<'i> From<Vec<usize>> for SelectedIndices<'i> {
-    fn from(v: Vec<usize>) -> Self {
-        Self(Cow::Owned(v))
-    }
-}
-
-impl<'i> From<&'i Vec<usize>> for SelectedIndices<'i> {
-    fn from(v: &'i Vec<usize>) -> Self {
-        Self(Cow::Borrowed(v))
     }
 }
 
@@ -141,10 +137,10 @@ impl<'i> BitOr for SelectedIndices<'i> {
 
                     if ll == li {
                         v.extend(rhs[ri..].iter());
-                        return v.into();
+                        return SelectedIndices::owned(v);
                     } else if lr == ri {
                         v.extend(lhs[li..].iter());
-                        return v.into();
+                        return SelectedIndices::owned(v);
                     }
                 }
             }
@@ -185,7 +181,7 @@ impl<'i> BitAnd for SelectedIndices<'i> {
             }
 
             if li == ll || ri == lr {
-                return v.into();
+                return SelectedIndices::owned(v);
             }
         }
     }
@@ -529,7 +525,7 @@ mod tests {
         impl List {
             fn eq(&self, i: usize) -> SelectedIndices<'_> {
                 match self.0.binary_search(&i) {
-                    Ok(pos) => vec![pos].into(),
+                    Ok(pos) => SelectedIndices::owned(vec![pos]),
                     Err(_) => SelectedIndices::empty(),
                 }
             }
