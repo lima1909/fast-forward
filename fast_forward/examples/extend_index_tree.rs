@@ -1,4 +1,8 @@
-use fast_forward::{fast, index::uint::UIntIndex, index::Retriever, SelectedIndices};
+use fast_forward::{
+    fast,
+    index::uint::UIntIndex,
+    index::{Retriever, SelectedIndices},
+};
 
 use std::ops::Index;
 

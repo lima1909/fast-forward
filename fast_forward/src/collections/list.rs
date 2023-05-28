@@ -164,7 +164,7 @@ impl<'i, T> Iterator for Iter<'i, T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::SelectedIndices;
+    use crate::index::SelectedIndices;
 
     use super::*;
 

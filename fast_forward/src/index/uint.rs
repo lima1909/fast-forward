@@ -31,8 +31,8 @@
 //! ...  | ...
 //! ```
 use crate::{
-    index::{EqFilter, Indices, ItemRetriever, MinMax, Retriever, Store},
-    ListIndexFilter, SelectedIndices,
+    index::{EqFilter, Indices, ItemRetriever, MinMax, Retriever, SelectedIndices, Store},
+    ListIndexFilter,
 };
 use std::marker::PhantomData;
 

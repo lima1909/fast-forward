@@ -27,8 +27,8 @@
 //!
 //! ```
 use crate::{
-    index::{EqFilter, Indices, ItemRetriever, NoMeta, Retriever, Store},
-    ListIndexFilter, SelectedIndices,
+    index::{EqFilter, Indices, ItemRetriever, NoMeta, Retriever, SelectedIndices, Store},
+    ListIndexFilter,
 };
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 

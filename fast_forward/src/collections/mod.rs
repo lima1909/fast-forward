@@ -3,7 +3,7 @@ pub mod one;
 
 pub use one::OneIndexList;
 
-use crate::SelectedIndices;
+use crate::index::SelectedIndices;
 
 /// `ListIndexFilter` means, that you get an `Iterator` over all `Items` which exists for a given list of indices.
 pub trait ListIndexFilter {

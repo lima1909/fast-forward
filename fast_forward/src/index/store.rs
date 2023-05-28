@@ -1,4 +1,4 @@
-use crate::{Iter, ListIndexFilter, SelectedIndices};
+use crate::{index::SelectedIndices, Iter, ListIndexFilter};
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Default {
@@ -215,6 +215,7 @@ impl NoMeta {
     }
 }
 
+#[repr(transparent)]
 pub struct EqFilter<'s, R: Retriever>(pub &'s R);
 
 impl<'s, R: Retriever> EqFilter<'s, R> {
