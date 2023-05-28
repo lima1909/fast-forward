@@ -30,9 +30,8 @@
 //!  3   |  0, 2
 //! ...  | ...
 //! ```
-use crate::{
-    index::{EqFilter, Indices, ItemRetriever, MinMax, Retriever, SelectedIndices, Store},
-    IndexFilter,
+use crate::index::{
+    EqFilter, IndexFilter, Indices, ItemRetriever, MinMax, Retriever, SelectedIndices, Store,
 };
 use std::marker::PhantomData;
 

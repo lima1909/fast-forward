@@ -59,6 +59,10 @@ where
         self.store.retrieve(&self.items)
     }
 
+    pub fn get(&self, index: usize) -> Option<&I> {
+        self.items.get(index)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
@@ -107,6 +111,7 @@ mod tests {
             OneIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
         assert!(cars.idx().contains(2));
+        assert!(cars.get(2).is_some());
 
         let r = cars.idx().get(&2).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
@@ -180,6 +185,7 @@ mod tests {
 
         let deleted_car = cars.delete(0);
         assert_eq!(&Car(2, "BMW".into()), deleted_car);
+        assert!(cars.get(0).is_none());
 
         // after delete: 1 Car
         let r = cars.idx().get(&2).collect::<Vec<_>>();

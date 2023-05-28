@@ -28,8 +28,6 @@
 pub mod collections;
 pub mod index;
 
-pub use collections::{IndexFilter, Iter};
-
 /// This `macro` is not a solution, it is more an POC (proof of concept)!
 /// The Problem with this macro is the visibility. This means, it can not hide internal fields,
 /// like the `_items_` Vec, for example. But it illustrate the idea behind `fast forward`.
@@ -138,8 +136,8 @@ macro_rules! fast {
             /// Panics if the positions are out of bound.
             ///
             #[allow(dead_code)]
-            fn filter<'i>(&'i self, filter: $crate::index::SelectedIndices<'i>) -> $crate::Iter<'i, $crate::collections::list::List<$item>> {
-                use $crate::IndexFilter;
+            fn filter<'i>(&'i self, filter: $crate::index::SelectedIndices<'i>) -> $crate::index::Filter<'i, $crate::collections::list::List<$item>> {
+                use $crate::index::IndexFilter;
 
                 self._items_.filter(filter)
             }

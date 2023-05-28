@@ -1,4 +1,4 @@
-use crate::{index::SelectedIndices, IndexFilter, Iter};
+use crate::index::{Filter, IndexFilter, SelectedIndices};
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Default {
@@ -166,7 +166,7 @@ where
     }
 
     /// Get all items for a given `Key`.
-    pub fn get(&self, key: &R::Key) -> Iter<'a, L> {
+    pub fn get(&self, key: &R::Key) -> Filter<'a, L> {
         let indices = self.retrieve.get(key);
         self.items.filter(indices)
     }
@@ -178,7 +178,7 @@ where
     /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
     /// ```
-    pub fn get_many<I>(&self, keys: I) -> Iter<'a, L>
+    pub fn get_many<I>(&self, keys: I) -> Filter<'a, L>
     where
         I: IntoIterator<Item = R::Key>,
     {
@@ -192,7 +192,7 @@ where
     }
 
     /// Return filter methods from the `Store`.
-    pub fn filter<P>(&self, predicate: P) -> Iter<'a, L>
+    pub fn filter<P>(&self, predicate: P) -> Filter<'a, L>
     where
         P: Fn(R::Filter<'a>) -> SelectedIndices<'_>,
     {

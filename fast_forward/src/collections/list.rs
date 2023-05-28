@@ -1,4 +1,4 @@
-use crate::IndexFilter;
+use crate::index::IndexFilter;
 use std::ops::Index;
 
 #[derive(Debug, Clone)]
