@@ -1,4 +1,4 @@
-use crate::ListIndexFilter;
+use crate::IndexFilter;
 use std::ops::Index;
 
 #[derive(Debug, Clone)]
@@ -61,6 +61,15 @@ impl<T> List<T> {
         del_item
     }
 
+    /// Get the Item on the given position/index in the List.
+    /// If the Item was deleted, the return value is `None`
+    pub fn get(&self, index: usize) -> Option<&T> {
+        if self.is_deleted(index) {
+            return None;
+        }
+        self.items.get(index)
+    }
+
     pub fn is_deleted(&self, pos: usize) -> bool {
         self.deleted_pos.contains(&pos)
     }
@@ -92,16 +101,8 @@ impl<T> List<T> {
     }
 }
 
-impl<T> ListIndexFilter for List<T> {
+impl<T> IndexFilter for List<T> {
     type Item = T;
-
-    /// Get the Item on the given position in the List. If the Item was deleted, the return is `None`
-    fn item(&self, index: usize) -> Option<&Self::Item> {
-        if self.is_deleted(index) {
-            return None;
-        }
-        self.items.get(index)
-    }
 }
 
 impl<T> Default for List<T> {
@@ -118,7 +119,7 @@ impl<T> Index<usize> for List<T> {
 
     fn index(&self, pos: usize) -> &Self::Output {
         if self.is_deleted(pos) {
-            panic!("Item is deleted");
+            panic!("Item on index: '{pos}' was deleted");
         }
         &self.items[pos]
     }
@@ -139,7 +140,7 @@ impl<'i, T> Iterator for Iter<'i, T> {
     type Item = &'i T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.list.item(self.pos) {
+        match self.list.get(self.pos) {
             Some(item) => {
                 self.pos += 1;
                 Some(item)
@@ -154,7 +155,7 @@ impl<'i, T> Iterator for Iter<'i, T> {
                     continue;
                 }
 
-                let ret = self.list.item(self.pos);
+                let ret = self.list.get(self.pos);
                 self.pos += 1;
                 return ret;
             },
@@ -239,7 +240,7 @@ mod tests {
         assert_eq!(3, l.count());
 
         assert_eq!(Some(&1), l.iter().next());
-        assert_eq!(Some(&2), l.item(1));
+        assert_eq!(Some(&2), l.get(1));
         assert_eq!(3, l[2]); // get with Index
     }
 
@@ -328,15 +329,14 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn iter_filter_delete() {
         let mut l: List<_> = vec![1, 2, 3].into();
         l.delete(1, |_, _| {});
 
-        let mut it = l.filter(SelectedIndices::owned(vec![0, 1, 2]));
+        let mut it = l.filter(SelectedIndices::borrowed(&[1]));
 
         assert_eq!(Some(&1), it.next());
-        assert_eq!(Some(&3), it.next());
-        assert_eq!(None, it.next());
     }
 
     #[test]

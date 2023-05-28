@@ -1,4 +1,4 @@
-use crate::{index::SelectedIndices, Iter, ListIndexFilter};
+use crate::{index::SelectedIndices, IndexFilter, Iter};
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Default {
@@ -94,7 +94,7 @@ pub trait Store: Default {
     fn retrieve<'a, I, L>(&'a self, items: &'a L) -> ItemRetriever<'a, Self::Retriever<'a>, L>
     where
         I: 'a,
-        L: ListIndexFilter<Item = I> + 'a,
+        L: IndexFilter<Item = I> + 'a,
         <Self as Store>::Retriever<'a>: Retriever;
 }
 
@@ -159,7 +159,7 @@ pub struct ItemRetriever<'a, R, L> {
 impl<'a, R, L> ItemRetriever<'a, R, L>
 where
     R: Retriever,
-    L: ListIndexFilter,
+    L: IndexFilter,
 {
     pub fn new(retrieve: &'a R, items: &'a L) -> Self {
         Self { retrieve, items }

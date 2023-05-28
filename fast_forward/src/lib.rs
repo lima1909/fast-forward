@@ -28,7 +28,7 @@
 pub mod collections;
 pub mod index;
 
-pub use collections::{Iter, ListIndexFilter};
+pub use collections::{IndexFilter, Iter};
 
 /// This `macro` is not a solution, it is more an POC (proof of concept)!
 /// The Problem with this macro is the visibility. This means, it can not hide internal fields,
@@ -139,7 +139,7 @@ macro_rules! fast {
             ///
             #[allow(dead_code)]
             fn filter<'i>(&'i self, filter: $crate::index::SelectedIndices<'i>) -> $crate::Iter<'i, $crate::collections::list::List<$item>> {
-                use $crate::ListIndexFilter;
+                use $crate::IndexFilter;
 
                 self._items_.filter(filter)
             }

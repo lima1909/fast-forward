@@ -1,16 +1,15 @@
 pub mod list;
 pub mod one;
 
+use std::ops::Index;
+
 pub use one::OneIndexList;
 
 use crate::index::SelectedIndices;
 
-/// `ListIndexFilter` means, that you get an `Iterator` over all `Items` which exists for a given list of indices.
-pub trait ListIndexFilter {
+/// `IndexFilter` means, that you get an `Iterator` over all `Items` which exists for a given list of indices.
+pub trait IndexFilter: Index<usize, Output = Self::Item> {
     type Item;
-
-    /// Returns `Some(Item)` from the given index (position) if it exist, otherwise `None`
-    fn item(&self, index: usize) -> Option<&Self::Item>;
 
     /// Returns a `Iterator` over all `Items` with the given index list.
     fn filter<'i>(&'i self, indices: SelectedIndices<'i>) -> Iter<'i, Self>
@@ -21,16 +20,13 @@ pub trait ListIndexFilter {
     }
 }
 
-pub struct Iter<'i, F: ListIndexFilter> {
+pub struct Iter<'i, F> {
     pos: usize,
     list: &'i F,
     indices: SelectedIndices<'i>,
 }
 
-impl<'i, F> Iter<'i, F>
-where
-    F: ListIndexFilter,
-{
+impl<'i, F> Iter<'i, F> {
     pub const fn new(list: &'i F, indices: SelectedIndices<'i>) -> Self {
         Self {
             pos: 0,
@@ -42,20 +38,13 @@ where
 
 impl<'i, F> Iterator for Iter<'i, F>
 where
-    F: ListIndexFilter,
+    F: IndexFilter,
 {
     type Item = &'i F::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while self.pos < self.indices.len() {
-            let idx = self.indices[self.pos];
-            self.pos += 1;
-            match self.list.item(idx) {
-                Some(item) => return Some(item),
-                // ignore deleted items
-                None => continue,
-            }
-        }
-        None
+        let idx = self.indices.get(self.pos)?;
+        self.pos += 1;
+        Some(&self.list[*idx])
     }
 }

@@ -28,7 +28,7 @@
 //! ```
 use crate::{
     index::{EqFilter, Indices, ItemRetriever, NoMeta, Retriever, SelectedIndices, Store},
-    ListIndexFilter,
+    IndexFilter,
 };
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
@@ -68,7 +68,7 @@ where
     fn retrieve<'a, I, L>(&'a self, items: &'a L) -> ItemRetriever<'a, Self::Retriever<'a>, L>
     where
         I: 'a,
-        L: ListIndexFilter<Item = I> + 'a,
+        L: IndexFilter<Item = I> + 'a,
     {
         ItemRetriever::new(self, items)
     }

@@ -32,7 +32,7 @@
 //! ```
 use crate::{
     index::{EqFilter, Indices, ItemRetriever, MinMax, Retriever, SelectedIndices, Store},
-    ListIndexFilter,
+    IndexFilter,
 };
 use std::marker::PhantomData;
 
@@ -106,7 +106,7 @@ where
     fn retrieve<'a, I, L>(&'a self, items: &'a L) -> ItemRetriever<'a, Self::Retriever<'a>, L>
     where
         I: 'a,
-        L: ListIndexFilter<Item = I> + 'a,
+        L: IndexFilter<Item = I> + 'a,
     {
         ItemRetriever::new(self, items)
     }
@@ -197,12 +197,8 @@ where
 mod tests {
     use super::*;
 
-    impl<T> ListIndexFilter for Vec<T> {
+    impl<T> IndexFilter for Vec<T> {
         type Item = T;
-
-        fn item(&self, index: usize) -> Option<&Self::Item> {
-            self.get(index)
-        }
     }
 
     #[test]

@@ -66,6 +66,11 @@ impl<'i> SelectedIndices<'i> {
     }
 
     #[inline]
+    pub fn get(&self, index: usize) -> Option<&usize> {
+        self.0.get(index)
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         self.0.len()
     }
