@@ -59,15 +59,3 @@ where
         None
     }
 }
-
-impl<'i, F> ExactSizeIterator for Iter<'i, F>
-where
-    F: ListIndexFilter,
-{
-    fn len(&self) -> usize {
-        self.indices
-            .iter()
-            .filter(|i| self.list.item(**i).is_some())
-            .count()
-    }
-}

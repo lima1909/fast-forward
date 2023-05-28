@@ -38,6 +38,7 @@ pub mod index;
 pub use collections::{Iter, ListIndexFilter};
 
 #[derive(Debug, Default, Clone)]
+#[repr(transparent)]
 pub struct SelectedIndices<'i>(Cow<'i, [usize]>);
 
 /// `SelIdx` (Selected Indices) is the result from quering (filter) a list.
@@ -161,7 +162,6 @@ impl<'i> BitAnd for SelectedIndices<'i> {
         let lhs = &self.0;
         let rhs = &other.0;
 
-        // pub fn and<'a>(lhs: &[usize], rhs: &[usize]) -> Cow<'a, [usize]> {
         if lhs.is_empty() || rhs.is_empty() {
             return SelectedIndices::empty();
         }
