@@ -50,15 +50,15 @@ impl<T> List<T> {
     ///
     /// Panics if the pos is out of bound.
     ///
-    pub fn delete<F>(&mut self, pos: usize, mut trigger: F) -> &T
+    pub fn delete<F>(&mut self, pos: usize, mut trigger: F) -> Option<&T>
     where
         F: FnMut(&T, usize), // param are: &Item, current position in the list
     {
-        let del_item = &self.items[pos];
+        let del_item = self.items.get(pos)?;
         trigger(del_item, pos);
 
         self.deleted_pos.push(pos);
-        del_item
+        Some(del_item)
     }
 
     /// Get the Item on the given position/index in the List.
@@ -259,7 +259,7 @@ mod tests {
     fn delete_first() {
         let mut l: List<_> = vec![1, 2, 3].into();
 
-        assert_eq!(&1, l.delete(0, |_, _| {}));
+        assert_eq!(Some(&1), l.delete(0, |_, _| {}));
         assert_eq!(3, l.len());
         assert_eq!(2, l.count());
 

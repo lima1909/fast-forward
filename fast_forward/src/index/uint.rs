@@ -111,9 +111,9 @@ where
     }
 }
 
-pub struct NewMeta<'s, K: Default + 's>(&'s UIntIndex<K>);
+pub struct UIntMeta<'s, K: Default + 's>(&'s UIntIndex<K>);
 
-impl<'s, K> NewMeta<'s, K>
+impl<'s, K> UIntMeta<'s, K>
 where
     K: Default + 's,
 {
@@ -142,10 +142,10 @@ where
         }
     }
 
-    type Meta<'f> = NewMeta<'f, K> where K:'f;
+    type Meta<'f> = UIntMeta<'f, K> where K:'f;
 
     fn meta(&self) -> Self::Meta<'_> {
-        NewMeta(self)
+        UIntMeta(self)
     }
 
     type Filter<'f> = EqFilter<'f, Self> where K:'f;

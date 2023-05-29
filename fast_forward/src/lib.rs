@@ -116,7 +116,7 @@ macro_rules! fast {
             /// Panics if the pos is out of bound.
             ///
             #[allow(dead_code)]
-            fn delete(&mut self, pos: usize) -> &$item{
+            fn delete(&mut self, pos: usize) -> Option<&$item> {
                 use $crate::index::Store;
 
                 self._items_.delete(pos, |it: &$item, pos: usize| {

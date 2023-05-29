@@ -47,7 +47,7 @@ where
             })
     }
 
-    pub fn delete(&mut self, pos: usize) -> &I {
+    pub fn delete(&mut self, pos: usize) -> Option<&I> {
         self.items
             .delete(pos, |it, idx| self.store.delete((self.field)(it), idx))
     }
@@ -160,6 +160,7 @@ mod tests {
         let mut cars =
             OneIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
+        // update name, where name is NOT a Index
         let updated = cars.update(0, |c| {
             let mut c_update = c.clone();
             c_update.1 = "BMW updated".into();
@@ -171,6 +172,29 @@ mod tests {
             vec![&Car(2, "BMW updated".into()), &Car(2, "VW".into())],
             cars.idx().get(&2).collect::<Vec<_>>()
         );
+
+        // update ID, where ID is a Index
+        let updated = cars.update(0, |c| {
+            let mut c_update = c.clone();
+            c_update.0 = 5;
+            c_update
+        });
+        assert!(updated);
+
+        assert_eq!(
+            vec![&Car(2, "VW".into())],
+            cars.idx().get(&2).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![&Car(5, "BMW updated".into()), &Car(5, "Audi".into())],
+            cars.idx().get(&5).collect::<Vec<_>>()
+        );
+
+        // update wrong ID
+        let updated = cars.update(10_000, |_c| {
+            panic!("wrong ID, never call this update function")
+        });
+        assert!(!updated);
     }
 
     #[rstest]
@@ -184,7 +208,7 @@ mod tests {
         assert_eq!(4, cars.count());
 
         let deleted_car = cars.delete(0);
-        assert_eq!(&Car(2, "BMW".into()), deleted_car);
+        assert_eq!(Some(&Car(2, "BMW".into())), deleted_car);
         assert!(cars.get(0).is_none());
 
         // after delete: 1 Car
@@ -196,9 +220,12 @@ mod tests {
 
         // delete a second Car
         let deleted_car = cars.delete(3);
-        assert_eq!(&Car(99, "Porsche".into()), deleted_car);
+        assert_eq!(Some(&Car(99, "Porsche".into())), deleted_car);
         assert_eq!(2, cars.count());
         assert_eq!(4, cars.len());
         assert!(cars.is_deleted(3));
+
+        // delete wrong ID
+        assert_eq!(None, cars.delete(10_000));
     }
 }
