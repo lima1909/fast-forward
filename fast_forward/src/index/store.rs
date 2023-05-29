@@ -216,21 +216,27 @@ impl NoMeta {
 }
 
 #[repr(transparent)]
-pub struct EqFilter<'s, R: Retriever>(pub &'s R);
+pub struct EqFilter<'s, R: Retriever> {
+    retriever: &'s R,
+}
 
 impl<'s, R: Retriever> EqFilter<'s, R> {
+    pub const fn new(retriever: &'s R) -> Self {
+        Self { retriever }
+    }
+
     pub fn eq(&self, key: &R::Key) -> SelectedIndices<'s> {
-        self.0.get(key)
+        self.retriever.get(key)
     }
 
     pub fn eq_many<I>(&self, keys: I) -> SelectedIndices<'_>
     where
         I: IntoIterator<Item = R::Key>,
     {
-        self.0.get_many(keys)
+        self.retriever.get_many(keys)
     }
 
     pub fn contains(&self, key: &R::Key) -> bool {
-        self.0.contains(key)
+        self.retriever.contains(key)
     }
 }

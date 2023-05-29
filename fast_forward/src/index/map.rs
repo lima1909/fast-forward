@@ -98,7 +98,7 @@ where
     where
         P: Fn(<Self as Retriever>::Filter<'s>) -> SelectedIndices<'_>,
     {
-        predicate(EqFilter(self))
+        predicate(EqFilter::new(self))
     }
 }
 
