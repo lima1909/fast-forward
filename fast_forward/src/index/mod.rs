@@ -308,8 +308,9 @@ mod tests {
         // expected
         #[rstest]
         #[case::empty(
-            SelectedIndices::empty(), SelectedIndices::empty(),
             SelectedIndices::empty(),
+            SelectedIndices::empty(),
+            SelectedIndices::empty()
         )]
         #[case::only_left(
             SelectedIndices::from_slice(&[1, 2]), SelectedIndices::empty(),
@@ -321,7 +322,7 @@ mod tests {
         )]
         #[case::diff_len1(
             SelectedIndices::new(1), SelectedIndices::from_slice(&[2, 3]),
-            SelectedIndices::from_slice(&[1, 2, 3]), 
+            SelectedIndices::from_slice(&[1, 2, 3]),
         )]
         #[case::diff_len2(
             SelectedIndices::from_slice(&[2, 3]), SelectedIndices::new(1),
@@ -360,8 +361,9 @@ mod tests {
         // expected
         #[rstest]
         #[case::empty(
-            SelectedIndices::empty(), SelectedIndices::empty(),
             SelectedIndices::empty(),
+            SelectedIndices::empty(),
+            SelectedIndices::empty()
         )]
         #[case::only_left(
             SelectedIndices::from_slice(&[1, 2]), SelectedIndices::empty(),
@@ -382,8 +384,6 @@ mod tests {
         ) {
             assert_eq!(expected, left & right);
         }
-
-
 
         mod indices_and {
             use super::*;
