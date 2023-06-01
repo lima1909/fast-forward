@@ -1,9 +1,7 @@
 use crate::index::{Filter, IndexFilter, SelectedIndices};
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
-pub trait Store: Default {
-    type Key;
-
+pub trait Store: Filterable {
     /// Insert an `Key` for a given `Index`.
     ///
     /// Before:
@@ -235,8 +233,141 @@ impl<'s, R: Retriever> EqFilter<'s, R> {
     {
         self.retriever.get_many(keys)
     }
+}
 
-    pub fn contains(&self, key: &R::Key) -> bool {
-        self.retriever.contains(key)
+/// A Store is [`Filterable`], if by given `Key` can get all Indices.
+pub trait Filterable {
+    type Key;
+
+    /// Get all indices for a given `Key`.
+    /// If the `Key` not exist, than this method returns [`SelectedIndices::empty()`]
+    fn indices(&self, key: &Self::Key) -> SelectedIndices<'_>;
+
+    /// Checks whether the `Key` exists.
+    #[inline]
+    fn x_contains(&self, key: &Self::Key) -> bool {
+        !self.indices(key).is_empty()
+    }
+
+    /// Combined all given `keys` with an logical `OR`.
+    ///
+    /// ## Example:
+    ///```text
+    /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
+    /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
+    /// ```
+    #[inline]
+    fn x_get_many<I>(&self, keys: I) -> SelectedIndices<'_>
+    where
+        I: IntoIterator<Item = Self::Key>,
+    {
+        let mut it = keys.into_iter();
+        match it.next() {
+            Some(key) => {
+                let mut c = self.indices(&key);
+                for k in it {
+                    c = c | self.indices(&k)
+                }
+                c
+            }
+            None => SelectedIndices::empty(),
+        }
+    }
+}
+
+#[repr(transparent)]
+pub struct XFilter<'f, F>(&'f F);
+
+impl<'f, F> XFilter<'f, F>
+where
+    F: Filterable,
+{
+    // pub const fn new(filter: &'f F) -> Self {
+    //     Self { filter }
+    // }
+
+    pub fn eq(&self, key: &F::Key) -> SelectedIndices<'f> {
+        self.0.indices(key)
+    }
+
+    pub fn eq_many<I>(&self, keys: I) -> SelectedIndices<'_>
+    where
+        I: IntoIterator<Item = F::Key>,
+    {
+        self.0.x_get_many(keys)
+    }
+}
+
+#[repr(transparent)]
+pub struct XRetriever<'f, F>(&'f F);
+
+impl<'f, F> XRetriever<'f, F>
+where
+    F: Filterable,
+{
+    /// Get all items for a given `Key`.
+    pub fn get(&self, key: &F::Key) -> SelectedIndices<'f> {
+        self.0.indices(key)
+    }
+
+    /// Combined all given `keys` with an logical `OR`.
+    ///
+    /// ## Example:
+    ///```text
+    /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
+    /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
+    /// ```
+    pub fn get_many<I>(&self, keys: I) -> SelectedIndices<'f>
+    where
+        I: IntoIterator<Item = F::Key>,
+    {
+        self.0.x_get_many(keys)
+    }
+
+    /// Checks whether the `Key` exists.
+    pub fn contains(&self, key: &F::Key) -> bool {
+        self.0.x_contains(key)
+    }
+
+    /// Return filter methods from the `Store`.
+    pub fn filter<P>(&self, predicate: P) -> SelectedIndices<'f>
+    where
+        P: Fn(XFilter<'f, F>) -> SelectedIndices<'f>,
+    {
+        predicate(XFilter(self.0))
+    }
+
+    // /// Return meta data from the `Store`.
+    // pub fn meta(&self) -> R::Meta<'_> {
+    //     self.retrieve.meta()
+    // }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    impl Filterable for Vec<&'static str> {
+        type Key = &'static str;
+
+        fn indices(&self, key: &Self::Key) -> SelectedIndices<'_> {
+            let idx = self.binary_search(key).unwrap();
+            SelectedIndices::new(idx)
+        }
+    }
+
+    #[test]
+    fn retrieve() {
+        let list = vec!["a", "b", "c"];
+        let r = XRetriever(&list);
+        assert!(r.contains(&"a"));
+        assert_eq!(SelectedIndices::new(1), r.get(&"b"));
+        assert_eq!(SelectedIndices::owned(vec![0, 1]), r.get_many(["a", "b"]));
+        assert_eq!(SelectedIndices::new(2), r.filter(|f| f.eq(&"c")));
+
+        assert_eq!(
+            SelectedIndices::new(2),
+            r.filter(|_f| SelectedIndices::new(2))
+        );
     }
 }

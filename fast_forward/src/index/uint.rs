@@ -31,7 +31,8 @@
 //! ...  | ...
 //! ```
 use crate::index::{
-    EqFilter, IndexFilter, Indices, ItemRetriever, MinMax, Retriever, SelectedIndices, Store,
+    store::Filterable, EqFilter, IndexFilter, Indices, ItemRetriever, MinMax, Retriever,
+    SelectedIndices, Store,
 };
 use std::marker::PhantomData;
 
@@ -53,12 +54,26 @@ impl UIntIndex<usize> {
     }
 }
 
-impl<K> Store for UIntIndex<K>
+impl<K> Filterable for UIntIndex<K>
 where
     K: Default + Into<usize> + Copy,
 {
     type Key = K;
 
+    #[inline]
+    fn indices(&self, key: &Self::Key) -> SelectedIndices<'_> {
+        let i: usize = (*key).into();
+        match self.data.get(i) {
+            Some(Some(idx)) => idx.get(),
+            _ => SelectedIndices::empty(),
+        }
+    }
+}
+
+impl<K> Store for UIntIndex<K>
+where
+    K: Default + Into<usize> + Copy,
+{
     fn insert(&mut self, k: K, i: usize) {
         let k = k.into();
 

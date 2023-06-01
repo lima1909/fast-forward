@@ -27,7 +27,8 @@
 //!
 //! ```
 use crate::index::{
-    EqFilter, IndexFilter, Indices, ItemRetriever, NoMeta, Retriever, SelectedIndices, Store,
+    store::Filterable, EqFilter, IndexFilter, Indices, ItemRetriever, NoMeta, Retriever,
+    SelectedIndices, Store,
 };
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
@@ -35,12 +36,25 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash};
 #[derive(Debug, Default)]
 pub struct MapIndex<K: Default = String>(HashMap<K, Indices>);
 
+impl<K> Filterable for MapIndex<K>
+where
+    K: Default + Hash + Eq,
+{
+    type Key = K;
+
+    #[inline]
+    fn indices(&self, key: &Self::Key) -> SelectedIndices<'_> {
+        match self.0.get(key) {
+            Some(i) => i.get(),
+            None => SelectedIndices::empty(),
+        }
+    }
+}
+
 impl<K> Store for MapIndex<K>
 where
     K: Default + Eq + Hash,
 {
-    type Key = K;
-
     fn insert(&mut self, key: K, i: usize) {
         match self.0.get_mut(&key) {
             Some(v) => v.add(i),

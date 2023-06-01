@@ -295,6 +295,7 @@ mod tests {
 
     mod selected_indices {
         use super::*;
+        use rstest::rstest;
 
         impl<'i> SelectedIndices<'i> {
             fn from_slice(s: &'i [usize]) -> Self {
@@ -302,103 +303,90 @@ mod tests {
             }
         }
 
-        mod indices_or {
-            use super::*;
-
-            #[test]
-            fn both_empty() {
-                assert_eq!(
-                    SelectedIndices::empty(),
-                    SelectedIndices::empty() | SelectedIndices::empty()
-                );
-            }
-
-            #[test]
-            fn only_left() {
-                assert_eq!(
-                    SelectedIndices::from_slice(&[1, 2]),
-                    SelectedIndices::from_slice(&[1, 2]) | SelectedIndices::empty()
-                );
-            }
-
-            #[test]
-            fn only_right() {
-                assert_eq!(
-                    SelectedIndices::from_slice(&[1, 2]),
-                    SelectedIndices::empty() | SelectedIndices::from_slice(&[1, 2])
-                );
-            }
-
-            #[test]
-            fn diff_len() {
-                assert_eq!(
-                    SelectedIndices::from_slice(&[1, 2, 3]),
-                    SelectedIndices::new(1) | SelectedIndices::from_slice(&[2, 3]),
-                );
-                assert_eq!(
-                    SelectedIndices::from_slice(&[1, 2, 3]),
-                    SelectedIndices::from_slice(&[2, 3]) | SelectedIndices::new(1)
-                );
-            }
-
-            #[test]
-            fn overlapping_simple() {
-                assert_eq!(
-                    SelectedIndices::from_slice(&[1, 2, 3]),
-                    SelectedIndices::from_slice(&[1, 2]) | SelectedIndices::from_slice(&[2, 3])
-                );
-                assert_eq!(
-                    SelectedIndices::from_slice(&[1, 2, 3]),
-                    SelectedIndices::from_slice(&[2, 3]) | SelectedIndices::from_slice(&[1, 2])
-                );
-            }
-
-            #[test]
-            fn overlapping_diff_len() {
-                // 1, 2, 8, 9, 12
-                // 2, 5, 6, 10
-                assert_eq!(
-                    SelectedIndices::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
-                    SelectedIndices::from_slice(&[1, 2, 8, 9, 12])
-                        | SelectedIndices::from_slice(&[2, 5, 6, 10])
-                );
-
-                // 2, 5, 6, 10
-                // 1, 2, 8, 9, 12
-                assert_eq!(
-                    SelectedIndices::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
-                    SelectedIndices::from_slice(&[2, 5, 6, 10])
-                        | SelectedIndices::from_slice(&[1, 2, 8, 9, 12])
-                );
-            }
+        // SelectedIndices - ORs:
+        // left | right
+        // expected
+        #[rstest]
+        #[case::empty(
+            SelectedIndices::empty(), SelectedIndices::empty(),
+            SelectedIndices::empty()
+        )]
+        #[case::only_left(
+            SelectedIndices::from_slice(&[1, 2]), SelectedIndices::empty(),
+            SelectedIndices::from_slice(&[1, 2])
+        )]
+        #[case::only_right(
+            SelectedIndices::empty(), SelectedIndices::from_slice(&[1, 2]),
+            SelectedIndices::from_slice(&[1, 2])
+        )]
+        #[case::diff_len1(
+            SelectedIndices::new(1), SelectedIndices::from_slice(&[2, 3]),
+            SelectedIndices::from_slice(&[1, 2, 3]), 
+        )]
+        #[case::diff_len2(
+            SelectedIndices::from_slice(&[2, 3]), SelectedIndices::new(1),
+            SelectedIndices::from_slice(&[1, 2, 3]),
+        )]
+        #[case::overlapping_simple1(
+            SelectedIndices::from_slice(&[1, 2]), SelectedIndices::from_slice(&[2, 3]),
+            SelectedIndices::from_slice(&[1, 2, 3]),
+        )]
+        #[case::overlapping_simple2(
+            SelectedIndices::from_slice(&[2, 3]), SelectedIndices::from_slice(&[1, 2]),
+            SelectedIndices::from_slice(&[1, 2, 3]),
+        )]
+        #[case::overlapping_diff_len1(
+            // 1, 2, 8, 9, 12
+            // 2, 5, 6, 10
+            SelectedIndices::from_slice(&[1, 2, 8, 9, 12]), SelectedIndices::from_slice(&[2, 5, 6, 10]),
+            SelectedIndices::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
+        )]
+        #[case::overlapping_diff_len1(
+            // 2, 5, 6, 10
+            // 1, 2, 8, 9, 12
+            SelectedIndices::from_slice(&[2, 5, 6, 10]), SelectedIndices::from_slice(&[1, 2, 8, 9, 12]),
+            SelectedIndices::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
+        )]
+        fn ors(
+            #[case] left: SelectedIndices,
+            #[case] right: SelectedIndices,
+            #[case] expected: SelectedIndices,
+        ) {
+            assert_eq!(expected, left | right);
         }
+
+        // SelectedIndices - ANDs:
+        // left | right
+        // expected
+        #[rstest]
+        #[case::empty(
+            SelectedIndices::empty(), SelectedIndices::empty(),
+            SelectedIndices::empty()
+        )]
+        #[case::only_left(
+            SelectedIndices::from_slice(&[1, 2]), SelectedIndices::empty(),
+            SelectedIndices::empty()
+        )]
+        #[case::only_right(
+            SelectedIndices::empty(), SelectedIndices::from_slice(&[1, 2]),
+            SelectedIndices::empty()
+        )]
+        #[case::diff_len(
+            SelectedIndices::empty(), SelectedIndices::from_slice(&[1, 2]),
+            SelectedIndices::empty()
+        )]
+        fn ands(
+            #[case] left: SelectedIndices,
+            #[case] right: SelectedIndices,
+            #[case] expected: SelectedIndices,
+        ) {
+            assert_eq!(expected, left & right);
+        }
+
+
 
         mod indices_and {
             use super::*;
-
-            #[test]
-            fn both_empty() {
-                assert_eq!(
-                    SelectedIndices::empty(),
-                    SelectedIndices::empty() & SelectedIndices::empty()
-                );
-            }
-
-            #[test]
-            fn only_left() {
-                assert_eq!(
-                    SelectedIndices::empty(),
-                    SelectedIndices::from_slice(&[1, 2]) & SelectedIndices::empty()
-                );
-            }
-
-            #[test]
-            fn only_right() {
-                assert_eq!(
-                    SelectedIndices::empty(),
-                    SelectedIndices::empty() & SelectedIndices::from_slice(&[1, 2])
-                );
-            }
 
             #[test]
             fn diff_len() {
