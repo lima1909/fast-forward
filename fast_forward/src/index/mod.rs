@@ -308,43 +308,52 @@ mod tests {
         // expected
         #[rstest]
         #[case::empty(
-            SelectedIndices::empty(), SelectedIndices::empty(),
+            SelectedIndices::empty(), 
+            SelectedIndices::empty(),
             SelectedIndices::empty()
         )]
         #[case::only_left(
-            SelectedIndices::from_slice(&[1, 2]), SelectedIndices::empty(),
+            SelectedIndices::from_slice(&[1, 2]), 
+            SelectedIndices::empty(),
             SelectedIndices::from_slice(&[1, 2])
         )]
         #[case::only_right(
-            SelectedIndices::empty(), SelectedIndices::from_slice(&[1, 2]),
+            SelectedIndices::empty(), 
+            SelectedIndices::from_slice(&[1, 2]),
             SelectedIndices::from_slice(&[1, 2])
         )]
         #[case::diff_len1(
-            SelectedIndices::new(1), SelectedIndices::from_slice(&[2, 3]),
+            SelectedIndices::new(1), 
+            SelectedIndices::from_slice(&[2, 3]),
             SelectedIndices::from_slice(&[1, 2, 3]), 
         )]
         #[case::diff_len2(
-            SelectedIndices::from_slice(&[2, 3]), SelectedIndices::new(1),
+            SelectedIndices::from_slice(&[2, 3]), 
+            SelectedIndices::new(1),
             SelectedIndices::from_slice(&[1, 2, 3]),
         )]
         #[case::overlapping_simple1(
-            SelectedIndices::from_slice(&[1, 2]), SelectedIndices::from_slice(&[2, 3]),
+            SelectedIndices::from_slice(&[1, 2]), 
+            SelectedIndices::from_slice(&[2, 3]),
             SelectedIndices::from_slice(&[1, 2, 3]),
         )]
         #[case::overlapping_simple2(
-            SelectedIndices::from_slice(&[2, 3]), SelectedIndices::from_slice(&[1, 2]),
+            SelectedIndices::from_slice(&[2, 3]), 
+            SelectedIndices::from_slice(&[1, 2]),
             SelectedIndices::from_slice(&[1, 2, 3]),
         )]
         #[case::overlapping_diff_len1(
             // 1, 2, 8, 9, 12
             // 2, 5, 6, 10
-            SelectedIndices::from_slice(&[1, 2, 8, 9, 12]), SelectedIndices::from_slice(&[2, 5, 6, 10]),
+            SelectedIndices::from_slice(&[1, 2, 8, 9, 12]), 
+            SelectedIndices::from_slice(&[2, 5, 6, 10]),
             SelectedIndices::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
         )]
         #[case::overlapping_diff_len1(
             // 2, 5, 6, 10
             // 1, 2, 8, 9, 12
-            SelectedIndices::from_slice(&[2, 5, 6, 10]), SelectedIndices::from_slice(&[1, 2, 8, 9, 12]),
+            SelectedIndices::from_slice(&[2, 5, 6, 10]), 
+            SelectedIndices::from_slice(&[1, 2, 8, 9, 12]),
             SelectedIndices::from_slice(&[1, 2, 5, 6, 8, 9, 10, 12]),
         )]
         fn ors(
@@ -360,19 +369,23 @@ mod tests {
         // expected
         #[rstest]
         #[case::empty(
-            SelectedIndices::empty(), SelectedIndices::empty(),
+            SelectedIndices::empty(), 
+            SelectedIndices::empty(),
             SelectedIndices::empty()
         )]
         #[case::only_left(
-            SelectedIndices::from_slice(&[1, 2]), SelectedIndices::empty(),
+            SelectedIndices::from_slice(&[1, 2]), 
+            SelectedIndices::empty(),
             SelectedIndices::empty()
         )]
         #[case::only_right(
-            SelectedIndices::empty(), SelectedIndices::from_slice(&[1, 2]),
+            SelectedIndices::empty(), 
+            SelectedIndices::from_slice(&[1, 2]),
             SelectedIndices::empty()
         )]
         #[case::diff_len(
-            SelectedIndices::empty(), SelectedIndices::from_slice(&[1, 2]),
+            SelectedIndices::empty(), 
+            SelectedIndices::from_slice(&[1, 2]),
             SelectedIndices::empty()
         )]
         fn ands(

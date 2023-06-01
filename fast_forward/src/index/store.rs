@@ -356,6 +356,11 @@ mod tests {
         }
     }
 
+    fn filter<'i>(items: &'i [&str], search: &str) -> SelectedIndices<'i> {
+        let idx = items.binary_search(&search).unwrap();
+        SelectedIndices::new(idx)
+    }
+
     #[test]
     fn retrieve() {
         let list = vec!["a", "b", "c"];
@@ -369,5 +374,7 @@ mod tests {
             SelectedIndices::new(2),
             r.filter(|_f| SelectedIndices::new(2))
         );
+
+        assert_eq!(SelectedIndices::new(2), r.filter(|_f| filter(&list, "c")));
     }
 }
