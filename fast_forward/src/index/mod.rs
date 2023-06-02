@@ -28,7 +28,7 @@ pub mod map;
 pub mod store;
 pub mod uint;
 
-pub use store::{EqFilter, ItemRetriever, NoMeta, Retriever, Store};
+pub use store::{Retriever, Store};
 
 use std::{
     borrow::Cow,

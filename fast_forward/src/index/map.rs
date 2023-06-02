@@ -26,10 +26,7 @@
 //!   ...     | ...
 //!
 //! ```
-use crate::index::{
-    store::Filterable, EqFilter, IndexFilter, Indices, ItemRetriever, NoMeta, Retriever,
-    SelectedIndices, Store,
-};
+use crate::index::{store::Filterable, Indices, SelectedIndices, Store};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
@@ -75,46 +72,36 @@ where
     fn with_capacity(capacity: usize) -> Self {
         MapIndex(HashMap::with_capacity(capacity))
     }
-
-    type Retriever<'a> = MapIndex<K> where K:'a;
-
-    fn retrieve<'a, I, L>(&'a self, items: &'a L) -> ItemRetriever<'a, Self::Retriever<'a>, L>
-    where
-        I: 'a,
-        L: IndexFilter<Item = I> + 'a,
-    {
-        ItemRetriever::new(self, items)
-    }
 }
 
-impl<K> Retriever for MapIndex<K>
-where
-    K: Default + Eq + Hash,
-{
-    type Key = K;
+// impl<K> Retriever for MapIndex<K>
+// where
+//     K: Default + Eq + Hash,
+// {
+//     type Key = K;
 
-    fn get(&self, key: &Self::Key) -> SelectedIndices<'_> {
-        match self.0.get(key) {
-            Some(i) => i.get(),
-            None => SelectedIndices::empty(),
-        }
-    }
+//     fn get(&self, key: &Self::Key) -> SelectedIndices<'_> {
+//         match self.0.get(key) {
+//             Some(i) => i.get(),
+//             None => SelectedIndices::empty(),
+//         }
+//     }
 
-    type Meta<'f> = NoMeta where K:'f;
+//     type Meta<'f> = NoMeta where K:'f;
 
-    fn meta(&self) -> Self::Meta<'_> {
-        NoMeta
-    }
+//     fn meta(&self) -> Self::Meta<'_> {
+//         NoMeta
+//     }
 
-    type Filter<'f> = EqFilter<'f, Self> where K:'f;
+//     type Filter<'f> = EqFilter<'f, Self> where K:'f;
 
-    fn filter<'s, P>(&'s self, predicate: P) -> SelectedIndices<'_>
-    where
-        P: Fn(<Self as Retriever>::Filter<'s>) -> SelectedIndices<'_>,
-    {
-        predicate(EqFilter::new(self))
-    }
-}
+//     fn filter<'s, P>(&'s self, predicate: P) -> SelectedIndices<'_>
+//     where
+//         P: Fn(<Self as Retriever>::Filter<'s>) -> SelectedIndices<'_>,
+//     {
+//         predicate(EqFilter::new(self))
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -129,14 +116,14 @@ mod tests {
 
         assert!(i.contains(&"Paul"));
 
-        let items = vec!["a", "b", "c", "d", "e"];
-
-        let r = i.retrieve(&items);
-        let mut it = r.filter(|f| f.eq(&"Jasmin"));
-        assert_eq!(Some(&"e"), it.next());
+        // TODO lifetime Iter
+        let idxs = i.retrieve().filter(|f| f.eq(&"Jasmin"));
+        let mut it = idxs.iter();
+        assert_eq!(Some(&4), it.next());
         assert_eq!(None, it.next());
 
-        assert!(i.meta().has_no_meta_data());
+        // TODO
+        // assert!(i.meta().has_no_meta_data());
     }
 
     mod unique {
@@ -145,7 +132,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = MapIndex::default();
-            assert_eq!(0, i.get(&"Jasmin").len());
+            assert_eq!(0, i.retrieve().get(&"Jasmin").len());
             assert!(i.0.is_empty());
         }
 
@@ -154,7 +141,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert("Jasmin", 4);
 
-            assert_eq!(i.get(&"Jasmin"), [4]);
+            assert_eq!(i.retrieve().get(&"Jasmin"), [4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -163,7 +150,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert(5, 4);
 
-            assert_eq!(i.get(&5), [4]);
+            assert_eq!(i.retrieve().get(&5), [4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -172,7 +159,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert('x', 4);
 
-            assert_eq!(i.get(&'x'), [4]);
+            assert_eq!(i.retrieve().get(&'x'), [4]);
             assert_eq!(1, i.0.len());
         }
 
@@ -183,20 +170,20 @@ mod tests {
             idx.insert("Mario", 8);
             idx.insert("Paul", 6);
 
-            let r = idx.get(&"Mario") | idx.get(&"Paul");
+            let r = idx.retrieve().get(&"Mario") | idx.retrieve().get(&"Paul");
             assert_eq!(r, [6, 8]);
 
-            let r = idx.get(&"Paul") | idx.get(&"Blub");
+            let r = idx.retrieve().get(&"Paul") | idx.retrieve().get(&"Blub");
             assert_eq!(r, [6]);
 
-            let r = idx.get(&"Blub") | idx.get(&"Mario");
+            let r = idx.retrieve().get(&"Blub") | idx.retrieve().get(&"Mario");
             assert_eq!(r, [8]);
         }
 
         #[test]
         fn out_of_bound() {
             let i = MapIndex::default();
-            assert_eq!(0, i.get(&"Jasmin").len());
+            assert_eq!(0, i.retrieve().get(&"Jasmin").len());
         }
 
         #[test]
@@ -234,16 +221,16 @@ mod tests {
 
             // (old) Key: Jasmin do not exist, insert a (new) Key Jasmin NEW?
             idx.update("Jasmin", 4, "Jasmin NEW");
-            assert_eq!([4], idx.get(&"Jasmin NEW"));
+            assert_eq!([4], idx.retrieve().get(&"Jasmin NEW"));
 
             // (old) Key 2 exist, but not with Index: 8, insert known Key: 2 with add new Index 8
             idx.update("Jasmin NEW", 8, "Jasmin NEW");
-            assert_eq!([4, 8], idx.get(&"Jasmin NEW"));
+            assert_eq!([4, 8], idx.retrieve().get(&"Jasmin NEW"));
 
             // old Key 2 with Index 8 was removed and (new) Key 4 was added with Index 8
             idx.update("Jasmin NEW", 8, "Jasmin NEW NEW");
-            assert_eq!([8], idx.get(&"Jasmin NEW NEW"));
-            assert_eq!([4], idx.get(&"Jasmin NEW"));
+            assert_eq!([8], idx.retrieve().get(&"Jasmin NEW NEW"));
+            assert_eq!([4], idx.retrieve().get(&"Jasmin NEW"));
         }
 
         #[test]
@@ -255,15 +242,15 @@ mod tests {
 
             // delete correct Key with wrong Index, nothing happens
             idx.delete("Jasmin", 100);
-            assert_eq!([3, 4], idx.get(&"Jasmin"));
+            assert_eq!([3, 4], idx.retrieve().get(&"Jasmin"));
 
             // delete correct Key with correct Index
             idx.delete("Jasmin", 3);
-            assert_eq!([4], idx.get(&"Jasmin"));
+            assert_eq!([4], idx.retrieve().get(&"Jasmin"));
 
             // delete correct Key with last correct Index, Key now longer exist
             idx.delete("Jasmin", 4);
-            assert!(idx.get(&"Jasmin").is_empty());
+            assert!(idx.retrieve().get(&"Jasmin").is_empty());
         }
     }
 
@@ -273,7 +260,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = MapIndex::default();
-            assert_eq!(0, i.get(&"Jasmin").len());
+            assert_eq!(0, i.retrieve().get(&"Jasmin").len());
             assert!(i.0.is_empty());
         }
 
@@ -282,7 +269,7 @@ mod tests {
             let mut i = MapIndex::default();
             i.insert("Jasmin", 2);
 
-            assert_eq!(i.get(&"Jasmin"), [2]);
+            assert_eq!(i.retrieve().get(&"Jasmin"), [2]);
             assert_eq!(1, i.0.len());
         }
 
@@ -292,7 +279,7 @@ mod tests {
             i.insert("Jasmin", 2);
             i.insert("Jasmin", 1);
 
-            assert_eq!(i.get(&"Jasmin"), [1, 2]);
+            assert_eq!(i.retrieve().get(&"Jasmin"), [1, 2]);
         }
 
         #[test]
