@@ -45,6 +45,9 @@ fn main() {
 
     assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
 
+    assert_eq!(2, cars.idx().meta().min());
+    assert_eq!(99, cars.idx().meta().max());
+
     // ------------------------------
     // With `Name` Index: StrMapIndex
     // ------------------------------

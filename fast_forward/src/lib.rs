@@ -202,9 +202,8 @@ mod tests {
         let mut it = id_filter.get(&1000);
         assert_eq!(it.next(), None);
 
-        // TODO
-        // assert_eq!(2, id_filter.meta().min());
-        // assert_eq!(99, id_filter.meta().max());
+        assert_eq!(2, id_filter.meta().min());
+        assert_eq!(99, id_filter.meta().max());
     }
 
     #[test]

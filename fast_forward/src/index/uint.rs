@@ -30,7 +30,10 @@
 //!  3   |  0, 2
 //! ...  | ...
 //! ```
-use crate::index::{store::Filterable, Indices, MinMax, SelectedIndices, Store};
+use crate::index::{
+    store::{Filterable, MetaData},
+    Indices, MinMax, SelectedIndices, Store,
+};
 use std::marker::PhantomData;
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
@@ -110,6 +113,18 @@ where
             min_max_cache: MinMax::default(),
             _key: PhantomData,
         }
+    }
+}
+
+// type Meta<'m> = UIntMeta<'m, K> where K:'m;
+impl<K> MetaData for UIntIndex<K>
+where
+    K: Default + Into<usize> + Copy,
+{
+    type Meta<'m> = UIntMeta<'m, K> where K: 'm;
+
+    fn meta(&self) -> Self::Meta<'_> {
+        UIntMeta(self)
     }
 }
 
@@ -205,13 +220,11 @@ mod tests {
         i.insert(2, 4);
 
         // TODO lifetime Iter
-        let idxs = i.retrieve().filter(|f| f.eq(&2));
-        let mut it = idxs.iter();
-        assert_eq!(Some(&4), it.next());
+        // let mut it = i.retrieve().filter(|f| f.eq(&2)).iter();
+        // assert_eq!(Some(&4), it.next());
 
-        // TODO
-        // assert_eq!(1, r.meta().min());
-        // assert_eq!(2, r.meta().max());
+        assert_eq!(1, i.meta().min());
+        assert_eq!(2, i.meta().max());
     }
 
     #[test]
@@ -231,13 +244,13 @@ mod tests {
     fn meta() {
         let mut i = UIntIndex::new();
         i.insert(2, 4);
-        //TODO
-        // assert_eq!(2, i.meta().min());
-        // assert_eq!(2, i.meta().max());
 
-        // i.insert(1, 3);
-        // assert_eq!(1, i.meta().min());
-        // assert_eq!(2, i.meta().max());
+        assert_eq!(2, i.meta().min());
+        assert_eq!(2, i.meta().max());
+
+        i.insert(1, 3);
+        assert_eq!(1, i.meta().min());
+        assert_eq!(2, i.meta().max());
     }
 
     mod unique {
@@ -246,7 +259,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = UIntIndex::new();
-            assert_eq!(0, i.retrieve().get(&2).len());
+            assert_eq!(0, i.indices(&2).len());
             assert!(i.data.is_empty());
         }
 
@@ -255,7 +268,7 @@ mod tests {
             let mut i = UIntIndex::new();
             i.insert(2, 4);
 
-            assert_eq!(i.retrieve().get(&2), [4]);
+            assert_eq!(i.indices(&2), [4]);
             assert_eq!(3, i.data.len());
         }
 
@@ -264,7 +277,7 @@ mod tests {
             let mut i = UIntIndex::<bool>::default();
             i.insert(true, 4);
 
-            assert_eq!(i.retrieve().get(&true), [4]);
+            assert_eq!(i.indices(&true), [4]);
             assert_eq!(2, i.data.len());
         }
 
@@ -273,7 +286,7 @@ mod tests {
             let mut i = UIntIndex::<u16>::default();
             i.insert(2, 4);
 
-            assert_eq!(i.retrieve().get(&2), [4]);
+            assert_eq!(i.indices(&2), [4]);
             assert_eq!(3, i.data.len());
         }
 
@@ -284,19 +297,16 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            let r = idx.retrieve().get(&3) | idx.retrieve().get(&4);
+            let r = idx.indices(&3) | idx.indices(&4);
             assert_eq!(r, [6, 8]);
 
-            assert_eq!([6], idx.retrieve().get(&3) & idx.retrieve().get(&3));
-            assert_eq!([6], idx.retrieve().get(&3) | idx.retrieve().get(&99));
-            assert_eq!([8], idx.retrieve().get(&99) | idx.retrieve().get(&4));
-            assert_eq!(
-                SelectedIndices::empty(),
-                idx.retrieve().get(&3) & idx.retrieve().get(&4)
-            );
+            assert_eq!([6], idx.indices(&3) & idx.indices(&3));
+            assert_eq!([6], idx.indices(&3) | idx.indices(&99));
+            assert_eq!([8], idx.indices(&99) | idx.indices(&4));
+            assert_eq!(SelectedIndices::empty(), idx.indices(&3) & idx.indices(&4));
 
             idx.insert(99, 0);
-            assert_eq!([0], idx.retrieve().get(&99));
+            assert_eq!([0], idx.indices(&99));
         }
 
         #[test]
@@ -306,10 +316,7 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            assert_eq!(
-                SelectedIndices::empty(),
-                idx.retrieve().get(&3) & idx.retrieve().get(&2)
-            );
+            assert_eq!(SelectedIndices::empty(), idx.indices(&3) & idx.indices(&2));
 
             // =3 or =4 and =2 =>
             // (
@@ -317,16 +324,13 @@ mod tests {
             //  or 3 = true
             // )
             // => 3 -> 6
-            assert_eq!(
-                [6],
-                idx.retrieve().get(&3) | idx.retrieve().get(&4) & idx.retrieve().get(&2)
-            );
+            assert_eq!([6], idx.indices(&3) | idx.indices(&4) & idx.indices(&2));
         }
 
         #[test]
         fn out_of_bound() {
             let i = UIntIndex::<u8>::default();
-            assert_eq!(0, i.retrieve().get(&2).len());
+            assert_eq!(0, i.indices(&2).len());
         }
 
         #[test]
@@ -427,16 +431,16 @@ mod tests {
             // (old) Key: 99 do not exist, insert a (new) Key 100?
             idx.update(99, 4, 100);
             assert_eq!(101, idx.data.len());
-            assert_eq!([4], idx.retrieve().get(&100));
+            assert_eq!([4], idx.indices(&100));
 
             // (old) Key 2 exist, but not with Index: 8, insert known Key: 2 with add new Index 8
             idx.update(2, 8, 2);
-            assert_eq!([4, 8], idx.retrieve().get(&2));
+            assert_eq!([4, 8], idx.indices(&2));
 
             // old Key 2 with Index 8 was removed and (new) Key 4 was added with Index 8
             idx.update(2, 8, 4);
-            assert_eq!([8], idx.retrieve().get(&4));
-            assert_eq!([4], idx.retrieve().get(&2));
+            assert_eq!([8], idx.indices(&4));
+            assert_eq!([4], idx.indices(&2));
 
             assert_eq!(2, idx.min());
             assert_eq!(100, idx.max());
@@ -454,15 +458,15 @@ mod tests {
 
             // delete correct Key with wrong Index, nothing happens
             idx.delete(2, 100);
-            assert_eq!([3, 4], idx.retrieve().get(&2));
+            assert_eq!([3, 4], idx.indices(&2));
 
             // delete correct Key with correct Index
             idx.delete(2, 3);
-            assert_eq!([4], idx.retrieve().get(&2));
+            assert_eq!([4], idx.indices(&2));
 
             // delete correct Key with last correct Index, Key now longer exist
             idx.delete(2, 4);
-            assert!(idx.retrieve().get(&2).is_empty());
+            assert!(idx.indices(&2).is_empty());
 
             assert_eq!(3, idx.min());
             assert_eq!(3, idx.max());
@@ -475,7 +479,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = UIntIndex::<u8>::default();
-            assert_eq!(0, i.retrieve().get(&2).len());
+            assert_eq!(0, i.indices(&2).len());
             assert!(i.data.is_empty());
         }
 
@@ -484,7 +488,7 @@ mod tests {
             let mut i = UIntIndex::<u8>::default();
             i.insert(2, 2);
 
-            assert_eq!(i.retrieve().get(&2), [2]);
+            assert_eq!(i.indices(&2), [2]);
             assert_eq!(3, i.data.len());
         }
 
@@ -494,7 +498,7 @@ mod tests {
             i.insert(2, 2);
             i.insert(2, 1);
 
-            assert_eq!(i.retrieve().get(&2), [1, 2]);
+            assert_eq!(i.indices(&2), [1, 2]);
         }
 
         #[test]

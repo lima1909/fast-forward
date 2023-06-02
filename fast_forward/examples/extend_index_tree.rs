@@ -92,7 +92,7 @@ fn main() {
             .collect::<Vec<_>>()
     );
     assert_eq!(
-        vec![&Node::new(0, 0), &Node::new(1, 0), &Node::new(2, 0)],
+        vec![&Node::new(0, 0), &Node::new(1, 0), &Node::new(2, 1)],
         n.idx()
             .filter(|f| parents(f, 5, 0, &nodes))
             .collect::<Vec<_>>()
@@ -101,8 +101,8 @@ fn main() {
         vec![
             &Node::new(0, 0),
             &Node::new(1, 0),
-            &Node::new(2, 0),
-            &Node::new(5, 0)
+            &Node::new(2, 1),
+            &Node::new(5, 2)
         ],
         n.idx()
             .filter(|f| parents(f, 6, 0, &nodes))
@@ -111,7 +111,7 @@ fn main() {
 
     // // PARENTS-SUBTREE: NOT up to the root node
     assert_eq!(
-        vec![&Node::new(2, 0), &Node::new(5, 0)],
+        vec![&Node::new(2, 1), &Node::new(5, 2)],
         n.idx()
             .filter(|f| parents(f, 6, 2, &nodes))
             .collect::<Vec<_>>()

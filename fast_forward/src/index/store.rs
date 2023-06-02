@@ -93,144 +93,15 @@ pub trait Store: Filterable {
     }
 }
 
-/// Trait for read/select method from a `Store`.
-// pub trait Retriever {
-//     type Key;
+/// Meta data from the [`Store`], like min or max value of the `Key`.
+pub trait MetaData {
+    type Meta<'m>
+    where
+        Self: 'm;
 
-//     /// Get all indices for a given `Key`.
-//     fn get(&self, key: &Self::Key) -> SelectedIndices<'_>;
-
-//     /// Combined all given `keys` with an logical `OR`.
-//     ///
-//     /// ## Example:
-//     ///```text
-//     /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
-//     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
-//     /// ```
-//     fn get_many<I>(&self, keys: I) -> SelectedIndices<'_>
-//     where
-//         I: IntoIterator<Item = Self::Key>,
-//     {
-//         let mut it = keys.into_iter();
-//         match it.next() {
-//             Some(key) => {
-//                 let mut c = self.get(&key);
-//                 for k in it {
-//                     c = c | self.get(&k)
-//                 }
-//                 c
-//             }
-//             None => SelectedIndices::empty(),
-//         }
-//     }
-
-//     /// Checks whether the `Key` exists.
-//     fn contains(&self, key: &Self::Key) -> bool {
-//         !self.get(key).is_empty()
-//     }
-
-//     type Filter<'f>
-//     where
-//         Self: 'f;
-
-//     /// Return filter methods from the `Store`.
-//     fn filter<'r, P>(&'r self, predicate: P) -> SelectedIndices<'_>
-//     where
-//         P: Fn(<Self as Retriever>::Filter<'r>) -> SelectedIndices<'_>;
-
-//     type Meta<'m>
-//     where
-//         Self: 'm;
-
-//     /// Return meta data from the `Store`.
-//     fn meta(&self) -> Self::Meta<'_>;
-// }
-
-// pub struct ItemRetriever<'a, R, L> {
-//     retrieve: &'a R,
-//     items: &'a L,
-// }
-
-// impl<'a, R, L> ItemRetriever<'a, R, L>
-// where
-//     R: Retriever,
-//     L: IndexFilter,
-// {
-//     pub fn new(retrieve: &'a R, items: &'a L) -> Self {
-//         Self { retrieve, items }
-//     }
-
-//     /// Get all items for a given `Key`.
-//     pub fn get(&self, key: &R::Key) -> Filter<'a, L> {
-//         let indices = self.retrieve.get(key);
-//         self.items.filter(indices)
-//     }
-
-//     /// Combined all given `keys` with an logical `OR`.
-//     ///
-//     /// ## Example:
-//     ///```text
-//     /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
-//     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
-//     /// ```
-//     pub fn get_many<I>(&self, keys: I) -> Filter<'a, L>
-//     where
-//         I: IntoIterator<Item = R::Key>,
-//     {
-//         let indices = self.retrieve.get_many(keys);
-//         self.items.filter(indices)
-//     }
-
-//     /// Checks whether the `Key` exists.
-//     pub fn contains(&self, key: R::Key) -> bool {
-//         !self.retrieve.get(&key).is_empty()
-//     }
-
-//     /// Return filter methods from the `Store`.
-//     pub fn filter<P>(&self, predicate: P) -> Filter<'a, L>
-//     where
-//         P: Fn(R::Filter<'a>) -> SelectedIndices<'_>,
-//     {
-//         let indices = self.retrieve.filter(predicate);
-//         self.items.filter(indices)
-//     }
-
-//     /// Return meta data from the `Store`.
-//     pub fn meta(&self) -> R::Meta<'_> {
-//         self.retrieve.meta()
-//     }
-// }
-
-/// Empty Meta, if the `Retriever` no meta data supported.
-// pub struct NoMeta;
-
-// impl NoMeta {
-//     pub const fn has_no_meta_data(&self) -> bool {
-//         true
-//     }
-// }
-
-// #[repr(transparent)]
-// pub struct EqFilter<'s, R: Retriever> {
-//     retriever: &'s R,
-// }
-
-// impl<'s, R: Retriever> EqFilter<'s, R> {
-//     pub const fn new(retriever: &'s R) -> Self {
-//         Self { retriever }
-//     }
-
-//     pub fn eq(&self, key: &R::Key) -> SelectedIndices<'s> {
-//         self.retriever.get(key)
-//     }
-
-//     pub fn eq_many<I>(&self, keys: I) -> SelectedIndices<'_>
-//     where
-//         I: IntoIterator<Item = R::Key>,
-//     {
-//         self.retriever.get_many(keys)
-//     }
-// }
+    /// Return meta data from the `Store`.
+    fn meta(&self) -> Self::Meta<'_>;
+}
 
 /// Returns a list to the indices [`SelectedIndices`] corresponding to the key.
 pub trait Filterable {
@@ -329,6 +200,13 @@ where
         P: Fn(&Filter<'f, F>) -> SelectedIndices<'f>,
     {
         predicate(&self.0)
+    }
+
+    pub fn meta(&self) -> F::Meta<'_>
+    where
+        F: MetaData,
+    {
+        self.0 .0.meta()
     }
 }
 

@@ -127,9 +127,8 @@ mod tests {
         let mut it = cars.idx().get(&1000);
         assert_eq!(it.next(), None);
 
-        // TODO
-        // assert_eq!(2, cars.idx().meta().min());
-        // assert_eq!(99, cars.idx().meta().max());
+        assert_eq!(2, cars.idx().meta().min());
+        assert_eq!(99, cars.idx().meta().max());
     }
 
     #[rstest]

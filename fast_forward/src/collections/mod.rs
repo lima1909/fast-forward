@@ -5,7 +5,7 @@ pub use one::OneIndexList;
 
 use crate::index::{
     store::{self, Filterable},
-    Filter, IndexFilter, Retriever, SelectedIndices,
+    Filter, IndexFilter, MetaData, Retriever, SelectedIndices,
 };
 
 pub struct ItemRetriever<'a, F, L> {
@@ -55,5 +55,12 @@ where
     {
         let indices = self.retrieve.filter(predicate);
         self.items.filter(indices)
+    }
+
+    pub fn meta(&self) -> F::Meta<'_>
+    where
+        F: MetaData,
+    {
+        self.retrieve.meta()
     }
 }
