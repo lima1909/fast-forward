@@ -235,7 +235,7 @@ impl<'s, R: Retriever> EqFilter<'s, R> {
     }
 }
 
-/// A Store is [`Filterable`], if by given `Key` can get all Indices.
+/// Returns a list to the indices [`SelectedIndices`] corresponding to the key.
 pub trait Filterable {
     type Key;
 
@@ -282,10 +282,6 @@ impl<'f, F> XFilter<'f, F>
 where
     F: Filterable,
 {
-    // pub const fn new(filter: &'f F) -> Self {
-    //     Self { filter }
-    // }
-
     pub fn eq(&self, key: &F::Key) -> SelectedIndices<'f> {
         self.0.indices(key)
     }
@@ -298,16 +294,17 @@ where
     }
 }
 
+/// [`Retriever`] is the entry point for read methods for the [`Store`].
 #[repr(transparent)]
-pub struct XRetriever<'f, F>(&'f F);
+pub struct XRetriever<'f, F>(XFilter<'f, F>);
 
 impl<'f, F> XRetriever<'f, F>
 where
     F: Filterable,
 {
     /// Get all items for a given `Key`.
-    pub fn get(&self, key: &F::Key) -> SelectedIndices<'f> {
-        self.0.indices(key)
+    pub fn get(&'f self, key: &F::Key) -> SelectedIndices<'f> {
+        self.0.eq(key)
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -317,38 +314,33 @@ where
     /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
     /// ```
-    pub fn get_many<I>(&self, keys: I) -> SelectedIndices<'f>
+    pub fn get_many<I>(&'f self, keys: I) -> SelectedIndices<'f>
     where
         I: IntoIterator<Item = F::Key>,
     {
-        self.0.x_get_many(keys)
+        self.0.eq_many(keys)
     }
 
     /// Checks whether the `Key` exists.
     pub fn contains(&self, key: &F::Key) -> bool {
-        self.0.x_contains(key)
+        self.0 .0.x_contains(key)
     }
 
     /// Return filter methods from the `Store`.
-    pub fn filter<P>(&self, predicate: P) -> SelectedIndices<'f>
+    pub fn filter<P>(&'f self, predicate: P) -> SelectedIndices<'f>
     where
-        P: Fn(XFilter<'f, F>) -> SelectedIndices<'f>,
+        P: Fn(&'f XFilter<'f, F>) -> SelectedIndices<'f>,
     {
-        predicate(XFilter(self.0))
+        predicate(&self.0)
     }
-
-    // /// Return meta data from the `Store`.
-    // pub fn meta(&self) -> R::Meta<'_> {
-    //     self.retrieve.meta()
-    // }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    impl Filterable for Vec<&'static str> {
-        type Key = &'static str;
+    impl<'s> Filterable for Vec<&'s str> {
+        type Key = &'s str;
 
         fn indices(&self, key: &Self::Key) -> SelectedIndices<'_> {
             let idx = self.binary_search(key).unwrap();
@@ -356,25 +348,57 @@ mod tests {
         }
     }
 
-    fn filter<'i>(items: &'i [&str], search: &str) -> SelectedIndices<'i> {
-        let idx = items.binary_search(&search).unwrap();
-        SelectedIndices::new(idx)
+    trait Two {
+        type Key;
+
+        fn two<'i>(&'i self, key1: &Self::Key, key2: &Self::Key) -> SelectedIndices<'i>;
+    }
+
+    impl<'f, F: Filterable> Two for XFilter<'f, F> {
+        type Key = F::Key;
+
+        fn two<'i>(&'i self, key1: &Self::Key, key2: &Self::Key) -> SelectedIndices<'i> {
+            self.eq(key1) | self.eq(key2)
+        }
+    }
+
+    fn extended_filter<'i>(f: &'i XFilter<'i, Vec<&'i str>>, key: &'i &str) -> SelectedIndices<'i> {
+        f.eq(key)
     }
 
     #[test]
-    fn retrieve() {
+    fn retrieve_filter() {
         let list = vec!["a", "b", "c"];
-        let r = XRetriever(&list);
+        let r = XRetriever(XFilter(&list));
         assert!(r.contains(&"a"));
         assert_eq!(SelectedIndices::new(1), r.get(&"b"));
         assert_eq!(SelectedIndices::owned(vec![0, 1]), r.get_many(["a", "b"]));
         assert_eq!(SelectedIndices::new(2), r.filter(|f| f.eq(&"c")));
+    }
+
+    #[test]
+    fn retrieve_ignore_filter_eather_func() {
+        let list = vec!["a", "b", "c"];
+        let r = XRetriever(XFilter(&list));
 
         assert_eq!(
             SelectedIndices::new(2),
             r.filter(|_f| SelectedIndices::new(2))
         );
+    }
 
-        assert_eq!(SelectedIndices::new(2), r.filter(|_f| filter(&list, "c")));
+    #[test]
+    fn retrieve_extend_filter() {
+        let list = vec!["a", "b", "c"];
+        let r = XRetriever(XFilter(&list));
+
+        assert_eq!(
+            SelectedIndices::owned(vec![0, 2]),
+            r.filter(|f| f.two(&"c", &"a"))
+        );
+        assert_eq!(
+            SelectedIndices::new(2),
+            r.filter(|f| extended_filter(f, &"c"))
+        );
     }
 }
