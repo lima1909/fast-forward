@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use crate::{
     collections::{
         list::{Iter, List},
@@ -81,6 +83,14 @@ where
 
     pub const fn iter(&self) -> Iter<'_, I> {
         self.items.iter()
+    }
+}
+
+impl<S, K, I, F: Fn(&I) -> K> Index<usize> for OneIndexList<S, K, I, F> {
+    type Output = I;
+
+    fn index(&self, pos: usize) -> &Self::Output {
+        &self.items[pos]
     }
 }
 
