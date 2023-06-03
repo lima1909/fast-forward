@@ -223,13 +223,13 @@ mod tests {
         }
     }
 
-    trait Two {
+    trait Two<'f> {
         type Key;
 
-        fn two(&self, key1: &Self::Key, key2: &Self::Key) -> SelectedIndices<'_>;
+        fn two(&self, key1: &Self::Key, key2: &Self::Key) -> SelectedIndices<'f>;
     }
 
-    impl<'f, F: Filterable> Two for Filter<'f, F> {
+    impl<'f, F: Filterable> Two<'f> for Filter<'f, F> {
         type Key = F::Key;
 
         fn two(&self, key1: &Self::Key, key2: &Self::Key) -> SelectedIndices<'f> {
@@ -267,11 +267,10 @@ mod tests {
         let list = vec!["a", "b", "c"];
         let r = Retriever(Filter(&list));
 
-        // TODO
-        // assert_eq!(
-        //     SelectedIndices::owned(vec![0, 2]),
-        //     r.filter(|f| f.two(&"c", &"a"))
-        // );
+        assert_eq!(
+            SelectedIndices::owned(vec![0, 2]),
+            r.filter(|f| f.two(&"c", &"a"))
+        );
         assert_eq!(
             SelectedIndices::new(2),
             r.filter(|f| extended_filter(f, &"c"))
