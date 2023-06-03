@@ -116,7 +116,10 @@ mod tests {
 
         assert!(i.contains(&"Paul"));
 
-        // TODO lifetime Iter
+        for idx in i.retrieve().filter(|f| f.eq(&"Jasmin")).iter() {
+            assert_eq!(&4, idx);
+        }
+
         let idxs = i.retrieve().filter(|f| f.eq(&"Jasmin"));
         let mut it = idxs.iter();
         assert_eq!(Some(&4), it.next());

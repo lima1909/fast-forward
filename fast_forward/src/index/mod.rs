@@ -546,6 +546,15 @@ mod tests {
                 assert_eq!([0, 3], l.eq(0) | l.eq(1) & l.eq(2) | l.eq(3));
             }
         }
+
+        #[test]
+        fn iter() {
+            let idxs = SelectedIndices::owned(vec![1, 3, 2]);
+            let mut it = idxs.iter();
+            assert_eq!(Some(&1), it.next());
+            assert_eq!(Some(&3), it.next());
+            assert_eq!(Some(&2), it.next());
+        }
     }
 
     mod indices {
