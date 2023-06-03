@@ -117,10 +117,7 @@ where
 }
 
 // type Meta<'m> = UIntMeta<'m, K> where K:'m;
-impl<K> MetaData for UIntIndex<K>
-where
-    K: Default + Into<usize> + Copy,
-{
+impl<K: Default> MetaData for UIntIndex<K> {
     type Meta<'m> = UIntMeta<'m, K> where K: 'm;
 
     fn meta(&self) -> Self::Meta<'_> {
@@ -145,40 +142,7 @@ where
     }
 }
 
-// impl<K> Retriever for UIntIndex<K>
-// where
-//     K: Default + Into<usize> + Copy,
-// {
-//     type Key = K;
-
-//     fn get(&self, key: &Self::Key) -> SelectedIndices<'_> {
-//         let i: usize = (*key).into();
-//         match self.data.get(i) {
-//             Some(Some(idx)) => idx.get(),
-//             _ => SelectedIndices::empty(),
-//         }
-//     }
-
-//     type Meta<'f> = UIntMeta<'f, K> where K:'f;
-
-//     fn meta(&self) -> Self::Meta<'_> {
-//         UIntMeta(self)
-//     }
-
-//     type Filter<'f> = EqFilter<'f, Self> where K:'f;
-
-//     fn filter<'s, P>(&'s self, predicate: P) -> SelectedIndices<'_>
-//     where
-//         P: Fn(<Self as Retriever>::Filter<'s>) -> SelectedIndices<'_>,
-//     {
-//         predicate(EqFilter::new(self))
-//     }
-// }
-
-impl<K> UIntIndex<K>
-where
-    K: Default,
-{
+impl<K: Default> UIntIndex<K> {
     /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
     pub fn min(&self) -> usize {
         self.min_max_cache.min

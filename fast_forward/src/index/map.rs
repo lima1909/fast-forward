@@ -74,35 +74,6 @@ where
     }
 }
 
-// impl<K> Retriever for MapIndex<K>
-// where
-//     K: Default + Eq + Hash,
-// {
-//     type Key = K;
-
-//     fn get(&self, key: &Self::Key) -> SelectedIndices<'_> {
-//         match self.0.get(key) {
-//             Some(i) => i.get(),
-//             None => SelectedIndices::empty(),
-//         }
-//     }
-
-//     type Meta<'f> = NoMeta where K:'f;
-
-//     fn meta(&self) -> Self::Meta<'_> {
-//         NoMeta
-//     }
-
-//     type Filter<'f> = EqFilter<'f, Self> where K:'f;
-
-//     fn filter<'s, P>(&'s self, predicate: P) -> SelectedIndices<'_>
-//     where
-//         P: Fn(<Self as Retriever>::Filter<'s>) -> SelectedIndices<'_>,
-//     {
-//         predicate(EqFilter::new(self))
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;

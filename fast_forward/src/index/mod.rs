@@ -79,7 +79,7 @@ where
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct SelectedIndices<'i>(Cow<'i, [usize]>);
 
@@ -235,7 +235,7 @@ impl<'i> BitAnd for SelectedIndices<'i> {
 }
 
 /// `Indices` is a wrapper for saving all indices for a given `Key` in the `Store`.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Indices(Vec<usize>);
 
 impl Indices {
