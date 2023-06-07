@@ -24,12 +24,9 @@
 //!
 //! To Find the `Key`: "Jon" with the `operation equals` is only one step necessary.
 //!
-pub mod index;
-pub mod list;
-pub mod query;
 
-/// Empty array of `Idx`
-pub const EMPTY_IDXS: &[usize] = &[];
+pub mod collections;
+pub mod index;
 
 /// This `macro` is not a solution, it is more an POC (proof of concept)!
 /// The Problem with this macro is the visibility. This means, it can not hide internal fields,
@@ -68,7 +65,7 @@ macro_rules! fast {
             $(
                 $store: $store_type,
             )+
-            _items_: $crate::list::List<$item>,
+            _items_: $crate::collections::list::List<$item>,
         }
 
         ///
@@ -119,7 +116,7 @@ macro_rules! fast {
             /// Panics if the pos is out of bound.
             ///
             #[allow(dead_code)]
-            fn delete(&mut self, pos: usize) -> &$item{
+            fn delete(&mut self, pos: usize) -> Option<&$item> {
                 use $crate::index::Store;
 
                 self._items_.delete(pos, |it: &$item, pos: usize| {
@@ -139,15 +136,26 @@ macro_rules! fast {
             /// Panics if the positions are out of bound.
             ///
             #[allow(dead_code)]
-            fn filter<'i>(&'i self, filter: std::borrow::Cow<'i, [usize]>) -> $crate::list::FilterIter<'i, $item> {
+            fn filter<'i>(&'i self, filter: $crate::index::SelectedIndices<'i>) -> $crate::index::Filter<'i, $crate::collections::list::List<$item>> {
+                use $crate::index::IndexFilter;
+
                 self._items_.filter(filter)
             }
 
             #[allow(dead_code)]
-            fn iter(&self) -> $crate::list::Iter<'_, $item> {
+            fn iter(&self) -> $crate::collections::list::Iter<'_, $item> {
                 self._items_.iter()
             }
 
+            $(
+                /// Create and get a Filter for the Store
+                #[allow(dead_code)]
+                fn $store(&self) -> $crate::collections::ItemRetriever<'_, $store_type, $crate::collections::list::List<$item>> {
+                    use $crate::index::Store;
+
+                    $crate::collections::ItemRetriever::new(self.$store.retrieve(), &self._items_)
+                }
+            )+
         }
 
 
@@ -162,12 +170,41 @@ macro_rules! fast {
 mod tests {
     use crate::{
         fast,
-        index::{map::MapIndex, uint::UIntIndex, Equals},
-        query::query,
+        index::{map::MapIndex, uint::UIntIndex, Store},
     };
 
-    #[derive(Debug, Eq, PartialEq)]
+    #[derive(Debug, Eq, PartialEq, Clone)]
     struct Car(usize, String);
+
+    #[test]
+    fn one_indexed_list_filter() {
+        let mut cars = fast!(Cars on Car {id: UIntIndex => 0});
+        cars.insert(Car(2, "BMW".into()));
+        cars.insert(Car(5, "Audi".into()));
+        cars.insert(Car(2, "VW".into()));
+        cars.insert(Car(99, "Porsche".into()));
+
+        let id_filter = cars.id();
+
+        assert!(id_filter.contains(2));
+
+        let r = id_filter.get(&2).collect::<Vec<_>>();
+        assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
+
+        let mut it = id_filter.get(&5);
+        assert_eq!(it.next(), Some(&Car(5, "Audi".into())));
+        assert_eq!(it.next(), None);
+
+        let mut it = id_filter.filter(|f| f.eq(&5));
+        assert_eq!(it.next(), Some(&Car(5, "Audi".into())));
+        assert_eq!(it.next(), None);
+
+        let mut it = id_filter.get(&1000);
+        assert_eq!(it.next(), None);
+
+        assert_eq!(2, id_filter.meta().min());
+        assert_eq!(99, id_filter.meta().max());
+    }
 
     #[test]
     fn one_indexed_list_delete_item() {
@@ -208,7 +245,7 @@ mod tests {
 
         // idx [1,3,5]
         // del [3]
-        let r = cars.filter(cars.id.eq_iter([1, 3, 5])).collect::<Vec<_>>();
+        let r = cars.id().get_many([1, 3, 5]).collect::<Vec<_>>();
         assert_eq!(vec![&Car(1, "BMW".into()), &Car(5, "VW".into())], r);
     }
 
@@ -221,11 +258,11 @@ mod tests {
         cars.insert(Car(99, "Porsche".into()));
 
         // simple equals filter
-        let r = cars.filter(cars.id.eq(2)).collect::<Vec<_>>();
+        let r = cars.id().get(&2).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
 
         // many/iter equals filter
-        let mut r = cars.filter(cars.id.eq_iter(2..6));
+        let mut r = cars.id().get_many(2..6);
         assert_eq!(Some(&Car(2, "BMW".into())), r.next());
         assert_eq!(Some(&Car(5, "Audi".into())), r.next());
         assert_eq!(Some(&Car(2, "VW".into())), r.next());
@@ -233,20 +270,23 @@ mod tests {
 
         // or equals query
         let r = cars
-            .filter(query(cars.id.eq(2)).or(cars.id.eq(100)).exec())
+            .id()
+            .filter(|f| f.eq(&2) | f.eq(&100))
             .collect::<Vec<_>>();
         assert_eq!(&[&Car(2, "BMW".into()), &Car(2, "VW".into())], &r[..]);
 
         // update one Car
-        assert_eq!(None, cars.filter(cars.id.eq(100)).next());
-        cars.update(cars.id.eq(99)[0], |c: &Car| Car(c.0 + 1, c.1.clone()));
-        let r = cars.filter(cars.id.eq(100)).collect::<Vec<_>>();
+        assert_eq!(None, cars.id().get(&100).next());
+        cars.update(cars.id.retrieve().get(&99)[0], |c: &Car| {
+            Car(c.0 + 1, c.1.clone())
+        });
+        let r = cars.id().get(&100).collect::<Vec<_>>();
         assert_eq!(vec![&Car(100, "Porsche".into())], r);
 
         // remove one Car
-        assert!(cars.filter(cars.id.eq(100)).next().is_some());
-        cars.delete(cars.id.eq(100)[0]);
-        assert_eq!(None, cars.filter(cars.id.eq(100)).next());
+        assert!(cars.id().get(&100).next().is_some());
+        cars.delete(cars.id.retrieve().get(&100)[0]);
+        assert_eq!(None, cars.id().get(&100).next());
     }
 
     #[test]
@@ -258,7 +298,7 @@ mod tests {
         cars.insert(Car(99, "Porsche".into()));
 
         // simple equals filter
-        let r = cars.filter(cars.id.eq(2)).collect::<Vec<_>>();
+        let r = cars.id().get(&2).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
 
         // min and max
@@ -275,15 +315,13 @@ mod tests {
         cars.insert(Car(99, "Porsche".into()));
 
         // simple equals filter
-        let r: Vec<&Car> = cars.filter(cars.name.eq(&"vw".into())).collect();
+        let r: Vec<&Car> = cars.name().get(&"vw".into()).collect();
         assert_eq!(vec![&Car(2, "VW".into())], r);
 
         // many/iter equals filter
         let r: Vec<&Car> = cars
-            .filter(
-                cars.name
-                    .eq_iter([&"vw".into(), &"audi".into(), &"bmw".into()]),
-            )
+            .name()
+            .get_many(["vw".into(), "audi".into(), "bmw".into()])
             .collect();
         assert_eq!(
             vec![
@@ -296,31 +334,33 @@ mod tests {
 
         // or equals query
         let r: Vec<&Car> = cars
-            .filter(
-                query(cars.name.eq(&"vw".into()))
-                    .or(cars.name.eq(&"audi".into()))
-                    .exec(),
-            )
+            .name()
+            .filter(|f| f.eq(&"vw".into()) | f.eq(&"audi".into()))
             .collect();
         assert_eq!(vec![&Car(5, "Audi".into()), &Car(2, "VW".into())], r);
 
         // update one Car
-        assert_eq!(None, cars.filter(cars.name.eq(&"mercedes".into())).next());
-        cars.update(cars.name.eq(&"porsche".into())[0], |c: &Car| {
+        assert_eq!(
+            None,
+            cars.name().filter(|f| f.eq(&"mercedes".into())).next()
+        );
+        cars.update(cars.name.retrieve().get(&"porsche".into())[0], |c: &Car| {
             Car(c.0, "Mercedes".into())
         });
         let r = cars
-            .filter(cars.name.eq(&"mercedes".into()))
+            .name()
+            .filter(|f| f.eq(&"mercedes".into()))
             .collect::<Vec<_>>();
         assert_eq!(vec![&Car(99, "Mercedes".into())], r);
 
         // remove one Car
         assert!(cars
-            .filter(cars.name.eq(&"mercedes".into()))
+            .name()
+            .filter(|f| f.eq(&"mercedes".into()))
             .next()
             .is_some());
-        cars.delete(cars.name.eq(&"mercedes".into())[0]);
-        assert_eq!(None, cars.filter(cars.name.eq(&"mercedes".into())).next());
+        cars.delete(cars.name.retrieve().get(&"mercedes".into())[0]);
+        assert_eq!(None, cars.name().get(&"mercedes".into()).next());
     }
 
     #[test]
@@ -335,18 +375,14 @@ mod tests {
         fast_cars.insert(Car(1, "Mercedes".into()));
         fast_cars.insert(Car(4, "Porsche".into()));
 
-        assert_eq!([0], *query(fast_cars.id_map.eq(&1)).exec());
+        assert_eq!([0], fast_cars.id_map.retrieve().get(&1));
         assert_eq!(
             [1],
-            *query(fast_cars.id.eq(4))
-                .or(fast_cars.name.eq(&"Porsche".into()))
-                .exec()
+            fast_cars.id.retrieve().get(&4) | fast_cars.name.retrieve().get(&"Porsche".into())
         );
 
         let r = fast_cars.filter(
-            query(fast_cars.id.eq(4))
-                .and(fast_cars.name.eq(&"Porsche".into()))
-                .exec(),
+            fast_cars.id.retrieve().get(&4) & fast_cars.name.retrieve().get(&"Porsche".into()),
         );
         assert_eq!(vec![&Car(4, "Porsche".into())], r.collect::<Vec<_>>())
     }
@@ -406,29 +442,23 @@ mod tests {
         persons.insert(Person::new(41, 7, "Mario", Male));
         persons.insert(Person::new(111, 234, "Paul", Male));
 
-        assert_eq!([1], *query(persons.pk.eq(41)).exec());
-        assert_eq!([0], *query(persons.pk.eq(3)).exec());
-        assert!(query(persons.pk.eq(101)).exec().is_empty());
+        assert_eq!([1], persons.pk.retrieve().get(&41));
+        assert_eq!([0], persons.pk.retrieve().get(&3));
+        assert!(persons.pk.retrieve().get(&101).is_empty());
 
-        let r = query(persons.multi.eq(7)).exec();
-        assert_eq!(*r, [0, 1]);
+        assert_eq!([0, 1], persons.multi.retrieve().get(&7));
 
-        let r = query(persons.multi.eq(3)).or(persons.multi.eq(7)).exec();
-        assert_eq!(*r, [0, 1]);
+        let r = persons.multi.retrieve().get(&3) | persons.multi.retrieve().get(&7);
+        assert_eq!([0, 1], r);
 
-        let r = query(persons.name.eq(&"Jasmin".into())).exec();
-        assert_eq!(*r, [0]);
+        assert_eq!([0], persons.name.retrieve().get(&"Jasmin".into()));
 
-        let r = query(persons.name.eq(&"Jasmin".into()))
-            .or(persons.name.eq(&"Mario".into()))
-            .exec();
-        assert_eq!(*r, [0, 1]);
+        let r = persons.name.retrieve().get(&"Jasmin".into())
+            | persons.name.retrieve().get(&"Mario".into());
+        assert_eq!([0, 1], r);
 
-        let r = query(persons.gender.eq(Male)).exec();
-        assert_eq!(*r, [1, 2]);
-
-        let r = query(persons.gender.eq(Female)).exec();
-        assert_eq!(*r, [0]);
+        assert_eq!([1, 2], persons.gender.retrieve().get(&Male));
+        assert_eq!([0], persons.gender.retrieve().get(&Female));
     }
 
     #[test]
@@ -448,14 +478,16 @@ mod tests {
         name.insert("b", 2);
         name.insert("z", 0);
 
-        let r = query(gender.eq(Female)).and(name.eq(&"Julia")).exec();
-        assert_eq!(*r, [1]);
+        assert_eq!(
+            [1],
+            gender.retrieve().get(&Female) & name.retrieve().get(&"Julia")
+        );
 
-        let r = query(name.eq(&"z"))
-            .or(gender.eq(Female))
-            .and(name.eq(&"Julia"))
-            .exec();
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
-        assert_eq!(*r, [0, 1]);
+        assert_eq!(
+            [0, 1],
+            name.retrieve().get(&"z")
+                | gender.retrieve().get(&Female) & name.retrieve().get(&"Julia")
+        );
     }
 }

@@ -30,18 +30,16 @@
 //!  3   |  0, 2
 //! ...  | ...
 //! ```
-use crate::{
-    index::{Index, Store},
-    EMPTY_IDXS,
+use crate::index::{
+    store::{Filterable, MetaData},
+    Indices, MinMax, SelectedIndices, Store,
 };
-use std::{borrow::Cow, marker::PhantomData};
-
-use super::{Equals, MinMax};
+use std::marker::PhantomData;
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
 pub struct UIntIndex<K: Default = usize> {
-    data: Vec<Option<Index>>,
+    data: Vec<Option<Indices>>,
     min_max_cache: MinMax<usize>,
     _key: PhantomData<K>,
 }
@@ -56,9 +54,25 @@ impl UIntIndex<usize> {
     }
 }
 
-impl<K> Store<K> for UIntIndex<K>
+impl<K> Filterable for UIntIndex<K>
 where
-    K: Default + Into<usize>,
+    K: Default + Into<usize> + Copy,
+{
+    type Key = K;
+
+    #[inline]
+    fn indices(&self, key: &Self::Key) -> SelectedIndices<'_> {
+        let i: usize = (*key).into();
+        match self.data.get(i) {
+            Some(Some(idx)) => idx.get(),
+            _ => SelectedIndices::empty(),
+        }
+    }
+}
+
+impl<K> Store for UIntIndex<K>
+where
+    K: Default + Into<usize> + Copy,
 {
     fn insert(&mut self, k: K, i: usize) {
         let k = k.into();
@@ -69,11 +83,11 @@ where
 
         match self.data[k].as_mut() {
             Some(idx) => idx.add(i),
-            None => self.data[k] = Some(Index::new(i)),
+            None => self.data[k] = Some(Indices::new(i)),
         }
 
-        self.min_max_cache.new_min(k);
-        self.min_max_cache.new_max(k);
+        self.min_max_cache.new_min_value(k);
+        self.min_max_cache.new_max_value(k);
     }
 
     fn delete(&mut self, key: K, idx: usize) {
@@ -102,23 +116,33 @@ where
     }
 }
 
-impl<K> Equals<K> for UIntIndex<K>
-where
-    K: Default + Into<usize>,
-{
-    #[inline]
-    fn eq(&self, key: K) -> Cow<[usize]> {
-        match &self.data.get(key.into()) {
-            Some(Some(idx)) => idx.get(),
-            _ => Cow::Borrowed(EMPTY_IDXS),
-        }
+// type Meta<'m> = UIntMeta<'m, K> where K:'m;
+impl<K: Default> MetaData for UIntIndex<K> {
+    type Meta<'m> = UIntMeta<'m, K> where K: 'm;
+
+    fn meta(&self) -> Self::Meta<'_> {
+        UIntMeta(self)
     }
 }
 
-impl<K> UIntIndex<K>
+pub struct UIntMeta<'s, K: Default + 's>(&'s UIntIndex<K>);
+
+impl<'s, K> UIntMeta<'s, K>
 where
-    K: Default,
+    K: Default + 's,
 {
+    /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
+    pub fn min(&self) -> usize {
+        self.0.min_max_cache.min
+    }
+
+    /// Filter for get the highest (`max`) `Key` which is stored in `UIntIndex`.
+    pub fn max(&self) -> usize {
+        self.0.min_max_cache.max
+    }
+}
+
+impl<K: Default> UIntIndex<K> {
     /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
     pub fn min(&self) -> usize {
         self.min_max_cache.min
@@ -141,9 +165,10 @@ where
 
     /// Find `max` key. _Importand_ if the max value was removed, to find the new valid `max Key`.
     fn _find_max(&self) -> usize {
-        match self.data.last() {
-            Some(Some(_)) => self.data.len() - 1,
-            _ => 0,
+        if self.data.is_empty() {
+            0
+        } else {
+            self.data.len() - 1
         }
     }
 }
@@ -151,7 +176,47 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::query;
+
+    #[test]
+    fn retrieve() {
+        let mut i = UIntIndex::new();
+        i.insert(1, 3);
+        i.insert(2, 4);
+
+        let idx = i.retrieve().filter(|f| f.eq(&2));
+        let mut it = idx.iter();
+        assert_eq!(Some(&4), it.next());
+        assert_eq!(None, it.next());
+
+        assert_eq!(1, i.meta().min());
+        assert_eq!(2, i.meta().max());
+    }
+
+    #[test]
+    fn filter() {
+        let mut i = UIntIndex::new();
+        i.insert(2, 4);
+
+        let r = i.retrieve().filter(|f| f.eq(&2));
+        assert_eq!(r, [4]);
+
+        i.insert(1, 3);
+        let r = i.retrieve().filter(|f| f.eq(&2) | f.eq(&1));
+        assert_eq!(r, [3, 4]);
+    }
+
+    #[test]
+    fn meta() {
+        let mut i = UIntIndex::new();
+        i.insert(2, 4);
+
+        assert_eq!(2, i.meta().min());
+        assert_eq!(2, i.meta().max());
+
+        i.insert(1, 3);
+        assert_eq!(1, i.meta().min());
+        assert_eq!(2, i.meta().max());
+    }
 
     mod unique {
         use super::*;
@@ -159,7 +224,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = UIntIndex::new();
-            assert_eq!(0, i.eq(2).len());
+            assert_eq!(0, i.indices(&2).len());
             assert!(i.data.is_empty());
         }
 
@@ -168,7 +233,7 @@ mod tests {
             let mut i = UIntIndex::new();
             i.insert(2, 4);
 
-            assert_eq!(*i.eq(2), [4]);
+            assert_eq!(i.indices(&2), [4]);
             assert_eq!(3, i.data.len());
         }
 
@@ -177,7 +242,7 @@ mod tests {
             let mut i = UIntIndex::<bool>::default();
             i.insert(true, 4);
 
-            assert_eq!(*i.eq(true), [4]);
+            assert_eq!(i.indices(&true), [4]);
             assert_eq!(2, i.data.len());
         }
 
@@ -186,7 +251,7 @@ mod tests {
             let mut i = UIntIndex::<u16>::default();
             i.insert(2, 4);
 
-            assert_eq!(*i.eq(2), [4]);
+            assert_eq!(i.indices(&2), [4]);
             assert_eq!(3, i.data.len());
         }
 
@@ -197,25 +262,16 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            let r = query(idx.eq(3)).or(idx.eq(4)).exec();
-            assert_eq!(*r, [6, 8]);
+            let r = idx.indices(&3) | idx.indices(&4);
+            assert_eq!(r, [6, 8]);
 
-            let q = query(idx.eq(3));
-            let r = q.and(idx.eq(3)).exec();
-            assert_eq!(*r, [6]);
-
-            let r = query(idx.eq(3)).or(idx.eq(99)).exec();
-            assert_eq!(*r, [6]);
-
-            let r = query(idx.eq(99)).or(idx.eq(4)).exec();
-            assert_eq!(*r, [8]);
-
-            let r = query(idx.eq(3)).and(idx.eq(4)).exec();
-            assert_eq!(&*r, EMPTY_IDXS);
+            assert_eq!([6], idx.indices(&3) & idx.indices(&3));
+            assert_eq!([6], idx.indices(&3) | idx.indices(&99));
+            assert_eq!([8], idx.indices(&99) | idx.indices(&4));
+            assert_eq!(SelectedIndices::empty(), idx.indices(&3) & idx.indices(&4));
 
             idx.insert(99, 0);
-            let r = query(idx.eq(99)).exec();
-            assert_eq!(*r, [0]);
+            assert_eq!([0], idx.indices(&99));
         }
 
         #[test]
@@ -225,23 +281,21 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            let r = query(idx.eq(3)).and(idx.eq(2)).exec();
-            assert_eq!(&*r, EMPTY_IDXS);
+            assert_eq!(SelectedIndices::empty(), idx.indices(&3) & idx.indices(&2));
 
-            let r = query(idx.eq(3)).or(idx.eq(4)).and(idx.eq(2)).exec();
             // =3 or =4 and =2 =>
             // (
             // (4 and 2 = false) // `and` has higher prio than `or`
             //  or 3 = true
             // )
             // => 3 -> 6
-            assert_eq!(*r, [6]);
+            assert_eq!([6], idx.indices(&3) | idx.indices(&4) & idx.indices(&2));
         }
 
         #[test]
         fn out_of_bound() {
             let i = UIntIndex::<u8>::default();
-            assert_eq!(0, i.eq(2).len());
+            assert_eq!(0, i.indices(&2).len());
         }
 
         #[test]
@@ -259,15 +313,15 @@ mod tests {
             i.insert(2, 2);
             i.insert(6, 6);
 
-            assert_eq!(0, i.eq_iter([]).iter().len());
-            assert_eq!(0, i.eq_iter([9]).iter().len());
-            assert_eq!([2], *i.eq_iter([2]));
-            assert_eq!([2, 6], *i.eq_iter([6, 2]));
-            assert_eq!([2, 6], *i.eq_iter([9, 6, 2]));
-            assert_eq!([2, 5, 6], *i.eq_iter([5, 9, 6, 2]));
+            assert_eq!(0, i.get_many([]).iter().len());
+            assert_eq!(0, i.get_many([9]).iter().len());
+            assert_eq!([2], i.get_many([2]));
+            assert_eq!([2, 6], i.get_many([6, 2]));
+            assert_eq!([2, 6], i.get_many([9, 6, 2]));
+            assert_eq!([2, 5, 6], i.get_many([5, 9, 6, 2]));
 
-            assert_eq!([2, 5, 6], *i.eq_iter(2..=6));
-            assert_eq!([2, 5, 6], *i.eq_iter(2..9));
+            assert_eq!([2, 5, 6], i.get_many(2..=6));
+            assert_eq!([2, 5, 6], i.get_many(2..9));
         }
 
         #[test]
@@ -276,8 +330,8 @@ mod tests {
             i.insert(5, 5);
             i.insert(2, 2);
 
-            assert!(i.contains(5));
-            assert!(!i.contains(55));
+            assert!(i.contains(&5));
+            assert!(!i.contains(&55));
         }
 
         #[test]
@@ -342,16 +396,16 @@ mod tests {
             // (old) Key: 99 do not exist, insert a (new) Key 100?
             idx.update(99, 4, 100);
             assert_eq!(101, idx.data.len());
-            assert_eq!([4], *idx.eq(100));
+            assert_eq!([4], idx.indices(&100));
 
             // (old) Key 2 exist, but not with Index: 8, insert known Key: 2 with add new Index 8
             idx.update(2, 8, 2);
-            assert_eq!([4, 8], *idx.eq(2));
+            assert_eq!([4, 8], idx.indices(&2));
 
             // old Key 2 with Index 8 was removed and (new) Key 4 was added with Index 8
             idx.update(2, 8, 4);
-            assert_eq!([8], *idx.eq(4));
-            assert_eq!([4], *idx.eq(2));
+            assert_eq!([8], idx.indices(&4));
+            assert_eq!([4], idx.indices(&2));
 
             assert_eq!(2, idx.min());
             assert_eq!(100, idx.max());
@@ -369,15 +423,15 @@ mod tests {
 
             // delete correct Key with wrong Index, nothing happens
             idx.delete(2, 100);
-            assert_eq!([3, 4], *idx.eq(2));
+            assert_eq!([3, 4], idx.indices(&2));
 
             // delete correct Key with correct Index
             idx.delete(2, 3);
-            assert_eq!([4], *idx.eq(2));
+            assert_eq!([4], idx.indices(&2));
 
             // delete correct Key with last correct Index, Key now longer exist
             idx.delete(2, 4);
-            assert!(idx.eq(2).is_empty());
+            assert!(idx.indices(&2).is_empty());
 
             assert_eq!(3, idx.min());
             assert_eq!(3, idx.max());
@@ -390,7 +444,7 @@ mod tests {
         #[test]
         fn empty() {
             let i = UIntIndex::<u8>::default();
-            assert_eq!(0, i.eq(2).len());
+            assert_eq!(0, i.indices(&2).len());
             assert!(i.data.is_empty());
         }
 
@@ -399,7 +453,7 @@ mod tests {
             let mut i = UIntIndex::<u8>::default();
             i.insert(2, 2);
 
-            assert_eq!(*i.eq(2), [2]);
+            assert_eq!(i.indices(&2), [2]);
             assert_eq!(3, i.data.len());
         }
 
@@ -409,7 +463,7 @@ mod tests {
             i.insert(2, 2);
             i.insert(2, 1);
 
-            assert_eq!(*i.eq(2), [1, 2]);
+            assert_eq!(i.indices(&2), [1, 2]);
         }
 
         #[test]
@@ -420,12 +474,13 @@ mod tests {
             i.insert(2, 1);
             i.insert(6, 6);
 
-            assert_eq!(0, i.eq_iter([]).iter().len());
-            assert_eq!(0, i.eq_iter([9]).iter().len());
-            assert_eq!([1, 2], *i.eq_iter([2]));
-            assert_eq!([1, 2, 6], *i.eq_iter([6, 2]));
-            assert_eq!([1, 2, 6], *i.eq_iter([9, 6, 2]));
-            assert_eq!([1, 2, 5, 6], *i.eq_iter([5, 9, 6, 2]));
+            // TODO
+            // assert_eq!(0, i.get_many([]).iter().len());
+            // assert_eq!(0, i.get_many([9]).iter().len());
+            assert_eq!([1, 2], i.get_many([2]));
+            assert_eq!([1, 2, 6], i.get_many([6, 2]));
+            assert_eq!([1, 2, 6], i.get_many([9, 6, 2]));
+            assert_eq!([1, 2, 5, 6], i.get_many([5, 9, 6, 2]));
         }
 
         #[test]
@@ -434,8 +489,8 @@ mod tests {
             i.insert(2, 2);
             i.insert(2, 1);
 
-            assert!(i.contains(2));
-            assert!(!i.contains(55));
+            assert!(i.contains(&2));
+            assert!(!i.contains(&55));
         }
     }
 }

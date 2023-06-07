@@ -1,4 +1,5 @@
-use std::{borrow::Cow, ops::Index};
+use crate::index::IndexFilter;
+use std::ops::Index;
 
 #[derive(Debug, Clone)]
 pub struct List<T> {
@@ -49,28 +50,28 @@ impl<T> List<T> {
     ///
     /// Panics if the pos is out of bound.
     ///
-    pub fn delete<F>(&mut self, pos: usize, mut trigger: F) -> &T
+    pub fn delete<F>(&mut self, pos: usize, mut trigger: F) -> Option<&T>
     where
         F: FnMut(&T, usize), // param are: &Item, current position in the list
     {
-        let del_item = &self.items[pos];
+        let del_item = self.items.get(pos)?;
         trigger(del_item, pos);
 
         self.deleted_pos.push(pos);
-        del_item
+        Some(del_item)
+    }
+
+    /// Get the Item on the given position/index in the List.
+    /// If the Item was deleted, the return value is `None`
+    pub fn get(&self, index: usize) -> Option<&T> {
+        if self.is_deleted(index) {
+            return None;
+        }
+        self.items.get(index)
     }
 
     pub fn is_deleted(&self, pos: usize) -> bool {
         self.deleted_pos.contains(&pos)
-    }
-
-    /// Get the Item on the given position in the List. If the Item was deleted, the return `get` -> `None`
-    pub fn get(&self, pos: usize) -> Option<&T> {
-        let item = self.items.get(pos)?;
-        if self.is_deleted(pos) {
-            return None;
-        }
-        Some(item)
     }
 
     /// The number of not deleted Items in the List.
@@ -88,13 +89,20 @@ impl<T> List<T> {
         self.items.len()
     }
 
-    pub const fn filter<'i>(&'i self, filter: Cow<'i, [usize]>) -> FilterIter<'i, T> {
-        FilterIter::new(filter, self)
-    }
-
     pub const fn iter(&self) -> Iter<'_, T> {
         Iter::new(self)
     }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+            deleted_pos: Vec::new(),
+        }
+    }
+}
+
+impl<T> IndexFilter for List<T> {
+    type Item = T;
 }
 
 impl<T> Default for List<T> {
@@ -106,22 +114,12 @@ impl<T> Default for List<T> {
     }
 }
 
-impl<T> From<Vec<T>> for List<T> {
-    fn from(v: Vec<T>) -> Self {
-        let mut l = List::default();
-        for i in v {
-            l.insert(i, |_, _| {});
-        }
-        l
-    }
-}
-
 impl<T> Index<usize> for List<T> {
     type Output = T;
 
     fn index(&self, pos: usize) -> &Self::Output {
         if self.is_deleted(pos) {
-            panic!("Item is deleted");
+            panic!("Item on index: '{pos}' was deleted");
         }
         &self.items[pos]
     }
@@ -165,41 +163,21 @@ impl<'i, T> Iterator for Iter<'i, T> {
     }
 }
 
-pub struct FilterIter<'i, T> {
-    pos: usize,
-    filter: Cow<'i, [usize]>,
-    list: &'i List<T>,
-}
-
-impl<'i, T> FilterIter<'i, T> {
-    pub const fn new(filter: Cow<'i, [usize]>, list: &'i List<T>) -> Self {
-        Self {
-            pos: 0,
-            filter,
-            list,
-        }
-    }
-}
-
-impl<'i, T> Iterator for FilterIter<'i, T> {
-    type Item = &'i T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while self.pos < self.filter.len() {
-            let idx = self.filter[self.pos];
-            self.pos += 1;
-            if self.list.is_deleted(idx) {
-                continue;
-            }
-            return Some(&self.list[idx]);
-        }
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::index::SelectedIndices;
+
     use super::*;
+
+    impl<T> From<Vec<T>> for List<T> {
+        fn from(v: Vec<T>) -> Self {
+            let mut l = List::with_capacity(v.len());
+            for i in v {
+                l.insert(i, |_, _| {});
+            }
+            l
+        }
+    }
 
     #[test]
     fn insert() {
@@ -281,7 +259,7 @@ mod tests {
     fn delete_first() {
         let mut l: List<_> = vec![1, 2, 3].into();
 
-        assert_eq!(&1, l.delete(0, |_, _| {}));
+        assert_eq!(Some(&1), l.delete(0, |_, _| {}));
         assert_eq!(3, l.len());
         assert_eq!(2, l.count());
 
@@ -351,21 +329,20 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn iter_filter_delete() {
         let mut l: List<_> = vec![1, 2, 3].into();
         l.delete(1, |_, _| {});
 
-        let mut it = l.filter(Cow::Owned(vec![0, 1, 2]));
+        let mut it = l.filter(SelectedIndices::borrowed(&[1]));
 
         assert_eq!(Some(&1), it.next());
-        assert_eq!(Some(&3), it.next());
-        assert_eq!(None, it.next());
     }
 
     #[test]
     fn filter_first() {
         let l: List<_> = vec![1, 2, 3].into();
-        let mut it = l.filter(Cow::Owned(vec![0, 1]));
+        let mut it = l.filter(SelectedIndices::owned(vec![0, 1]));
 
         assert_eq!(Some(&1), it.next());
         assert_eq!(Some(&2), it.next());
@@ -375,7 +352,7 @@ mod tests {
     #[test]
     fn filter_last() {
         let l: List<_> = vec![1, 2, 3].into();
-        let mut it = l.filter(Cow::Owned(vec![1, 2]));
+        let mut it = l.filter(SelectedIndices::owned(vec![1, 2]));
 
         assert_eq!(Some(&2), it.next());
         assert_eq!(Some(&3), it.next());
