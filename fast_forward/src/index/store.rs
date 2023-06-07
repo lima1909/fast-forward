@@ -93,16 +93,6 @@ pub trait Store: Filterable {
     }
 }
 
-/// Meta data from the [`Store`], like min or max value of the `Key`.
-pub trait MetaData {
-    type Meta<'m>
-    where
-        Self: 'm;
-
-    /// Return meta data from the `Store`.
-    fn meta(&self) -> Self::Meta<'_>;
-}
-
 /// Returns a list to the indices [`SelectedIndices`] corresponding to the key.
 pub trait Filterable {
     type Key;
@@ -208,6 +198,16 @@ where
     {
         self.0 .0.meta()
     }
+}
+
+/// Meta data from the [`Store`], like min or max value of the `Key`.
+pub trait MetaData {
+    type Meta<'m>
+    where
+        Self: 'm;
+
+    /// Return meta data from the `Store`.
+    fn meta(&self) -> Self::Meta<'_>;
 }
 
 #[cfg(test)]

@@ -132,24 +132,24 @@ where
     K: Default + 's,
 {
     /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
-    pub fn min(&self) -> usize {
+    pub const fn min(&self) -> usize {
         self.0.min_max_cache.min
     }
 
     /// Filter for get the highest (`max`) `Key` which is stored in `UIntIndex`.
-    pub fn max(&self) -> usize {
+    pub const fn max(&self) -> usize {
         self.0.min_max_cache.max
     }
 }
 
 impl<K: Default> UIntIndex<K> {
     /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
-    pub fn min(&self) -> usize {
+    pub const fn min(&self) -> usize {
         self.min_max_cache.min
     }
 
     /// Filter for get the highest (`max`) `Key` which is stored in `UIntIndex`.
-    pub fn max(&self) -> usize {
+    pub const fn max(&self) -> usize {
         self.min_max_cache.max
     }
 
