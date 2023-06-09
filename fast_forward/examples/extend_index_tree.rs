@@ -1,28 +1,19 @@
 use fast_forward::{
-    collections::OneIndexList,
-    index::{
-        store::{Filter, Filterable},
-        uint::UIntIndex,
-    },
-    index::{SelectedIndices, Store},
+    collections::{ItemFilter, OneIndexList},
+    index::{store::Filterable, uint::UIntIndex},
+    index::{IndexFilter, SelectedIndices, Store},
 };
 
-use std::ops::Index;
-
 trait Parents<'f> {
-    fn parents<I>(&self, key: usize, stop: usize, nodes: &I) -> SelectedIndices<'f>
-    where
-        I: Index<usize, Output = Node>;
+    fn parents(&self, key: usize, stop: usize) -> SelectedIndices<'f>;
 }
 
-impl<'f, F> Parents<'f> for Filter<'f, F>
+impl<'f, F, L> Parents<'f> for ItemFilter<'f, F, L>
 where
     F: Filterable<Key = usize>,
+    L: IndexFilter<Item = Node>,
 {
-    fn parents<I>(&self, key: usize, stop: usize, nodes: &I) -> SelectedIndices<'f>
-    where
-        I: Index<usize, Output = Node>,
-    {
+    fn parents(&self, key: usize, stop: usize) -> SelectedIndices<'f> {
         let mut result = SelectedIndices::empty();
 
         if key == stop {
@@ -30,8 +21,8 @@ where
         }
 
         for i in self.eq(&key).iter() {
-            let n = &nodes[*i];
-            result = self.eq(&n.parent) | self.parents(n.parent, stop, nodes);
+            let n = self.get(*i);
+            result = self.eq(&n.parent) | self.parents(n.parent, stop);
         }
 
         result
@@ -74,28 +65,28 @@ fn main() {
     );
 
     // PARENTS: up to the root node
-    assert_eq!(None, n.idx().filter(|f| f.parents(9, 0, &n)).next());
-    assert_eq!(None, n.idx().filter(|f| f.parents(0, 0, &n)).next());
+    assert_eq!(None, n.idx().filter(|f| f.parents(9, 0)).next());
+    assert_eq!(None, n.idx().filter(|f| f.parents(0, 0)).next());
 
     assert_eq!(
         vec![&Node::new(0, 0)],
-        n.idx().filter(|f| f.parents(1, 0, &n)).collect::<Vec<_>>()
+        n.idx().filter(|f| f.parents(1, 0)).collect::<Vec<_>>()
     );
     assert_eq!(
         vec![&Node::new(0, 0)],
-        n.idx().filter(|f| f.parents(4, 0, &n)).collect::<Vec<_>>()
+        n.idx().filter(|f| f.parents(4, 0)).collect::<Vec<_>>()
     );
     assert_eq!(
         vec![&Node::new(0, 0), &Node::new(1, 0)],
-        n.idx().filter(|f| f.parents(2, 0, &n)).collect::<Vec<_>>()
+        n.idx().filter(|f| f.parents(2, 0)).collect::<Vec<_>>()
     );
     assert_eq!(
         vec![&Node::new(0, 0), &Node::new(1, 0)],
-        n.idx().filter(|f| f.parents(3, 0, &n)).collect::<Vec<_>>()
+        n.idx().filter(|f| f.parents(3, 0)).collect::<Vec<_>>()
     );
     assert_eq!(
         vec![&Node::new(0, 0), &Node::new(1, 0), &Node::new(2, 1)],
-        n.idx().filter(|f| f.parents(5, 0, &n)).collect::<Vec<_>>()
+        n.idx().filter(|f| f.parents(5, 0)).collect::<Vec<_>>()
     );
     assert_eq!(
         vec![
@@ -104,12 +95,12 @@ fn main() {
             &Node::new(2, 1),
             &Node::new(5, 2)
         ],
-        n.idx().filter(|f| f.parents(6, 0, &n)).collect::<Vec<_>>()
+        n.idx().filter(|f| f.parents(6, 0)).collect::<Vec<_>>()
     );
 
     // // PARENTS-SUBTREE: NOT up to the root node
     assert_eq!(
         vec![&Node::new(2, 1), &Node::new(5, 2)],
-        n.idx().filter(|f| f.parents(6, 2, &n)).collect::<Vec<_>>()
+        n.idx().filter(|f| f.parents(6, 2)).collect::<Vec<_>>()
     );
 }

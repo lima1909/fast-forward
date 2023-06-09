@@ -58,7 +58,7 @@ where
     }
 
     pub fn idx(&self) -> ItemRetriever<'_, S, List<I>> {
-        ItemRetriever::new(self.store.retrieve(), &self.items)
+        ItemRetriever::new(&self.store, self.store.retrieve(), &self.items)
     }
 
     pub fn get(&self, index: usize) -> Option<&I> {

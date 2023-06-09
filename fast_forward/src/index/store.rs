@@ -99,12 +99,12 @@ pub trait Filterable {
 
     /// Get all indices for a given `Key`.
     /// If the `Key` not exist, than this method returns [`SelectedIndices::empty()`]
-    fn indices(&self, key: &Self::Key) -> SelectedIndices<'_>;
+    fn get(&self, key: &Self::Key) -> SelectedIndices<'_>;
 
     /// Checks whether the `Key` exists.
     #[inline]
     fn contains(&self, key: &Self::Key) -> bool {
-        !self.indices(key).is_empty()
+        !self.get(key).is_empty()
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -122,9 +122,9 @@ pub trait Filterable {
         let mut it = keys.into_iter();
         match it.next() {
             Some(key) => {
-                let mut c = self.indices(&key);
+                let mut c = self.get(&key);
                 for k in it {
-                    c = c | self.indices(&k)
+                    c = c | self.get(&k)
                 }
                 c
             }
@@ -134,14 +134,14 @@ pub trait Filterable {
 }
 
 #[repr(transparent)]
-pub struct Filter<'f, F>(&'f F);
+pub struct Filter<'f, F>(pub &'f F);
 
 impl<'f, F> Filter<'f, F>
 where
     F: Filterable,
 {
     pub fn eq(&self, key: &F::Key) -> SelectedIndices<'f> {
-        self.0.indices(key)
+        self.0.get(key)
     }
 
     pub fn eq_many<I>(&self, keys: I) -> SelectedIndices<'f>
@@ -217,7 +217,7 @@ mod tests {
     impl<'s> Filterable for Vec<&'s str> {
         type Key = &'s str;
 
-        fn indices(&self, key: &Self::Key) -> SelectedIndices<'_> {
+        fn get(&self, key: &Self::Key) -> SelectedIndices<'_> {
             let idx = self.binary_search(key).unwrap();
             SelectedIndices::new(idx)
         }

@@ -5,11 +5,42 @@ pub use one::OneIndexList;
 
 use crate::index::{
     self,
-    store::{self, Filterable},
+    store::{Filter, Filterable},
     IndexFilter, MetaData, Retriever, SelectedIndices,
 };
 
+pub struct ItemFilter<'a, F, L> {
+    filter: Filter<'a, F>,
+    items: &'a L,
+}
+
+impl<'a, F, L> ItemFilter<'a, F, L>
+where
+    F: Filterable,
+    L: IndexFilter,
+{
+    const fn new(filter: Filter<'a, F>, items: &'a L) -> Self {
+        Self { filter, items }
+    }
+
+    pub fn eq(&self, key: &F::Key) -> SelectedIndices<'a> {
+        self.filter.eq(key)
+    }
+
+    pub fn eq_many<I>(&self, keys: I) -> SelectedIndices<'a>
+    where
+        I: IntoIterator<Item = F::Key>,
+    {
+        self.filter.eq_many(keys)
+    }
+
+    pub fn get(&self, index: usize) -> &<L as IndexFilter>::Item {
+        &self.items[index]
+    }
+}
+
 pub struct ItemRetriever<'a, F, L> {
+    filter: ItemFilter<'a, F, L>,
     retrieve: Retriever<'a, F>,
     items: &'a L,
 }
@@ -19,8 +50,12 @@ where
     F: Filterable,
     L: IndexFilter,
 {
-    pub const fn new(retrieve: Retriever<'a, F>, items: &'a L) -> Self {
-        Self { retrieve, items }
+    pub const fn new(filter: &'a F, retrieve: Retriever<'a, F>, items: &'a L) -> Self {
+        Self {
+            filter: ItemFilter::new(Filter(filter), items),
+            retrieve,
+            items,
+        }
     }
 
     /// Get all items for a given `Key`.
@@ -52,9 +87,9 @@ where
     /// Return filter methods from the `Store`.
     pub fn filter<P>(&self, predicate: P) -> index::Iter<'a, L>
     where
-        P: Fn(&store::Filter<'a, F>) -> SelectedIndices<'a>,
+        P: Fn(&ItemFilter<'a, F, L>) -> SelectedIndices<'a>,
     {
-        let indices = self.retrieve.filter(predicate);
+        let indices = predicate(&self.filter);
         self.items.filter(indices)
     }
 

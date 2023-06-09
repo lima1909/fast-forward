@@ -38,7 +38,7 @@ use std::{
 };
 
 /// `IndexFilter` returns an [`std::iter::Iterator`] for all `Items` which exists for a given list of indices.
-pub trait IndexFilter {
+pub trait IndexFilter: Index<usize, Output = Self::Item> {
     type Item;
 
     /// Returns a `Iterator` over all `Items` with the given index list.

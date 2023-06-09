@@ -153,7 +153,7 @@ macro_rules! fast {
                 fn $store(&self) -> $crate::collections::ItemRetriever<'_, $store_type, $crate::collections::list::List<$item>> {
                     use $crate::index::Store;
 
-                    $crate::collections::ItemRetriever::new(self.$store.retrieve(), &self._items_)
+                    $crate::collections::ItemRetriever::new(&self.$store, self.$store.retrieve(), &self._items_)
                 }
             )+
         }
