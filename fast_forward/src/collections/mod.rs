@@ -1,66 +1,67 @@
 pub mod list;
 pub mod one;
 
-pub use one::OneIndexList;
+use std::ops::Index;
 
-use crate::index::{
-    self,
-    store::{Filter, Filterable},
-    IndexFilter, MetaData, Retriever, SelectedIndices,
+pub use crate::{
+    collections::one::OneIndexList,
+    index::{self, Filterable, IndexFilter, MetaData, SelectedIndices},
 };
 
-pub struct ItemFilter<'a, F, L> {
-    filter: Filter<'a, F>,
-    items: &'a L,
+pub struct Filter<'f, F, I> {
+    filter: &'f F,
+    items: &'f I,
 }
 
-impl<'a, F, L> ItemFilter<'a, F, L>
+impl<'f, F, I> Filter<'f, F, I>
 where
     F: Filterable,
-    L: IndexFilter,
 {
-    const fn new(filter: Filter<'a, F>, items: &'a L) -> Self {
+    const fn new(filter: &'f F, items: &'f I) -> Self {
         Self { filter, items }
     }
 
-    pub fn eq(&self, key: &F::Key) -> SelectedIndices<'a> {
-        self.filter.eq(key)
+    pub fn eq(&self, key: &F::Key) -> SelectedIndices<'f> {
+        self.filter.get(key)
     }
 
-    pub fn eq_many<I>(&self, keys: I) -> SelectedIndices<'a>
+    pub fn eq_many<It>(&self, keys: It) -> SelectedIndices<'f>
     where
-        I: IntoIterator<Item = F::Key>,
+        It: IntoIterator<Item = F::Key>,
     {
-        self.filter.eq_many(keys)
+        self.filter.get_many(keys)
     }
 
-    pub fn get(&self, index: usize) -> &<L as IndexFilter>::Item {
-        &self.items[index]
+    pub fn get(&self, i: usize) -> &<I as Index<usize>>::Output
+    where
+        I: Index<usize>,
+    {
+        &self.items[i]
     }
 }
 
-pub struct ItemRetriever<'a, F, L> {
-    filter: ItemFilter<'a, F, L>,
-    retrieve: Retriever<'a, F>,
-    items: &'a L,
+pub struct Retriever<'f, F, L> {
+    filter: Filter<'f, F, L>,
+    items: &'f L,
 }
 
-impl<'a, F, L> ItemRetriever<'a, F, L>
+impl<'f, F, L> Retriever<'f, F, L>
 where
     F: Filterable,
-    L: IndexFilter,
 {
-    pub const fn new(filter: &'a F, retrieve: Retriever<'a, F>, items: &'a L) -> Self {
+    pub const fn new(filter: &'f F, items: &'f L) -> Self {
         Self {
-            filter: ItemFilter::new(Filter(filter), items),
-            retrieve,
+            filter: Filter::new(filter, items),
             items,
         }
     }
 
     /// Get all items for a given `Key`.
-    pub fn get(&self, key: &F::Key) -> index::Iter<'a, L> {
-        let indices = self.retrieve.get(key);
+    pub fn get(&self, key: &F::Key) -> index::Iter<'f, L>
+    where
+        L: IndexFilter,
+    {
+        let indices = self.filter.eq(key);
         self.items.filter(indices)
     }
 
@@ -71,23 +72,25 @@ where
     /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
     /// ```
-    pub fn get_many<I>(&self, keys: I) -> index::Iter<'a, L>
+    pub fn get_many<I>(&self, keys: I) -> index::Iter<'f, L>
     where
         I: IntoIterator<Item = F::Key>,
+        L: IndexFilter,
     {
-        let indices = self.retrieve.get_many(keys);
+        let indices = self.filter.eq_many(keys);
         self.items.filter(indices)
     }
 
     /// Checks whether the `Key` exists.
     pub fn contains(&self, key: F::Key) -> bool {
-        !self.retrieve.get(&key).is_empty()
+        !self.filter.eq(&key).is_empty()
     }
 
     /// Return filter methods from the `Store`.
-    pub fn filter<P>(&self, predicate: P) -> index::Iter<'a, L>
+    pub fn filter<P>(&self, predicate: P) -> index::Iter<'f, L>
     where
-        P: Fn(&ItemFilter<'a, F, L>) -> SelectedIndices<'a>,
+        P: Fn(&Filter<'f, F, L>) -> SelectedIndices<'f>,
+        L: IndexFilter,
     {
         let indices = predicate(&self.filter);
         self.items.filter(indices)
@@ -97,6 +100,6 @@ where
     where
         F: MetaData,
     {
-        self.retrieve.meta()
+        self.filter.filter.meta()
     }
 }

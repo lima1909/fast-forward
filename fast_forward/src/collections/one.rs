@@ -3,7 +3,7 @@ use std::ops::Index;
 use crate::{
     collections::{
         list::{Iter, List},
-        ItemRetriever,
+        Retriever,
     },
     index::Store,
 };
@@ -57,8 +57,8 @@ where
             .delete(pos, |it, idx| self.store.delete((self.field)(it), idx))
     }
 
-    pub fn idx(&self) -> ItemRetriever<'_, S, List<I>> {
-        ItemRetriever::new(&self.store, self.store.retrieve(), &self.items)
+    pub fn idx(&self) -> Retriever<'_, S, List<I>> {
+        Retriever::new(&self.store, &self.items)
     }
 
     pub fn get(&self, index: usize) -> Option<&I> {

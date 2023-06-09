@@ -1,5 +1,5 @@
 use fast_forward::{
-    collections::{ItemFilter, OneIndexList},
+    collections::{Filter, OneIndexList},
     index::{store::Filterable, uint::UIntIndex},
     index::{IndexFilter, SelectedIndices, Store},
 };
@@ -8,7 +8,7 @@ trait Parents<'f> {
     fn parents(&self, key: usize, stop: usize) -> SelectedIndices<'f>;
 }
 
-impl<'f, F, L> Parents<'f> for ItemFilter<'f, F, L>
+impl<'f, F, L> Parents<'f> for Filter<'f, F, L>
 where
     F: Filterable<Key = usize>,
     L: IndexFilter<Item = Node>,

@@ -28,7 +28,7 @@ pub mod map;
 pub mod store;
 pub mod uint;
 
-pub use store::{MetaData, Retriever, Store};
+pub use store::{Filterable, MetaData, Store};
 
 use std::{
     borrow::Cow,

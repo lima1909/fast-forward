@@ -183,8 +183,8 @@ mod tests {
         i.insert(1, 3);
         i.insert(2, 4);
 
-        let idx = i.retrieve().filter(|f| f.eq(&2));
-        let mut it = idx.iter();
+        let idxs = i.get(&2);
+        let mut it = idxs.iter();
         assert_eq!(Some(&4), it.next());
         assert_eq!(None, it.next());
 
@@ -197,12 +197,10 @@ mod tests {
         let mut i = UIntIndex::new();
         i.insert(2, 4);
 
-        let r = i.retrieve().filter(|f| f.eq(&2));
-        assert_eq!(r, [4]);
+        assert_eq!(i.get(&2), [4]);
 
         i.insert(1, 3);
-        let r = i.retrieve().filter(|f| f.eq(&2) | f.eq(&1));
-        assert_eq!(r, [3, 4]);
+        assert_eq!(i.get(&2) | i.get(&1), [3, 4]);
     }
 
     #[test]

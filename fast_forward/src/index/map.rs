@@ -87,11 +87,11 @@ mod tests {
 
         assert!(i.contains(&"Paul"));
 
-        for idx in i.retrieve().filter(|f| f.eq(&"Jasmin")).iter() {
+        for idx in i.get(&"Jasmin").iter() {
             assert_eq!(&4, idx);
         }
 
-        let idxs = i.retrieve().filter(|f| f.eq(&"Jasmin"));
+        let idxs = i.get(&"Jasmin");
         let mut it = idxs.iter();
         assert_eq!(Some(&4), it.next());
         assert_eq!(None, it.next());
