@@ -137,9 +137,7 @@ macro_rules! fast {
             ///
             #[allow(dead_code)]
             fn filter<'i>(&'i self, filter: $crate::index::SelectedIndices<'i>) -> $crate::index::Iter<'i, $crate::collections::list::List<$item>> {
-                use $crate::index::IndexFilter;
-
-                self._items_.filter(filter)
+                filter.items(&self._items_)
             }
 
             #[allow(dead_code)]

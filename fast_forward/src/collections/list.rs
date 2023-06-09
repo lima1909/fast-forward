@@ -1,4 +1,3 @@
-use crate::index::IndexFilter;
 use std::ops::Index;
 
 #[derive(Debug, Clone)]
@@ -99,10 +98,6 @@ impl<T> List<T> {
             deleted_pos: Vec::new(),
         }
     }
-}
-
-impl<T> IndexFilter for List<T> {
-    type Item = T;
 }
 
 impl<T> Default for List<T> {
@@ -334,15 +329,15 @@ mod tests {
         let mut l: List<_> = vec![1, 2, 3].into();
         l.delete(1, |_, _| {});
 
-        let mut it = l.filter(SelectedIndices::borrowed(&[1]));
-
+        let mut it = SelectedIndices::borrowed(&[1]).items(&l);
         assert_eq!(Some(&1), it.next());
+        assert_eq!(None, it.next());
     }
 
     #[test]
     fn filter_first() {
         let l: List<_> = vec![1, 2, 3].into();
-        let mut it = l.filter(SelectedIndices::owned(vec![0, 1]));
+        let mut it = SelectedIndices::owned(vec![0, 1]).items(&l);
 
         assert_eq!(Some(&1), it.next());
         assert_eq!(Some(&2), it.next());
@@ -352,7 +347,7 @@ mod tests {
     #[test]
     fn filter_last() {
         let l: List<_> = vec![1, 2, 3].into();
-        let mut it = l.filter(SelectedIndices::owned(vec![1, 2]));
+        let mut it = SelectedIndices::owned(vec![1, 2]).items(&l);
 
         assert_eq!(Some(&2), it.next());
         assert_eq!(Some(&3), it.next());

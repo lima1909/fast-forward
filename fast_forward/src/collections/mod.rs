@@ -5,7 +5,7 @@ use std::ops::Index;
 
 pub use crate::{
     collections::one::OneIndexList,
-    index::{self, Filterable, IndexFilter, MetaData, SelectedIndices},
+    index::{self, Filterable, MetaData, SelectedIndices},
 };
 
 pub struct Filter<'f, F, I> {
@@ -59,10 +59,9 @@ where
     /// Get all items for a given `Key`.
     pub fn get(&self, key: &F::Key) -> index::Iter<'f, L>
     where
-        L: IndexFilter,
+        L: Index<usize>,
     {
-        let indices = self.filter.eq(key);
-        self.items.filter(indices)
+        self.filter.eq(key).items(self.items)
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -75,10 +74,9 @@ where
     pub fn get_many<I>(&self, keys: I) -> index::Iter<'f, L>
     where
         I: IntoIterator<Item = F::Key>,
-        L: IndexFilter,
+        L: Index<usize>,
     {
-        let indices = self.filter.eq_many(keys);
-        self.items.filter(indices)
+        self.filter.eq_many(keys).items(self.items)
     }
 
     /// Checks whether the `Key` exists.
@@ -90,10 +88,9 @@ where
     pub fn filter<P>(&self, predicate: P) -> index::Iter<'f, L>
     where
         P: Fn(&Filter<'f, F, L>) -> SelectedIndices<'f>,
-        L: IndexFilter,
+        L: Index<usize>,
     {
-        let indices = predicate(&self.filter);
-        self.items.filter(indices)
+        predicate(&self.filter).items(self.items)
     }
 
     pub fn meta(&self) -> F::Meta<'_>

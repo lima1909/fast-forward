@@ -1,7 +1,9 @@
+use std::ops::Index;
+
 use fast_forward::{
     collections::{Filter, OneIndexList},
     index::{store::Filterable, uint::UIntIndex},
-    index::{IndexFilter, SelectedIndices, Store},
+    index::{SelectedIndices, Store},
 };
 
 trait Parents<'f> {
@@ -11,7 +13,7 @@ trait Parents<'f> {
 impl<'f, F, L> Parents<'f> for Filter<'f, F, L>
 where
     F: Filterable<Key = usize>,
-    L: IndexFilter<Item = Node>,
+    L: Index<usize, Output = Node>,
 {
     fn parents(&self, key: usize, stop: usize) -> SelectedIndices<'f> {
         let mut result = SelectedIndices::empty();

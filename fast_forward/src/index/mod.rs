@@ -37,39 +37,6 @@ use std::{
     slice,
 };
 
-/// `IndexFilter` returns an [`std::iter::Iterator`] for all `Items` which exists for a given list of indices.
-pub trait IndexFilter: Index<usize, Output = Self::Item> {
-    type Item;
-
-    /// Returns a `Iterator` over all `Items` with the given index list.
-    fn filter<'i>(&'i self, indices: SelectedIndices<'i>) -> Iter<'i, Self>
-    where
-        Self: Sized,
-    {
-        Iter {
-            pos: 0,
-            list: self,
-            indices,
-        }
-    }
-}
-
-pub struct Iter<'i, I> {
-    pos: usize,
-    list: &'i I,
-    indices: SelectedIndices<'i>,
-}
-
-impl<'i, I: Index<usize>> Iterator for Iter<'i, I> {
-    type Item = &'i I::Output;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let idx = self.indices.get(self.pos)?;
-        self.pos += 1;
-        Some(&self.list[*idx])
-    }
-}
-
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct SelectedIndices<'i>(Cow<'i, [usize]>);
@@ -99,6 +66,18 @@ impl<'i> SelectedIndices<'i> {
     }
 
     #[inline]
+    pub fn items<I>(self, list: &'i I) -> Iter<'i, I>
+    where
+        I: Index<usize>,
+    {
+        Iter {
+            pos: 0,
+            list,
+            indices: self,
+        }
+    }
+
+    #[inline]
     pub fn get(&self, index: usize) -> Option<&usize> {
         self.0.get(index)
     }
@@ -111,6 +90,25 @@ impl<'i> SelectedIndices<'i> {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+}
+
+pub struct Iter<'i, I> {
+    pos: usize,
+    list: &'i I,
+    indices: SelectedIndices<'i>,
+}
+
+impl<'i, I> Iterator for Iter<'i, I>
+where
+    I: Index<usize>,
+{
+    type Item = &'i I::Output;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let idx = self.indices.get(self.pos)?;
+        self.pos += 1;
+        Some(&self.list[*idx])
     }
 }
 
