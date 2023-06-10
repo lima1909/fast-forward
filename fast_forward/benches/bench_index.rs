@@ -41,13 +41,7 @@ fn list_index(c: &mut Criterion) {
 
     // group benchmark
     let mut group = c.benchmark_group("index");
-    group.bench_function("ff: query pk", |b| {
-        b.iter(|| {
-            let i = idx.pk.get(&FIND_ID)[0];
-            assert_eq!(&FIND_PERSON, &v[i]);
-        })
-    });
-    group.bench_function("ff: filter pk", |b| {
+    group.bench_function("ff: get pk", |b| {
         b.iter(|| {
             let i = idx.pk.get(&FIND_ID)[0];
             assert_eq!(&FIND_PERSON, &v[i]);

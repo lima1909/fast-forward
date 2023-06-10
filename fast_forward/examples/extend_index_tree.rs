@@ -3,11 +3,11 @@ use std::ops::Index;
 use fast_forward::{
     collections::{Filter, OneIndexList},
     index::{store::Filterable, uint::UIntIndex},
-    index::{SelectedIndices, Store},
+    index::{Indices, Store},
 };
 
 trait Parents<'f> {
-    fn parents(&self, key: usize, stop: usize) -> SelectedIndices<'f>;
+    fn parents(&self, key: usize, stop: usize) -> Indices<'f>;
 }
 
 impl<'f, F, L> Parents<'f> for Filter<'f, F, L>
@@ -15,8 +15,8 @@ where
     F: Filterable<Key = usize>,
     L: Index<usize, Output = Node>,
 {
-    fn parents(&self, key: usize, stop: usize) -> SelectedIndices<'f> {
-        let mut result = SelectedIndices::empty();
+    fn parents(&self, key: usize, stop: usize) -> Indices<'f> {
+        let mut result = Indices::empty();
 
         if key == stop {
             return result;

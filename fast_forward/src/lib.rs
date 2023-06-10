@@ -136,7 +136,7 @@ macro_rules! fast {
             /// Panics if the positions are out of bound.
             ///
             #[allow(dead_code)]
-            fn filter<'i>(&'i self, filter: $crate::index::SelectedIndices<'i>) -> $crate::index::Iter<'i, $crate::collections::list::List<$item>> {
+            fn filter<'i>(&'i self, filter: $crate::index::Indices<'i>) -> $crate::index::Iter<'i, $crate::collections::list::List<$item>> {
                 filter.items(&self._items_)
             }
 

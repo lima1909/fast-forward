@@ -26,12 +26,13 @@
 //!   ...     | ...
 //!
 //! ```
-use crate::index::{store::Filterable, Indices, SelectedIndices, Store};
+use crate::index::{store::Filterable, Indices, KeyIndices, Store};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
 #[derive(Debug, Default)]
-pub struct MapIndex<K: Default = String>(HashMap<K, Indices>);
+#[repr(transparent)]
+pub struct MapIndex<K: Default = String>(HashMap<K, KeyIndices>);
 
 impl<K> Filterable for MapIndex<K>
 where
@@ -40,10 +41,10 @@ where
     type Key = K;
 
     #[inline]
-    fn get(&self, key: &Self::Key) -> SelectedIndices<'_> {
+    fn get(&self, key: &Self::Key) -> Indices<'_> {
         match self.0.get(key) {
-            Some(i) => i.get(),
-            None => SelectedIndices::empty(),
+            Some(i) => i.indices(),
+            None => Indices::empty(),
         }
     }
 }
@@ -56,7 +57,7 @@ where
         match self.0.get_mut(&key) {
             Some(v) => v.add(i),
             None => {
-                self.0.insert(key, Indices::new(i));
+                self.0.insert(key, KeyIndices::new(i));
             }
         }
     }

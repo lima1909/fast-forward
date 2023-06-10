@@ -32,14 +32,14 @@
 //! ```
 use crate::index::{
     store::{Filterable, MetaData},
-    Indices, MinMax, SelectedIndices, Store,
+    Indices, KeyIndices, MinMax, Store,
 };
 use std::marker::PhantomData;
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
 pub struct UIntIndex<K: Default = usize> {
-    data: Vec<Option<Indices>>,
+    data: Vec<Option<KeyIndices>>,
     min_max_cache: MinMax<usize>,
     _key: PhantomData<K>,
 }
@@ -61,11 +61,11 @@ where
     type Key = K;
 
     #[inline]
-    fn get(&self, key: &Self::Key) -> SelectedIndices<'_> {
+    fn get(&self, key: &Self::Key) -> Indices<'_> {
         let i: usize = (*key).into();
         match self.data.get(i) {
-            Some(Some(idx)) => idx.get(),
-            _ => SelectedIndices::empty(),
+            Some(Some(idx)) => idx.indices(),
+            _ => Indices::empty(),
         }
     }
 }
@@ -83,7 +83,7 @@ where
 
         match self.data[k].as_mut() {
             Some(idx) => idx.add(i),
-            None => self.data[k] = Some(Indices::new(i)),
+            None => self.data[k] = Some(KeyIndices::new(i)),
         }
 
         self.min_max_cache.new_min_value(k);
@@ -266,7 +266,7 @@ mod tests {
             assert_eq!([6], idx.get(&3) & idx.get(&3));
             assert_eq!([6], idx.get(&3) | idx.get(&99));
             assert_eq!([8], idx.get(&99) | idx.get(&4));
-            assert_eq!(SelectedIndices::empty(), idx.get(&3) & idx.get(&4));
+            assert_eq!(Indices::empty(), idx.get(&3) & idx.get(&4));
 
             idx.insert(99, 0);
             assert_eq!([0], idx.get(&99));
@@ -279,7 +279,7 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            assert_eq!(SelectedIndices::empty(), idx.get(&3) & idx.get(&2));
+            assert_eq!(Indices::empty(), idx.get(&3) & idx.get(&2));
 
             // =3 or =4 and =2 =>
             // (
@@ -472,9 +472,9 @@ mod tests {
             i.insert(2, 1);
             i.insert(6, 6);
 
-            // TODO
-            // assert_eq!(0, i.get_many([]).iter().len());
-            // assert_eq!(0, i.get_many([9]).iter().len());
+            assert_eq!(0, i.get_many([]).iter().len());
+            assert_eq!(0, i.get_many([9]).iter().len());
+
             assert_eq!([1, 2], i.get_many([2]));
             assert_eq!([1, 2, 6], i.get_many([6, 2]));
             assert_eq!([1, 2, 6], i.get_many([9, 6, 2]));

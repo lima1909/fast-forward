@@ -5,7 +5,7 @@ use std::ops::Index;
 
 pub use crate::{
     collections::one::OneIndexList,
-    index::{self, Filterable, MetaData, SelectedIndices},
+    index::{self, Filterable, Indices, MetaData},
 };
 
 pub struct Filter<'f, F, I> {
@@ -21,11 +21,11 @@ where
         Self { filter, items }
     }
 
-    pub fn eq(&self, key: &F::Key) -> SelectedIndices<'f> {
+    pub fn eq(&self, key: &F::Key) -> Indices<'f> {
         self.filter.get(key)
     }
 
-    pub fn eq_many<It>(&self, keys: It) -> SelectedIndices<'f>
+    pub fn eq_many<It>(&self, keys: It) -> Indices<'f>
     where
         It: IntoIterator<Item = F::Key>,
     {
@@ -87,7 +87,7 @@ where
     /// Return filter methods from the `Store`.
     pub fn filter<P>(&self, predicate: P) -> index::Iter<'f, L>
     where
-        P: Fn(&Filter<'f, F, L>) -> SelectedIndices<'f>,
+        P: Fn(&Filter<'f, F, L>) -> Indices<'f>,
         L: Index<usize>,
     {
         predicate(&self.filter).items(self.items)

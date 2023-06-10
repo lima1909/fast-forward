@@ -1,4 +1,4 @@
-use crate::index::SelectedIndices;
+use super::Indices;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Filterable {
@@ -85,13 +85,13 @@ pub trait Store: Filterable {
     fn with_capacity(capacity: usize) -> Self;
 }
 
-/// Returns a list to the indices [`SelectedIndices`] corresponding to the key.
+/// Returns a list to the indices [`Indices`] corresponding to the key.
 pub trait Filterable {
     type Key;
 
     /// Get all indices for a given `Key`.
-    /// If the `Key` not exist, than this method returns [`SelectedIndices::empty()`]
-    fn get(&self, key: &Self::Key) -> SelectedIndices<'_>;
+    /// If the `Key` not exist, than this method returns [`Indices::empty()`]
+    fn get(&self, key: &Self::Key) -> Indices<'_>;
 
     /// Checks whether the `Key` exists.
     #[inline]
@@ -107,7 +107,7 @@ pub trait Filterable {
     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
     /// ```
     #[inline]
-    fn get_many<I>(&self, keys: I) -> SelectedIndices<'_>
+    fn get_many<I>(&self, keys: I) -> Indices<'_>
     where
         I: IntoIterator<Item = Self::Key>,
     {
@@ -120,7 +120,7 @@ pub trait Filterable {
                 }
                 c
             }
-            None => SelectedIndices::empty(),
+            None => Indices::empty(),
         }
     }
 }
@@ -144,9 +144,11 @@ mod tests {
     impl<'s> Filterable for Vec<&'s str> {
         type Key = &'s str;
 
-        fn get(&self, key: &Self::Key) -> SelectedIndices<'_> {
-            let idx = self.binary_search(key).unwrap();
-            SelectedIndices::new(idx)
+        fn get(&self, key: &Self::Key) -> Indices<'_> {
+            if let Ok(idx) = self.binary_search(key) {
+                return idx.into();
+            }
+            Indices::empty()
         }
     }
 
@@ -160,40 +162,43 @@ mod tests {
         }
     }
 
-    trait Two<'f> {
+    trait Or<'f> {
         type Key;
 
-        fn two(&'f self, key1: &Self::Key, key2: &Self::Key) -> SelectedIndices<'f>;
+        fn or(&'f self, key1: &Self::Key, key2: &Self::Key) -> Indices<'f>;
     }
 
-    impl<'f, F: Filterable> Two<'f> for Filter<'f, F> {
+    impl<'f, F: Filterable> Or<'f> for Filter<'f, F> {
         type Key = F::Key;
 
-        fn two(&'f self, key1: &Self::Key, key2: &Self::Key) -> SelectedIndices<'f> {
+        fn or(&'f self, key1: &Self::Key, key2: &Self::Key) -> Indices<'f> {
             self.get(key1) | self.get(key2)
         }
     }
 
-    fn extended_filter<'i>(f: &'i Filter<'i, Vec<&'i str>>, key: &'i &str) -> SelectedIndices<'i> {
+    fn extended_filter<'i>(f: &'i Filter<'i, Vec<&'i str>>, key: &'i &str) -> Indices<'i> {
         f.get(key)
     }
 
     #[test]
-    fn retrieve_filter() {
+    fn filter() {
         let list = vec!["a", "b", "c"];
         let f = Filter(&list);
         assert!(f.contains(&"a"));
         assert_eq!(&[1], &f.get(&"b"));
         assert_eq!(&[0, 1], &f.get_many(["a", "b"]));
         assert_eq!(&[2], &f.get(&"c"));
+        assert_eq!(&[], &f.get(&"zz"));
     }
 
     #[test]
-    fn retrieve_extend_filter() {
+    fn extend_filter() {
         let list = vec!["a", "b", "c"];
         let f = Filter(&list);
 
-        assert_eq!(&[0, 2], &f.two(&"c", &"a"));
+        assert_eq!(&[0, 2], &f.or(&"c", &"a"));
+        assert_eq!(&[0], &f.or(&"zz", &"a"));
+        assert_eq!(&[], &f.or(&"zz", &"xx"));
         assert_eq!(&[2], &extended_filter(&f, &"c"));
     }
 }
