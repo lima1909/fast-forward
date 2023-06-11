@@ -379,7 +379,7 @@ mod tests {
         assert_eq!(vec![&Car(4, "Porsche".into())], r.collect::<Vec<_>>())
     }
 
-    #[derive(Debug, Clone, Copy, Default)]
+    #[derive(Clone, Copy, Default)]
     enum Gender {
         Male,
         Female,
@@ -397,7 +397,6 @@ mod tests {
         }
     }
 
-    #[derive(Debug, Clone)]
     struct Person {
         pk: usize,
         multi: u16,
