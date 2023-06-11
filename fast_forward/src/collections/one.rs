@@ -120,7 +120,7 @@ mod tests {
         let cars =
             OneIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
-        assert!(cars.idx().contains(2));
+        assert!(cars.idx().contains(&2));
         assert!(cars.get(2).is_some());
 
         let r = cars.idx().get(&2).collect::<Vec<_>>();
@@ -149,7 +149,7 @@ mod tests {
             cars,
         );
 
-        assert!(cars.idx().contains("BMW".into()));
+        assert!(cars.idx().contains(&"BMW".into()));
 
         let r = cars.idx().get(&"VW".into()).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "VW".into())], r);

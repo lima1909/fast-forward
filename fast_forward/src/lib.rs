@@ -182,7 +182,7 @@ mod tests {
 
         let id_filter = cars.id();
 
-        assert!(id_filter.contains(2));
+        assert!(id_filter.contains(&2));
 
         let r = id_filter.get(&2).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);

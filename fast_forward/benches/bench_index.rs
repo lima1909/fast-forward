@@ -1,5 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
+use fast_forward::collections::ROIndexList;
 use fast_forward::index::map::MapIndex;
 use fast_forward::index::uint::UIntIndex;
 use fast_forward::index::{Filterable, Store};
@@ -29,6 +30,9 @@ fn list_index(c: &mut Criterion) {
     #[allow(non_snake_case)]
     let FIND_PERSON: Person = Person(FIND_ID, format!("Jasmin {FIND_ID}"));
 
+    // read only index list
+    let ro_idx = ROIndexList::new(UIntIndex::with_capacity(v.len()), |p: &Person| p.0, &v);
+
     // create search index
     let mut idx = Indices {
         pk: UIntIndex::with_capacity(HOW_MUCH_PERSON),
@@ -41,6 +45,13 @@ fn list_index(c: &mut Criterion) {
 
     // group benchmark
     let mut group = c.benchmark_group("index");
+    group.bench_function("ff: ro pk", |b| {
+        b.iter(|| {
+            let p = ro_idx.idx().get(&FIND_ID).next().unwrap();
+            assert_eq!(&FIND_PERSON, p);
+        })
+    });
+
     group.bench_function("ff: get pk", |b| {
         b.iter(|| {
             let i = idx.pk.get(&FIND_ID)[0];
