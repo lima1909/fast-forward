@@ -1,3 +1,4 @@
+//! Different kinds of collections which are using `Indices`.
 pub mod list;
 pub mod one;
 
@@ -69,10 +70,12 @@ where
         Self { filter, items }
     }
 
+    #[inline]
     pub fn eq(&self, key: &F::Key) -> Indices<'f> {
         self.filter.get(key)
     }
 
+    #[inline]
     pub fn eq_many<It>(&self, keys: It) -> Indices<'f>
     where
         It: IntoIterator<Item = F::Key>,
@@ -80,6 +83,7 @@ where
         self.filter.get_many(keys)
     }
 
+    #[inline]
     pub fn get(&self, i: usize) -> &<I as Index<usize>>::Output
     where
         I: Index<usize>,
@@ -105,6 +109,7 @@ where
     }
 
     /// Get all items for a given `Key`.
+    #[inline]
     pub fn get(&self, key: &F::Key) -> index::Iter<'f, L>
     where
         L: Index<usize>,
@@ -119,6 +124,13 @@ where
     /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
     /// ```
+    ///
+    /// ## Hint
+    ///
+    /// The `OR` generated a extra effort.
+    /// For performance reason it is better to use [`Self::get_many_cb()`] or
+    /// to call [`Self::get()`] several times.
+    #[inline]
     pub fn get_many<I>(&self, keys: I) -> index::Iter<'f, L>
     where
         I: IntoIterator<Item = F::Key>,
@@ -127,12 +139,30 @@ where
         self.filter.eq_many(keys).items(self.items)
     }
 
+    /// Combined all given `keys` with an logical `OR`.
+    /// The result is getting per callback function with the args:
+    /// `key` and an Iterator over all filtering Items.
+    #[inline]
+    pub fn get_many_cb<I, C>(&self, keys: I, callback: C)
+    where
+        I: IntoIterator<Item = F::Key>,
+        L: Index<usize>,
+        C: Fn(&F::Key, index::Iter<'f, L>),
+        F::Key: PartialEq,
+    {
+        for k in keys {
+            callback(&k, self.filter.eq(&k).items(self.items))
+        }
+    }
+
     /// Checks whether the `Key` exists.
+    #[inline]
     pub fn contains(&self, key: &F::Key) -> bool {
         !self.filter.eq(key).is_empty()
     }
 
     /// Return filter methods from the `Store`.
+    #[inline]
     pub fn filter<P>(&self, predicate: P) -> index::Iter<'f, L>
     where
         P: Fn(&Filter<'f, F, L>) -> Indices<'f>,
@@ -141,6 +171,7 @@ where
         predicate(&self.filter).items(self.items)
     }
 
+    #[inline]
     pub fn meta(&self) -> F::Meta<'_>
     where
         F: MetaData,
@@ -189,5 +220,26 @@ mod tests {
         });
         assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
         assert_eq!(None, it.next());
+    }
+
+    #[test]
+    fn read_only_index_list_get_many_callback() {
+        let cars = vec![
+            Car(2, "BMW".into()),
+            Car(5, "Audi".into()),
+            Car(2, "VW".into()),
+            Car(99, "Porsche".into()),
+        ];
+
+        let l = ROIndexList::new(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, &cars);
+
+        l.idx().get_many_cb([2, 5], |k, items| {
+            let l = items.collect::<Vec<_>>();
+            match k {
+                2 => assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], l),
+                5 => assert_eq!(vec![&Car(5, "Audi".into())], l),
+                _ => unreachable!("invalid Key: {k}"),
+            }
+        });
     }
 }

@@ -1,3 +1,5 @@
+//! A `Store` is saving `Indices` for a given `Key`,
+//! with the goal, to get the `Indices` as fast as possible.
 use super::Indices;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.

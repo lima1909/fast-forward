@@ -7,6 +7,7 @@ use fast_forward::index::{Filterable, Store};
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
+const FIND_ID_2: usize = 1_501;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Person(usize, String);
@@ -29,6 +30,8 @@ fn list_index(c: &mut Criterion) {
 
     #[allow(non_snake_case)]
     let FIND_PERSON: Person = Person(FIND_ID, format!("Jasmin {FIND_ID}"));
+    #[allow(non_snake_case)]
+    let FIND_PERSON_2: Person = Person(FIND_ID_2, format!("Jasmin {FIND_ID_2}"));
 
     // read only index list
     let ro_idx = ROIndexList::new(UIntIndex::with_capacity(v.len()), |p: &Person| p.0, &v);
@@ -45,24 +48,58 @@ fn list_index(c: &mut Criterion) {
 
     // group benchmark
     let mut group = c.benchmark_group("index");
-    group.bench_function("ff: ro pk", |b| {
+    group.bench_function("ff: ro pk get (one)", |b| {
         b.iter(|| {
             let p = ro_idx.idx().get(&FIND_ID).next().unwrap();
             assert_eq!(&FIND_PERSON, p);
         })
     });
 
-    group.bench_function("ff: get pk", |b| {
+    group.bench_function("ff: ro pk get (two)", |b| {
         b.iter(|| {
-            let i = idx.pk.get(&FIND_ID)[0];
-            assert_eq!(&FIND_PERSON, &v[i]);
+            let p = ro_idx.idx().get(&FIND_ID).next().unwrap();
+            assert_eq!(&FIND_PERSON, p);
+
+            let p = ro_idx.idx().get(&FIND_ID_2).next().unwrap();
+            assert_eq!(&FIND_PERSON_2, p);
         })
     });
 
-    group.bench_function("vec-iter: pk", |b| {
+    group.bench_function("ff: ro pk get_many_cb (callback - two)", |b| {
         b.iter(|| {
-            let v: Vec<&Person> = v.iter().filter(|p| p.0 == FIND_ID).collect();
-            assert_eq!(&FIND_PERSON, v[0]);
+            ro_idx
+                .idx()
+                .get_many_cb([FIND_ID, FIND_ID_2], |k, mut items| match k {
+                    &FIND_ID => assert_eq!(&FIND_PERSON, items.next().unwrap()),
+                    &FIND_ID_2 => assert_eq!(&FIND_PERSON_2, items.next().unwrap()),
+                    _ => unreachable!("invalid Key: {k}"),
+                });
+        })
+    });
+
+    group.bench_function("ff: ro pk get_many (two)", |b| {
+        b.iter(|| {
+            let mut it = ro_idx.idx().get_many([FIND_ID, FIND_ID_2]);
+            assert_eq!(&FIND_PERSON, it.next().unwrap());
+            assert_eq!(&FIND_PERSON_2, it.next().unwrap());
+            assert_eq!(None, it.next());
+        })
+    });
+
+    group.bench_function("vec-iter: pk (one)", |b| {
+        b.iter(|| {
+            let mut it = v.iter().filter(|p| p.0 == FIND_ID);
+            assert_eq!(Some(&FIND_PERSON), it.next());
+            assert_eq!(None, it.next());
+        })
+    });
+
+    group.bench_function("vec-iter: pk (two)", |b| {
+        b.iter(|| {
+            let mut it = v.iter().filter(|p| p.0 == FIND_ID || p.0 == FIND_ID_2);
+            assert_eq!(Some(&FIND_PERSON), it.next());
+            assert_eq!(Some(&FIND_PERSON_2), it.next());
+            assert_eq!(None, it.next());
         })
     });
 
@@ -72,6 +109,8 @@ fn list_index(c: &mut Criterion) {
             assert_eq!(&FIND_PERSON, &v[i]);
         })
     });
+
+    // compare with iter on a Vec and filter
     group.bench_function("vec-iter: pk and name", |b| {
         b.iter(|| {
             let v: Vec<&Person> = v
