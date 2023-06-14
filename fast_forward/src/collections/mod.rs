@@ -9,6 +9,7 @@ pub use crate::{
     index::{self, Filterable, Indices, MetaData, Store},
 };
 
+/// Wrapper for `slices`.
 #[repr(transparent)]
 pub struct Slice<'s, I>(&'s [I]);
 
@@ -20,6 +21,7 @@ impl<'s, I> Index<usize> for Slice<'s, I> {
     }
 }
 
+/// [`ROIndexList`] is a read only list with one index.
 pub struct ROIndexList<'l, I, S> {
     store: S,
     items: Slice<'l, I>,
@@ -57,6 +59,7 @@ impl<'l, I, S> Deref for ROIndexList<'l, I, S> {
     }
 }
 
+/// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'f, F, I> {
     filter: &'f F,
     items: &'f I,
@@ -92,6 +95,7 @@ where
     }
 }
 
+/// A `Retriever` is the interface for get Items by an given filter|query.
 pub struct Retriever<'f, F, L> {
     filter: Filter<'f, F, L>,
     items: &'f L,
@@ -101,6 +105,7 @@ impl<'f, F, L> Retriever<'f, F, L>
 where
     F: Filterable,
 {
+    /// Create a new instance of an [`Retriever`].
     pub const fn new(filter: &'f F, items: &'f L) -> Self {
         Self {
             filter: Filter::new(filter, items),
@@ -109,6 +114,22 @@ where
     }
 
     /// Get all items for a given `Key`.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use fast_forward::index::{Store, uint::UIntIndex};
+    /// use fast_forward::collections::ROIndexList;
+    ///
+    /// #[derive(Debug, Eq, PartialEq, Clone)]
+    /// pub struct Car(usize, String);
+    ///
+    /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
+    ///
+    /// let l = ROIndexList::new(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, &cars);
+    ///
+    /// assert_eq!(Some(&Car(2, "BMW".into())), l.idx().get(&2).next());
+    /// ```
     #[inline]
     pub fn get(&self, key: &F::Key) -> index::Iter<'f, L>
     where
@@ -209,12 +230,48 @@ where
     }
 
     /// Checks whether the `Key` exists.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use fast_forward::index::{Store, uint::UIntIndex};
+    /// use fast_forward::collections::ROIndexList;
+    ///
+    /// #[derive(Debug, Eq, PartialEq, Clone)]
+    /// pub struct Car(usize, String);
+    ///
+    /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
+    ///
+    /// let l = ROIndexList::new(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, &cars);
+    ///
+    /// assert!(l.idx().contains(&2));
+    /// assert!(!l.idx().contains(&99));
+    /// ```
     #[inline]
     pub fn contains(&self, key: &F::Key) -> bool {
         !self.filter.eq(key).is_empty()
     }
 
     /// Return filter methods from the `Store`.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use fast_forward::index::{Store, uint::UIntIndex};
+    /// use fast_forward::collections::ROIndexList;
+    ///
+    /// #[derive(Debug, Eq, PartialEq, Clone)]
+    /// pub struct Car(usize, String);
+    ///
+    /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
+    ///
+    /// let l = ROIndexList::new(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, &cars);
+    ///
+    /// assert_eq!(
+    ///     vec![&Car(2, "BMW".into()), &Car(5, "Audi".into())],
+    ///     l.idx().filter(|fltr| fltr.eq(&2) | fltr.eq(&5)).collect::<Vec<_>>()
+    /// );
+    /// ```
     #[inline]
     pub fn filter<P>(&self, predicate: P) -> index::Iter<'f, L>
     where
@@ -224,6 +281,7 @@ where
         predicate(&self.filter).items(self.items)
     }
 
+    /// Returns Meta data, if the [`Store`] supports any.
     #[inline]
     pub fn meta(&self) -> F::Meta<'_>
     where
