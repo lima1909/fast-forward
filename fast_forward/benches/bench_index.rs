@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use fast_forward::collections::ROIndexList;
+use fast_forward::collections::ro::ROIndexList;
 use fast_forward::index::map::MapIndex;
 use fast_forward::index::uint::UIntIndex;
 use fast_forward::index::{Filterable, Store};

@@ -1,63 +1,14 @@
 //! Different kinds of collections which are using `Indices`.
 pub mod list;
 pub mod one;
+pub mod ro;
 
-use std::ops::{Deref, Index};
+use std::ops::Index;
 
 pub use crate::{
     collections::one::OneIndexList,
     index::{self, Filterable, Indices, MetaData, Store},
 };
-
-/// Wrapper for `slices`.
-#[repr(transparent)]
-pub struct Slice<'s, I>(&'s [I]);
-
-impl<'s, I> Index<usize> for Slice<'s, I> {
-    type Output = I;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
-    }
-}
-
-/// [`ROIndexList`] is a read only list with one index.
-pub struct ROIndexList<'l, I, S> {
-    store: S,
-    items: Slice<'l, I>,
-}
-
-impl<'l, I, S> ROIndexList<'l, I, S> {
-    pub fn new<K, F>(mut store: S, field: F, items: &'l [I]) -> Self
-    where
-        F: Fn(&I) -> K,
-        S: Store<Key = K>,
-    {
-        for (pos, item) in items.iter().enumerate() {
-            store.insert((field)(item), pos);
-        }
-
-        Self {
-            store,
-            items: Slice(items),
-        }
-    }
-
-    pub fn idx(&self) -> Retriever<'_, S, Slice<'_, I>>
-    where
-        S: Filterable,
-    {
-        Retriever::new(&self.store, &self.items)
-    }
-}
-
-impl<'l, I, S> Deref for ROIndexList<'l, I, S> {
-    type Target = [I];
-
-    fn deref(&self) -> &Self::Target {
-        self.items.0
-    }
-}
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'f, F, I> {
@@ -96,17 +47,17 @@ where
 }
 
 /// A `Retriever` is the interface for get Items by an given filter|query.
-pub struct Retriever<'f, F, L> {
-    filter: Filter<'f, F, L>,
-    items: &'f L,
+pub struct Retriever<'r, F, I> {
+    filter: Filter<'r, F, I>,
+    items: &'r I,
 }
 
-impl<'f, F, L> Retriever<'f, F, L>
+impl<'r, F, I> Retriever<'r, F, I>
 where
     F: Filterable,
 {
     /// Create a new instance of an [`Retriever`].
-    pub const fn new(filter: &'f F, items: &'f L) -> Self {
+    pub const fn new(filter: &'r F, items: &'r I) -> Self {
         Self {
             filter: Filter::new(filter, items),
             items,
@@ -131,9 +82,9 @@ where
     /// assert_eq!(Some(&Car(2, "BMW".into())), l.idx().get(&2).next());
     /// ```
     #[inline]
-    pub fn get(&self, key: &F::Key) -> index::Iter<'f, L>
+    pub fn get(&self, key: &F::Key) -> index::Iter<'r, I>
     where
-        L: Index<usize>,
+        I: Index<usize>,
     {
         self.filter.eq(key).items(self.items)
     }
@@ -172,16 +123,17 @@ where
     ///     result);
     /// ```
     ///
-    /// ## Hint
+    /// ## Hint:
     ///
-    /// The `OR` generated a extra effort.
+    /// The `OR` generated a extra allocation.
+    ///
     /// For performance reason it is better to use [`Self::get_many_cb()`] or
     /// to call [`Self::get()`] several times.
     #[inline]
-    pub fn get_many<I>(&self, keys: I) -> index::Iter<'f, L>
+    pub fn get_many<II>(&self, keys: II) -> index::Iter<'r, I>
     where
-        I: IntoIterator<Item = F::Key>,
-        L: Index<usize>,
+        II: IntoIterator<Item = F::Key>,
+        I: Index<usize>,
     {
         self.filter.eq_many(keys).items(self.items)
     }
@@ -218,11 +170,11 @@ where
     /// });
     /// ```
     #[inline]
-    pub fn get_many_cb<I, C>(&self, keys: I, callback: C)
+    pub fn get_many_cb<II, C>(&self, keys: II, callback: C)
     where
-        I: IntoIterator<Item = F::Key>,
-        L: Index<usize>,
-        C: Fn(&F::Key, index::Iter<'f, L>),
+        II: IntoIterator<Item = F::Key>,
+        I: Index<usize>,
+        C: Fn(&F::Key, index::Iter<'r, I>),
     {
         for k in keys {
             callback(&k, self.filter.eq(&k).items(self.items))
@@ -272,11 +224,15 @@ where
     ///     l.idx().filter(|fltr| fltr.eq(&2) | fltr.eq(&5)).collect::<Vec<_>>()
     /// );
     /// ```
+    ///
+    /// ## Hint
+    ///
+    /// The `OR` (`|`) generated a extra allocation.
     #[inline]
-    pub fn filter<P>(&self, predicate: P) -> index::Iter<'f, L>
+    pub fn filter<P>(&self, predicate: P) -> index::Iter<'r, I>
     where
-        P: Fn(&Filter<'f, F, L>) -> Indices<'f>,
-        L: Index<usize>,
+        P: Fn(&Filter<'r, F, I>) -> Indices<'r>,
+        I: Index<usize>,
     {
         predicate(&self.filter).items(self.items)
     }
@@ -288,48 +244,5 @@ where
         F: MetaData,
     {
         self.filter.filter.meta()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::index::uint::UIntIndex;
-
-    use super::*;
-
-    #[derive(Debug, Eq, PartialEq, Clone)]
-    pub struct Car(usize, String);
-
-    #[test]
-    fn read_only_index_list_from_vec() {
-        let cars = vec![
-            Car(2, "BMW".into()),
-            Car(5, "Audi".into()),
-            Car(2, "VW".into()),
-            Car(99, "Porsche".into()),
-        ];
-
-        let l = ROIndexList::new(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, &cars);
-
-        // deref
-        assert_eq!(4, l.len());
-        assert_eq!(Car(2, "BMW".into()), l[0]);
-
-        // store
-        let mut it = l.idx().get(&2);
-        assert_eq!(Some(&Car(2, "BMW".into())), it.next());
-        assert_eq!(Some(&Car(2, "VW".into())), it.next());
-        assert_eq!(None, it.next());
-
-        assert!(l.idx().contains(&99));
-
-        let mut it = l.idx().filter(|f| {
-            let idxs = f.eq(&99);
-            assert_eq!([3], idxs);
-            let _porsche = f.get(3); // no panic
-            idxs
-        });
-        assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
-        assert_eq!(None, it.next());
     }
 }
