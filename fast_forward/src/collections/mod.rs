@@ -70,7 +70,7 @@ where
     ///
     /// ```
     /// use fast_forward::index::{Store, uint::UIntIndex};
-    /// use fast_forward::collections::ROIndexList;
+    /// use fast_forward::collections::ro::ROIndexList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
     /// pub struct Car(usize, String);
@@ -100,7 +100,7 @@ where
     ///
     /// ```
     /// use fast_forward::index::{Store, uint::UIntIndex};
-    /// use fast_forward::collections::ROIndexList;
+    /// use fast_forward::collections::ro::ROIndexList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
     /// pub struct Car(usize, String);
@@ -146,7 +146,7 @@ where
     ///
     /// ```
     /// use fast_forward::index::{Store, uint::UIntIndex};
-    /// use fast_forward::collections::ROIndexList;
+    /// use fast_forward::collections::ro::ROIndexList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
     /// pub struct Car(usize, String);
@@ -187,7 +187,7 @@ where
     ///
     /// ```
     /// use fast_forward::index::{Store, uint::UIntIndex};
-    /// use fast_forward::collections::ROIndexList;
+    /// use fast_forward::collections::ro::ROIndexList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
     /// pub struct Car(usize, String);
@@ -210,7 +210,7 @@ where
     ///
     /// ```
     /// use fast_forward::index::{Store, uint::UIntIndex};
-    /// use fast_forward::collections::ROIndexList;
+    /// use fast_forward::collections::ro::ROIndexList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
     /// pub struct Car(usize, String);
