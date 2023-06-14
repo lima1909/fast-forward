@@ -119,10 +119,36 @@ where
 
     /// Combined all given `keys` with an logical `OR`.
     ///
-    /// ## Example:
     ///```text
     /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
+    /// ```
+    ///
+    /// ## Example:
+    ///
+    /// ```
+    /// use fast_forward::index::{Store, uint::UIntIndex};
+    /// use fast_forward::collections::ROIndexList;
+    ///
+    /// #[derive(Debug, Eq, PartialEq, Clone)]
+    /// pub struct Car(usize, String);
+    ///
+    /// let cars = vec![
+    ///     Car(2, "BMW".into()),
+    ///     Car(5, "Audi".into()),
+    ///     Car(2, "VW".into()),
+    ///     Car(99, "Porsche".into()),
+    /// ];
+    ///
+    /// let l = ROIndexList::new(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, &cars);
+    ///
+    /// let result = l.idx().get_many([2, 5]).collect::<Vec<_>>();
+    /// assert_eq!(vec![
+    ///     &Car(2, "BMW".into()),
+    ///     &Car(5, "Audi".into()),
+    ///     &Car(2, "VW".into()),
+    ///     ],
+    ///     result);
     /// ```
     ///
     /// ## Hint
@@ -142,13 +168,40 @@ where
     /// Combined all given `keys` with an logical `OR`.
     /// The result is getting per callback function with the args:
     /// `key` and an Iterator over all filtering Items.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use fast_forward::index::{Store, uint::UIntIndex};
+    /// use fast_forward::collections::ROIndexList;
+    ///
+    /// #[derive(Debug, Eq, PartialEq, Clone)]
+    /// pub struct Car(usize, String);
+    ///
+    /// let cars = vec![
+    ///     Car(2, "BMW".into()),
+    ///     Car(5, "Audi".into()),
+    ///     Car(2, "VW".into()),
+    ///     Car(99, "Porsche".into()),
+    /// ];
+    ///
+    /// let l = ROIndexList::new(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, &cars);
+    ///
+    /// l.idx().get_many_cb([2, 5], |k, items| {
+    ///     let l = items.collect::<Vec<_>>();
+    ///     match k {
+    ///         2 => assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], l),
+    ///         5 => assert_eq!(vec![&Car(5, "Audi".into())], l),
+    ///         _ => unreachable!("invalid Key: {k}"),
+    ///     }
+    /// });
+    /// ```
     #[inline]
     pub fn get_many_cb<I, C>(&self, keys: I, callback: C)
     where
         I: IntoIterator<Item = F::Key>,
         L: Index<usize>,
         C: Fn(&F::Key, index::Iter<'f, L>),
-        F::Key: PartialEq,
     {
         for k in keys {
             callback(&k, self.filter.eq(&k).items(self.items))
@@ -220,26 +273,5 @@ mod tests {
         });
         assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
         assert_eq!(None, it.next());
-    }
-
-    #[test]
-    fn read_only_index_list_get_many_callback() {
-        let cars = vec![
-            Car(2, "BMW".into()),
-            Car(5, "Audi".into()),
-            Car(2, "VW".into()),
-            Car(99, "Porsche".into()),
-        ];
-
-        let l = ROIndexList::new(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, &cars);
-
-        l.idx().get_many_cb([2, 5], |k, items| {
-            let l = items.collect::<Vec<_>>();
-            match k {
-                2 => assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], l),
-                5 => assert_eq!(vec![&Car(5, "Audi".into())], l),
-                _ => unreachable!("invalid Key: {k}"),
-            }
-        });
     }
 }
