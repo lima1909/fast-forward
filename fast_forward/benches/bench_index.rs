@@ -12,6 +12,12 @@ const FIND_ID_2: usize = 1_501;
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Person(usize, String);
 
+impl Person {
+    fn id(&self) -> usize {
+        self.0
+    }
+}
+
 struct Indices {
     pk: UIntIndex,
     name: MapIndex,
@@ -34,7 +40,7 @@ fn list_index(c: &mut Criterion) {
     let FIND_PERSON_2: Person = Person(FIND_ID_2, format!("Jasmin {FIND_ID_2}"));
 
     // read only index list
-    let ro_idx = ROIndexList::new(UIntIndex::with_capacity(v.len()), |p: &Person| p.0, &v);
+    let ro_idx = ROIndexList::<'_, _, UIntIndex>::new(Person::id, &v);
 
     // create search index
     let mut idx = Indices {
