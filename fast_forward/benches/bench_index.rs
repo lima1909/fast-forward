@@ -40,7 +40,7 @@ fn list_index(c: &mut Criterion) {
     let FIND_PERSON_2: Person = Person(FIND_ID_2, format!("Jasmin {FIND_ID_2}"));
 
     // read only index list
-    let ro_idx = ROIndexList::<'_, _, UIntIndex>::new(Person::id, &v);
+    let ro_idx = ROIndexList::<'_, _, UIntIndex>::borrowed(Person::id, &v);
 
     // create search index
     let mut idx = Indices {

@@ -1,5 +1,8 @@
 //! Read-only-list with one index.
-use std::ops::{Deref, Index};
+use std::{
+    borrow::Cow,
+    ops::{Deref, Index},
+};
 
 use crate::{
     collections::Retriever,
@@ -7,26 +10,44 @@ use crate::{
 };
 
 /// [`ROIndexList`] is a read only list with one index.
-pub struct ROIndexList<'i, I, S> {
+pub struct ROIndexList<'i, I, S>
+where
+    [I]: ToOwned,
+{
     items: Slice<'i, I>,
     store: S,
 }
 
-impl<'i, I, S> ROIndexList<'i, I, S> {
-    pub fn new<K, F>(field: F, items: &'i [I]) -> Self
+impl<'i, I, S> ROIndexList<'i, I, S>
+where
+    [I]: ToOwned,
+{
+    pub fn borrowed<K, F>(field: F, items: &'i [I]) -> Self
     where
         F: Fn(&I) -> K,
         S: Store<Key = K>,
     {
         Self {
             store: S::from_iter(items.iter().map(field)),
-            items: Slice(items),
+            items: Slice(Cow::Borrowed(items)),
+        }
+    }
+
+    pub fn owned<K, F>(field: F, items: Vec<I>) -> Self
+    where
+        F: Fn(&I) -> K,
+        S: Store<Key = K>,
+    {
+        Self {
+            store: S::from_iter(items.iter().map(field)),
+            items: Slice(Cow::Owned(items.to_owned())),
         }
     }
 
     pub fn idx(&self) -> Retriever<'_, S, Slice<'_, I>>
     where
         S: Filterable,
+        [I]: ToOwned,
     {
         Retriever::new(&self.store, &self.items)
     }
@@ -34,39 +55,47 @@ impl<'i, I, S> ROIndexList<'i, I, S> {
 
 impl<'i, I, S, F, K> From<(F, &'i [I])> for ROIndexList<'i, I, S>
 where
+    [I]: ToOwned,
     F: Fn(&I) -> K,
     S: Store<Key = K>,
 {
     fn from(from: (F, &'i [I])) -> Self {
-        Self::new(from.0, from.1)
+        Self::borrowed(from.0, from.1)
     }
 }
 
-impl<'i, I, S> Deref for ROIndexList<'i, I, S> {
+impl<'i, I, S> Deref for ROIndexList<'i, I, S>
+where
+    [I]: ToOwned,
+{
     type Target = [I];
 
     fn deref(&self) -> &Self::Target {
-        self.items.0
+        &self.items.0
     }
 }
 
 /// Wrapper for `slices`.
 #[repr(transparent)]
-pub struct Slice<'s, I>(&'s [I]);
+pub struct Slice<'s, I>(Cow<'s, [I]>)
+where
+    [I]: ToOwned;
 
-impl<'s, I> Index<usize> for Slice<'s, I> {
+impl<'s, I> Index<usize> for Slice<'s, I>
+where
+    [I]: ToOwned,
+{
     type Output = I;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
     }
 }
-
 #[cfg(test)]
 mod tests {
-    use crate::index::{map::MapIndex, uint::UIntIndex};
-
     use super::*;
+    use crate::index::{map::MapIndex, uint::UIntIndex};
+    use rstest::{fixture, rstest};
 
     #[derive(Debug, Eq, PartialEq, Clone)]
     pub struct Car(usize, String);
@@ -77,16 +106,19 @@ mod tests {
         }
     }
 
-    #[test]
-    fn read_only_index_list_from_vec() {
-        let cars = vec![
+    #[fixture]
+    pub fn cars() -> Vec<Car> {
+        vec![
             Car(2, "BMW".into()),
             Car(5, "Audi".into()),
             Car(2, "VW".into()),
             Car(99, "Porsche".into()),
-        ];
+        ]
+    }
 
-        let l: ROIndexList<'_, _, UIntIndex> = (Car::id, cars.as_slice()).into();
+    #[rstest]
+    fn read_only_index_list_from_vec(cars: Vec<Car>) {
+        let l: ROIndexList<'_, _, UIntIndex> = ROIndexList::borrowed(Car::id, &cars);
 
         // deref
         assert_eq!(4, l.len());
@@ -108,6 +140,22 @@ mod tests {
         });
         assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
         assert_eq!(None, it.next());
+
+        // use cars vec after borrow from ROIndexList
+        assert_eq!(4, cars.len());
+    }
+
+    #[rstest]
+    fn owned_vec_for_ro_list(cars: Vec<Car>) {
+        let l: ROIndexList<'_, _, UIntIndex> = ROIndexList::owned(Car::id, cars);
+
+        // deref
+        assert_eq!(4, l.len());
+        assert_eq!(Car(2, "BMW".into()), l[0]);
+
+        // use cars vec after borrow from ROIndexList
+        // not possible: borrow of moved value: `cars`
+        // assert_eq!(4, cars.len());
     }
 
     struct Cars<'c> {
@@ -115,32 +163,25 @@ mod tests {
         names: ROIndexList<'c, Car, MapIndex>,
     }
 
-    #[test]
-    fn read_only_double_index_list_from_vec() {
-        let v = vec![
-            Car(2, "BMW".into()),
-            Car(5, "Audi".into()),
-            Car(2, "VW".into()),
-            Car(99, "Porsche".into()),
-        ];
+    #[rstest]
+    fn read_only_double_index_list_from_vec(cars: Vec<Car>) {
+        let ids: ROIndexList<'_, _, UIntIndex> = (Car::id, cars.as_slice()).into();
+        let names: ROIndexList<'_, _, MapIndex> = (|c: &Car| c.1.clone(), cars.as_slice()).into();
 
-        let ids: ROIndexList<'_, _, UIntIndex> = (Car::id, v.as_slice()).into();
-        let names: ROIndexList<'_, _, MapIndex> = (|c: &Car| c.1.clone(), v.as_slice()).into();
+        let l = Cars { ids, names };
 
-        let cars = Cars { ids, names };
-
-        let mut it = cars.ids.idx().get(&2);
+        let mut it = l.ids.idx().get(&2);
         assert_eq!(Some(&Car(2, "BMW".into())), it.next());
         assert_eq!(Some(&Car(2, "VW".into())), it.next());
         assert_eq!(None, it.next());
 
-        let mut it = cars.names.idx().get(&"VW".into());
+        let mut it = l.names.idx().get(&"VW".into());
         assert_eq!(Some(&Car(2, "VW".into())), it.next());
         assert_eq!(None, it.next());
 
         // combine two indices: id and name
-        let idxs = cars.ids.idx().eq(&2) & cars.names.idx().eq(&"VW".into());
-        let mut it = idxs.items(&v);
+        let idxs = l.ids.idx().eq(&2) & l.names.idx().eq(&"VW".into());
+        let mut it = idxs.items(&cars);
         assert_eq!(Some(&Car(2, "VW".into())), it.next());
         assert_eq!(None, it.next());
     }

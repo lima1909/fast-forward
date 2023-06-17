@@ -81,7 +81,7 @@ where
     ///
     /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
     ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::new(Car::id, &cars);
+    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(Car::id, &cars);
     ///
     /// assert_eq!(Some(&Car(2, "BMW".into())), l.idx().get(&2).next());
     /// ```
@@ -116,7 +116,7 @@ where
     ///     Car(99, "Porsche".into()),
     /// ];
     ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::new(|c: &Car| c.0, &cars);
+    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(|c: &Car| c.0, &cars);
     ///
     /// let result = l.idx().get_many([2, 5]).collect::<Vec<_>>();
     /// assert_eq!(vec![
@@ -162,7 +162,7 @@ where
     ///     Car(99, "Porsche".into()),
     /// ];
     ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::new(|c: &Car| c.0, &cars);
+    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(|c: &Car| c.0, &cars);
     ///
     /// l.idx().get_many_cb([2, 5], |k, items| {
     ///     let l = items.collect::<Vec<_>>();
@@ -198,7 +198,7 @@ where
     ///
     /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
     ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::new(|c: &Car| c.0, &cars);
+    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(|c: &Car| c.0, &cars);
     ///
     /// assert!(l.idx().contains(&2));
     /// assert!(!l.idx().contains(&99));
@@ -221,7 +221,7 @@ where
     ///
     /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
     ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::new(|c: &Car| c.0, &cars);
+    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(|c: &Car| c.0, &cars);
     ///
     /// assert_eq!(
     ///     vec![&Car(2, "BMW".into()), &Car(5, "Audi".into())],
