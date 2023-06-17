@@ -85,6 +85,21 @@ pub trait Store: Filterable {
 
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
+
+    /// Create a new `Store` with `Key`-values by given `Iterator`.
+    fn from_iter<I>(it: I) -> Self
+    where
+        I: IntoIterator<Item = Self::Key> + ExactSizeIterator,
+        Self: Sized,
+    {
+        let mut store = Self::with_capacity(it.len());
+
+        for (idx, k) in it.into_iter().enumerate() {
+            store.insert(k, idx)
+        }
+
+        store
+    }
 }
 
 /// Returns a list to the indices [`Indices`] corresponding to the key.

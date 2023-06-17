@@ -18,14 +18,8 @@ impl<'i, I, S> ROIndexList<'i, I, S> {
         F: Fn(&I) -> K,
         S: Store<Key = K>,
     {
-        let mut store = S::with_capacity(items.len());
-
-        for (pos, item) in items.iter().enumerate() {
-            store.insert((field)(item), pos);
-        }
-
         Self {
-            store,
+            store: S::from_iter(items.iter().map(field)),
             items: Slice(items),
         }
     }
