@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "fast_forward",
+    "fast_forward_macro",
     "fast_forward_derive",
 
 ]
