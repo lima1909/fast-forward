@@ -53,17 +53,6 @@ where
     }
 }
 
-impl<'i, I, S, F, K> From<(F, &'i [I])> for ROIndexList<'i, I, S>
-where
-    [I]: ToOwned,
-    F: Fn(&I) -> K,
-    S: Store<Key = K>,
-{
-    fn from(from: (F, &'i [I])) -> Self {
-        Self::borrowed(from.0, from.1)
-    }
-}
-
 impl<'i, I, S> Deref for ROIndexList<'i, I, S>
 where
     [I]: ToOwned,
@@ -165,8 +154,9 @@ mod tests {
 
     #[rstest]
     fn read_only_double_index_list_from_vec(cars: Vec<Car>) {
-        let ids: ROIndexList<'_, _, UIntIndex> = (Car::id, cars.as_slice()).into();
-        let names: ROIndexList<'_, _, MapIndex> = (|c: &Car| c.1.clone(), cars.as_slice()).into();
+        let ids: ROIndexList<'_, _, UIntIndex> = ROIndexList::borrowed(Car::id, &cars);
+        let names: ROIndexList<'_, _, MapIndex> =
+            ROIndexList::borrowed(|c: &Car| c.1.clone(), &cars);
 
         let l = Cars { ids, names };
 
