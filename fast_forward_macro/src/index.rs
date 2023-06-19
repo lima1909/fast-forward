@@ -9,11 +9,23 @@
 //! }
 //! ```
 //!
-
 use syn::{
     parse::{Parse, ParseStream},
+    punctuated::Punctuated,
     Ident, Member, Result, Token, TypePath,
 };
+
+#[derive(Debug, Clone, PartialEq)]
+struct IndexList(Vec<Index>);
+
+impl Parse for IndexList {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let indices: Punctuated<Index, Token![,]> =
+            input.parse_terminated(Index::parse, Token![,])?;
+
+        Ok(IndexList(Vec::from_iter(indices)))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 struct Index {
@@ -78,6 +90,34 @@ mod tests {
             syn::parse_str::<Index>("id UIntIndex => pk")
                 .unwrap_err()
                 .to_string()
+        );
+    }
+
+    #[test]
+    fn index_list() {
+        let l = syn::parse_str::<IndexList>("id: UIntIndex => 0, name: MapIndex => 1, ").unwrap();
+
+        assert_eq!(2, l.0.len());
+        assert_eq!(
+            IndexList(vec![
+                Index {
+                    name: Ident::new("id", proc_macro2::Span::call_site()),
+                    store: syn::parse_str::<TypePath>("UIntIndex").unwrap(),
+                    field: Member::Unnamed(SynIndex {
+                        index: 0,
+                        span: proc_macro2::Span::call_site()
+                    }),
+                },
+                Index {
+                    name: Ident::new("name", proc_macro2::Span::call_site()),
+                    store: syn::parse_str::<TypePath>("MapIndex").unwrap(),
+                    field: Member::Unnamed(SynIndex {
+                        index: 1,
+                        span: proc_macro2::Span::call_site()
+                    }),
+                },
+            ]),
+            l
         );
     }
 }
