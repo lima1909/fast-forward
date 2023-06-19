@@ -1,4 +1,4 @@
-// use fast_forward_macro::create_indexed_list;
+use fast_forward_macro::create_indexed_list;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Car(usize, String);
@@ -9,6 +9,9 @@ pub struct Car(usize, String);
 //     }
 // }
 
+create_indexed_list!(create ro Cars);
+
 fn main() {
-    // let _x = create_indexed_list!(create ro X);
+    let cars = Cars;
+    dbg!(cars);
 }

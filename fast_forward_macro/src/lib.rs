@@ -19,6 +19,10 @@
 //! }
 //! from [borrowed] &vec![...]
 //! ´´´
+
+mod index;
+mod list;
+
 use std::{fmt::Display, str::FromStr};
 
 use proc_macro::TokenStream;
@@ -62,9 +66,9 @@ impl ToTokens for IndexedList {
         let list_name = self.list_name.clone();
 
         tokens.extend(quote! {
+            #[derive(Debug)]
             pub struct #list_name;
 
-            #list_name
         });
     }
 }
