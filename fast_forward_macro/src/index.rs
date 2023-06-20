@@ -16,7 +16,7 @@ use syn::{
 };
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Indices(Vec<Index>);
+pub(crate) struct Indices(Vec<Index>);
 
 impl Parse for Indices {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -28,7 +28,7 @@ impl Parse for Indices {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Index {
+pub(crate) struct Index {
     name: Ident,
     store: TypePath,
     field: Member,

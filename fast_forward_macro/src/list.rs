@@ -31,10 +31,10 @@ mod keyword {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct IndexedList {
-    name: Ident,
-    kind: Kind,
-    on: TypePath,
+pub(crate) struct IndexedList {
+    pub(crate) name: Ident,
+    pub(crate) kind: Kind,
+    pub(crate) on: TypePath,
 }
 
 impl Parse for IndexedList {
@@ -55,9 +55,7 @@ impl Parse for IndexedList {
         // { id: UIntIndex => 0 }
         let index_list;
         let _brace = braced!(index_list in input);
-        let indices = index_list.parse::<Indices>()?;
-
-        dbg!(indices);
+        let _indices = index_list.parse::<Indices>()?;
 
         Ok(Self { name, kind, on })
     }
@@ -65,7 +63,7 @@ impl Parse for IndexedList {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(clippy::upper_case_acronyms)]
-enum Kind {
+pub(crate) enum Kind {
     /// Read only
     RO,
     /// Read write
