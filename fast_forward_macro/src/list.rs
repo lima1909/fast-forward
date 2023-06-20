@@ -10,15 +10,20 @@
 //! ```
 //!
 use syn::{
+    braced,
     parse::{Parse, ParseStream},
     Ident, Result, TypePath,
 };
+
+use crate::index::Indices;
 
 mod keyword {
     use syn::custom_keyword;
 
     custom_keyword!(create);
     custom_keyword!(on);
+    custom_keyword!(using);
+
     // Kinds
     custom_keyword!(ro);
     custom_keyword!(rw);
@@ -26,13 +31,13 @@ mod keyword {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct List {
+struct IndexedList {
     name: Ident,
     kind: Kind,
     on: TypePath,
 }
 
-impl Parse for List {
+impl Parse for IndexedList {
     fn parse(input: ParseStream) -> Result<Self> {
         // create
         let _kw_create = input.parse::<keyword::create>()?;
@@ -44,8 +49,17 @@ impl Parse for List {
         let _kw_on = input.parse::<keyword::on>()?;
         // Car
         let on = input.parse::<TypePath>()?;
+        // using
+        let _kw_using = input.parse::<keyword::using>()?;
 
-        Ok(List { name, kind, on })
+        // { id: UIntIndex => 0 }
+        let index_list;
+        let _brace = braced!(index_list in input);
+        let indices = index_list.parse::<Indices>()?;
+
+        dbg!(indices);
+
+        Ok(Self { name, kind, on })
     }
 }
 
@@ -94,24 +108,29 @@ mod tests {
     #[test]
     fn list() {
         assert_eq!(
-            List {
+            IndexedList {
                 name: Ident::new("Cars", proc_macro2::Span::call_site()),
                 kind: Kind::RW,
                 on: syn::parse_str::<TypePath>("Car").unwrap(),
             },
-            syn::parse_str::<List>("create rw Cars on Car").unwrap()
+            syn::parse_str::<IndexedList>(
+                "create rw Cars on Car using {
+                id: UIntIndex => 0,
+            }"
+            )
+            .unwrap()
         );
     }
 
     #[test]
-    fn list_default_kind() {
+    fn empty_list_default_kind() {
         assert_eq!(
-            List {
+            IndexedList {
                 name: Ident::new("Cars", proc_macro2::Span::call_site()),
                 kind: Kind::RO,
                 on: syn::parse_str::<TypePath>("mymod::Car").unwrap(),
             },
-            syn::parse_str::<List>("create Cars on mymod::Car").unwrap()
+            syn::parse_str::<IndexedList>("create Cars on mymod::Car using {}").unwrap()
         );
     }
 
@@ -119,13 +138,13 @@ mod tests {
     fn list_err_kw() {
         assert_eq!(
             "expected `create`",
-            syn::parse_str::<List>("crea Cars on Car")
+            syn::parse_str::<IndexedList>("crea Cars on Car")
                 .unwrap_err()
                 .to_string()
         );
         assert_eq!(
             "expected `on`",
-            syn::parse_str::<List>("create Cars onn Car")
+            syn::parse_str::<IndexedList>("create Cars onn Car")
                 .unwrap_err()
                 .to_string()
         );
@@ -135,7 +154,7 @@ mod tests {
     fn list_err_ident() {
         assert_eq!(
             "expected identifier",
-            syn::parse_str::<List>("create 9Cars")
+            syn::parse_str::<IndexedList>("create 9Cars")
                 .unwrap_err()
                 .to_string()
         );

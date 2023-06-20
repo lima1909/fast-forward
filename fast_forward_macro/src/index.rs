@@ -16,19 +16,19 @@ use syn::{
 };
 
 #[derive(Debug, Clone, PartialEq)]
-struct IndexList(Vec<Index>);
+pub struct Indices(Vec<Index>);
 
-impl Parse for IndexList {
+impl Parse for Indices {
     fn parse(input: ParseStream) -> Result<Self> {
         let indices: Punctuated<Index, Token![,]> =
             input.parse_terminated(Index::parse, Token![,])?;
 
-        Ok(IndexList(Vec::from_iter(indices)))
+        Ok(Indices(Vec::from_iter(indices)))
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct Index {
+pub struct Index {
     name: Ident,
     store: TypePath,
     field: Member,
@@ -94,12 +94,12 @@ mod tests {
     }
 
     #[test]
-    fn index_list() {
-        let l = syn::parse_str::<IndexList>("id: UIntIndex => 0, name: MapIndex => 1, ").unwrap();
+    fn indices() {
+        let l = syn::parse_str::<Indices>("id: UIntIndex => 0, name: MapIndex => 1, ").unwrap();
 
         assert_eq!(2, l.0.len());
         assert_eq!(
-            IndexList(vec![
+            Indices(vec![
                 Index {
                     name: Ident::new("id", proc_macro2::Span::call_site()),
                     store: syn::parse_str::<TypePath>("UIntIndex").unwrap(),
