@@ -238,7 +238,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fast_forward_macro"
+name = "fast_forward_macros"
 version = "0.0.1"
 dependencies = [
  "fast_forward",

@@ -1,5 +1,5 @@
 [package]
-name = "fast_forward_macro"
+name = "fast_forward_macros"
 version = "0.0.1"
 edition = "2021"
 authors = ["Mario Linke"]
@@ -12,7 +12,7 @@ categories = ["data-structures ", "caching ", "embedded"]
 
 
 [lib]
-name = "fast_forward_macro"
+name = "fast_forward_macros"
 proc-macro = true
 
 [dependencies]
