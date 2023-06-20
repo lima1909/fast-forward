@@ -30,11 +30,14 @@ mod keyword {
     custom_keyword!(rwd);
 }
 
+/// create [ro | rw | rwd] Cars on Car
+/// kw     Kind            name kw on(type)
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct IndexedList {
     pub(crate) name: Ident,
     pub(crate) kind: Kind,
     pub(crate) on: TypePath,
+    pub(crate) indices: Indices,
 }
 
 impl Parse for IndexedList {
@@ -55,9 +58,14 @@ impl Parse for IndexedList {
         // { id: UIntIndex => 0 }
         let index_list;
         let _brace = braced!(index_list in input);
-        let _indices = index_list.parse::<Indices>()?;
+        let indices = index_list.parse::<Indices>()?;
 
-        Ok(Self { name, kind, on })
+        Ok(Self {
+            name,
+            kind,
+            on,
+            indices,
+        })
     }
 }
 
@@ -93,6 +101,7 @@ impl Parse for Kind {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::index::Index;
 
     #[test]
     fn kind() {
@@ -105,11 +114,14 @@ mod tests {
 
     #[test]
     fn list() {
+        let idx = syn::parse_str::<Index>("id: UIntIndex => 0").unwrap();
+
         assert_eq!(
             IndexedList {
                 name: Ident::new("Cars", proc_macro2::Span::call_site()),
                 kind: Kind::RW,
                 on: syn::parse_str::<TypePath>("Car").unwrap(),
+                indices: Indices(vec![idx]),
             },
             syn::parse_str::<IndexedList>(
                 "create rw Cars on Car using {
@@ -127,6 +139,7 @@ mod tests {
                 name: Ident::new("Cars", proc_macro2::Span::call_site()),
                 kind: Kind::RO,
                 on: syn::parse_str::<TypePath>("mymod::Car").unwrap(),
+                indices: Indices(vec![]),
             },
             syn::parse_str::<IndexedList>("create Cars on mymod::Car using {}").unwrap()
         );

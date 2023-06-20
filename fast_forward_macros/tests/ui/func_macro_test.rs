@@ -3,19 +3,14 @@ use fast_forward_macros::create_indexed_list;
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Car(usize, String);
 
-// impl Car {
-//     fn id(&self) -> usize {
-//         self.0
-//     }
-// }
-
 create_indexed_list!(
-    create rw Cars on Car using {
-        id: UIntIndex => 0,
+    create Cars on Car using {
+        id: fast_forward::index::uint::UIntIndex => 0,
     }
 );
 
 fn main() {
-    let cars = Cars;
-    dbg!(cars);
+    // let v = vec![Car(1, "BMW".into()), Car(2, "VW".into())];
+    // let cars = Cars::borrowed(&v);
+    // assert!(!cars.id.idx().contains(&2));
 }

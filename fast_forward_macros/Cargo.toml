@@ -27,3 +27,7 @@ fast_forward = { path = "../fast_forward"}
 [[test]]
 name = "tests"
 path = "tests/run.rs"
+
+[[bin]]
+name = "ma"
+path = "tests/ui/func_macro_test.rs"
