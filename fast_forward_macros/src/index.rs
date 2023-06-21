@@ -101,7 +101,30 @@ impl Index {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syn::Index as SynIndex;
+    use syn::{parse_quote, Index as SynIndex};
+
+    #[test]
+    fn to_field_declare_tokens() {
+        let idx = syn::parse_str::<Index>("id: UIntIndex => 0").unwrap();
+        let on = syn::parse_str::<TypePath>("Car").unwrap();
+
+        let ts = idx.to_field_declare_tokens(&on);
+        let ts2: TokenStream =
+            parse_quote!(id: fast_forward::collections::ro::ROIndexList<'a, Car, UIntIndex>,);
+
+        assert_eq!(ts.to_string(), ts2.to_string());
+    }
+
+    #[test]
+    fn to_init_struct_field_tokens() {
+        let idx = syn::parse_str::<Index>("id: UIntIndex => 0").unwrap();
+        let on = syn::parse_str::<TypePath>("Car").unwrap();
+
+        let ts = idx.to_init_struct_field_tokens(&on);
+        let ts2: TokenStream = parse_quote!(id: fast_forward::collections::ro::ROIndexList::borrowed(|o: &Car| o.0.clone(), slice),);
+
+        assert_eq!(ts.to_string(), ts2.to_string());
+    }
 
     #[test]
     fn index_member_index() {
