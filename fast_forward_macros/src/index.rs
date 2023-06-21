@@ -9,12 +9,17 @@
 //! }
 //! ```
 //!
+use proc_macro2::TokenStream;
+use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     Ident, Member, Result, Token, TypePath,
 };
 
+///
+/// List of indices
+///
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Indices(pub(crate) Vec<Index>);
 
@@ -27,8 +32,26 @@ impl Parse for Indices {
     }
 }
 
+impl Indices {
+    pub(crate) fn to_field_declare_tokens(&self, on: &TypePath) -> Vec<TokenStream> {
+        self.0
+            .iter()
+            .map(|i| i.to_field_declare_tokens(on))
+            .collect::<Vec<_>>()
+    }
+
+    pub(crate) fn to_init_struct_field_tokens(&self, on: &TypePath) -> Vec<TokenStream> {
+        self.0
+            .iter()
+            .map(|i| i.to_init_struct_field_tokens(on))
+            .collect::<Vec<_>>()
+    }
+}
+
+///
 /// id:    UIntIndex => 0
 /// name   Store        field
+///
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Index {
     pub(crate) name: Ident,
@@ -50,6 +73,28 @@ impl Parse for Index {
         let field = input.parse::<Member>()?;
 
         Ok(Index { name, store, field })
+    }
+}
+
+impl Index {
+    pub(crate) fn to_field_declare_tokens(&self, on: &TypePath) -> TokenStream {
+        let name = self.name.clone();
+        let store = self.store.clone();
+
+        // ids: ROIndexList<'c, Car, UIntIndex>,
+        quote! {
+            #name: fast_forward::collections::ro::ROIndexList<'a, #on, #store>,
+        }
+    }
+
+    pub(crate) fn to_init_struct_field_tokens(&self, on: &TypePath) -> TokenStream {
+        let name = self.name.clone();
+        let field = self.field.clone();
+
+        // ids: ROIndexList::borrowed(Car::id, &cars);
+        quote! {
+            #name: fast_forward::collections::ro::ROIndexList::borrowed(|o: &#on| o.#field.clone(), slice),
+        }
     }
 }
 

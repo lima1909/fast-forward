@@ -9,6 +9,7 @@
 //! }
 //! ```
 //!
+use quote::{quote, ToTokens};
 use syn::{
     braced,
     parse::{Parse, ParseStream},
@@ -66,6 +67,38 @@ impl Parse for IndexedList {
             on,
             indices,
         })
+    }
+}
+
+impl ToTokens for IndexedList {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let list_name = self.name.clone();
+        let fields = self.indices.to_field_declare_tokens(&self.on);
+
+        // create struct with declared fields
+        tokens.extend(quote! {
+
+                pub struct #list_name<'a> {
+                    #(#fields)*
+                }
+
+        });
+
+        // create impl for creating the indexed list
+        let on = self.on.clone();
+        let init_fields = self.indices.to_init_struct_field_tokens(&self.on);
+
+        tokens.extend(quote! {
+
+            impl<'a> #list_name<'a> {
+                pub fn borrowed(slice: &'a [#on]) -> Self {
+                    Self {
+                        #(#init_fields)*
+                    }
+                }
+            }
+
+        });
     }
 }
 
