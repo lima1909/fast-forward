@@ -10,12 +10,27 @@
 //! ```
 //!
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     Ident, Member, Result, Token, TypePath,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum BorrowedOrOwned {
+    Borrowed,
+    Owned,
+}
+
+impl ToTokens for BorrowedOrOwned {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            BorrowedOrOwned::Borrowed => tokens.extend(quote!(borrowed)),
+            BorrowedOrOwned::Owned => tokens.extend(quote!(owned)),
+        }
+    }
+}
 
 ///
 /// List of indices
@@ -40,11 +55,15 @@ impl Indices {
         self.0.iter().map(|i| i.to_field_declare_tokens(on))
     }
 
-    pub(crate) fn to_init_struct_field_tokens<'a>(
-        &'a self,
-        on: &'a TypePath,
-    ) -> impl Iterator<Item = TokenStream> + 'a {
-        self.0.iter().map(|i| i.to_init_struct_field_tokens(on))
+    pub(crate) fn to_init_struct_field_tokens(
+        &self,
+        on: &TypePath,
+        borrow_or_owned: &BorrowedOrOwned,
+    ) -> Vec<TokenStream> {
+        self.0
+            .iter()
+            .map(|i| i.to_init_struct_field_tokens(on, borrow_or_owned))
+            .collect::<Vec<_>>()
     }
 }
 
@@ -100,7 +119,11 @@ impl Index {
         }
     }
 
-    pub(crate) fn to_init_struct_field_tokens(&self, on: &TypePath) -> TokenStream {
+    pub(crate) fn to_init_struct_field_tokens(
+        &self,
+        on: &TypePath,
+        borrow_or_owned: &BorrowedOrOwned,
+    ) -> TokenStream {
         let name = self.name.clone();
         let field = self.field.clone();
         let method = self.method.clone();
@@ -108,11 +131,11 @@ impl Index {
         // ids: ROIndexList::borrowed(Car::id, &cars);
         if let Some(method) = method {
             quote! {
-                #name: fast_forward::collections::ro::ROIndexList::borrowed(|o: &#on| o.#field.#method(), slice),
+                #name: fast_forward::collections::ro::ROIndexList::#borrow_or_owned(|o: &#on| o.#field.#method(), slice),
             }
         } else {
             quote! {
-                #name: fast_forward::collections::ro::ROIndexList::borrowed(|o: &#on| o.#field, slice),
+                #name: fast_forward::collections::ro::ROIndexList::#borrow_or_owned(|o: &#on| o.#field, slice),
             }
         }
     }
@@ -140,7 +163,7 @@ mod tests {
         let idx = syn::parse_str::<Index>("id: UIntIndex => 0").unwrap();
         let on = syn::parse_str::<TypePath>("Car").unwrap();
 
-        let ts = idx.to_init_struct_field_tokens(&on);
+        let ts = idx.to_init_struct_field_tokens(&on, &BorrowedOrOwned::Borrowed);
         let ts2: TokenStream = parse_quote!(id: fast_forward::collections::ro::ROIndexList::borrowed(|o: &Car| o.0, slice),);
 
         assert_eq!(ts.to_string(), ts2.to_string());

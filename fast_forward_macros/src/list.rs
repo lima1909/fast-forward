@@ -16,7 +16,7 @@ use syn::{
     Ident, Result, TypePath,
 };
 
-use crate::index::Indices;
+use crate::index::{BorrowedOrOwned::*, Indices};
 
 mod keyword {
     use syn::custom_keyword;
@@ -86,19 +86,37 @@ impl ToTokens for IndexedList {
 
         // create impl for creating the indexed list
         let on = self.on.clone();
-        let init_fields = self.indices.to_init_struct_field_tokens(&self.on);
+        let init_fields_borrowed = self
+            .indices
+            .to_init_struct_field_tokens(&self.on, &Borrowed);
 
         tokens.extend(quote! {
 
             impl<'a> #list_name<'a> {
                 pub fn borrowed(slice: &'a [#on]) -> Self {
                     Self {
-                        #(#init_fields)*
+                        #(#init_fields_borrowed)*
                     }
                 }
             }
-
         });
+
+        // owned
+        let init_fields_owned = self.indices.to_init_struct_field_tokens(&self.on, &Owned);
+
+        // only possible with len == 1, the Vec is moving
+        if init_fields_owned.len() == 1 {
+            tokens.extend(quote! {
+
+                impl<'a> #list_name<'a> {
+                    pub fn owned(slice: Vec<#on>) -> Self {
+                        Self {
+                            #(#init_fields_owned)*
+                        }
+                    }
+                }
+            });
+        }
     }
 }
 
