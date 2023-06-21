@@ -33,30 +33,31 @@ impl Parse for Indices {
 }
 
 impl Indices {
-    pub(crate) fn to_field_declare_tokens(&self, on: &TypePath) -> Vec<TokenStream> {
-        self.0
-            .iter()
-            .map(|i| i.to_field_declare_tokens(on))
-            .collect::<Vec<_>>()
+    pub(crate) fn to_field_declare_tokens<'a>(
+        &'a self,
+        on: &'a TypePath,
+    ) -> impl Iterator<Item = TokenStream> + 'a {
+        self.0.iter().map(|i| i.to_field_declare_tokens(on))
     }
 
-    pub(crate) fn to_init_struct_field_tokens(&self, on: &TypePath) -> Vec<TokenStream> {
-        self.0
-            .iter()
-            .map(|i| i.to_init_struct_field_tokens(on))
-            .collect::<Vec<_>>()
+    pub(crate) fn to_init_struct_field_tokens<'a>(
+        &'a self,
+        on: &'a TypePath,
+    ) -> impl Iterator<Item = TokenStream> + 'a {
+        self.0.iter().map(|i| i.to_init_struct_field_tokens(on))
     }
 }
 
 ///
-/// id:    UIntIndex => 0
-/// name   Store        field
+/// id:    UIntIndex => 0[.clone]
+/// name   store        field[.method]
 ///
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Index {
     pub(crate) name: Ident,
     pub(crate) store: TypePath,
     pub(crate) field: Member,
+    pub(crate) method: Option<Ident>,
 }
 
 impl Parse for Index {
@@ -72,7 +73,19 @@ impl Parse for Index {
         // 0 or id
         let field = input.parse::<Member>()?;
 
-        Ok(Index { name, store, field })
+        // optional point with method
+        let mut method = None;
+        if input.peek(Token![.]) {
+            let _p = input.parse::<Token![.]>();
+            method = Some(input.parse::<Ident>()?);
+        }
+
+        Ok(Index {
+            name,
+            store,
+            field,
+            method,
+        })
     }
 }
 
@@ -90,10 +103,17 @@ impl Index {
     pub(crate) fn to_init_struct_field_tokens(&self, on: &TypePath) -> TokenStream {
         let name = self.name.clone();
         let field = self.field.clone();
+        let method = self.method.clone();
 
         // ids: ROIndexList::borrowed(Car::id, &cars);
-        quote! {
-            #name: fast_forward::collections::ro::ROIndexList::borrowed(|o: &#on| o.#field.clone(), slice),
+        if let Some(method) = method {
+            quote! {
+                #name: fast_forward::collections::ro::ROIndexList::borrowed(|o: &#on| o.#field.#method(), slice),
+            }
+        } else {
+            quote! {
+                #name: fast_forward::collections::ro::ROIndexList::borrowed(|o: &#on| o.#field, slice),
+            }
         }
     }
 }
@@ -121,7 +141,7 @@ mod tests {
         let on = syn::parse_str::<TypePath>("Car").unwrap();
 
         let ts = idx.to_init_struct_field_tokens(&on);
-        let ts2: TokenStream = parse_quote!(id: fast_forward::collections::ro::ROIndexList::borrowed(|o: &Car| o.0.clone(), slice),);
+        let ts2: TokenStream = parse_quote!(id: fast_forward::collections::ro::ROIndexList::borrowed(|o: &Car| o.0, slice),);
 
         assert_eq!(ts.to_string(), ts2.to_string());
     }
@@ -136,8 +156,25 @@ mod tests {
                     index: 0,
                     span: proc_macro2::Span::call_site()
                 }),
+                method: None,
             },
             syn::parse_str::<Index>("id: UIntIndex => 0").unwrap()
+        );
+    }
+
+    #[test]
+    fn index_member_index_method() {
+        assert_eq!(
+            Index {
+                name: Ident::new("name", proc_macro2::Span::call_site()),
+                store: syn::parse_str::<TypePath>("MapIndex").unwrap(),
+                field: Member::Unnamed(SynIndex {
+                    index: 0,
+                    span: proc_macro2::Span::call_site()
+                }),
+                method: Some(Ident::new("clone", proc_macro2::Span::call_site())),
+            },
+            syn::parse_str::<Index>("name: MapIndex => 0.clone").unwrap()
         );
     }
 
@@ -148,6 +185,7 @@ mod tests {
                 name: Ident::new("id", proc_macro2::Span::call_site()),
                 store: syn::parse_str::<TypePath>("fast_forward::uint::UIntIndex").unwrap(),
                 field: Member::Named(Ident::new("pk", proc_macro2::Span::call_site())),
+                method: None,
             },
             syn::parse_str::<Index>("id: fast_forward::uint::UIntIndex => pk").unwrap()
         );
@@ -177,6 +215,7 @@ mod tests {
                         index: 0,
                         span: proc_macro2::Span::call_site()
                     }),
+                    method: None,
                 },
                 Index {
                     name: Ident::new("name", proc_macro2::Span::call_site()),
@@ -185,6 +224,7 @@ mod tests {
                         index: 1,
                         span: proc_macro2::Span::call_site()
                     }),
+                    method: None,
                 },
             ]),
             l

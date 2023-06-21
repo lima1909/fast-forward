@@ -6,7 +6,7 @@ pub struct Car(usize, String);
 create_indexed_list!(
     create Cars on Car using {
         id: fast_forward::index::uint::UIntIndex => 0,
-        name: fast_forward::index::map::MapIndex => 1,
+        name: fast_forward::index::map::MapIndex => 1.clone,
     }
 );
 
