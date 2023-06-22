@@ -66,7 +66,7 @@ where
 
 /// Wrapper for `slices`.
 #[repr(transparent)]
-pub struct Slice<'s, I>(Cow<'s, [I]>)
+pub struct Slice<'s, I>(pub Cow<'s, [I]>)
 where
     [I]: ToOwned;
 

@@ -16,7 +16,7 @@ use syn::{
     Ident, Result, TypePath,
 };
 
-use crate::index::{BorrowedOrOwned::*, Indices};
+use crate::index::Indices;
 
 mod keyword {
     use syn::custom_keyword;
@@ -73,50 +73,83 @@ impl Parse for IndexedList {
 impl ToTokens for IndexedList {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let list_name = self.name.clone();
-        let fields = self.indices.to_declare_struct_field_tokens(&self.on);
+        let on = self.on.clone();
 
-        // create struct with declared fields
+        let fields = self.indices.to_declare_struct_field_tokens();
+
+        // create struct
         tokens.extend(quote! {
 
                 pub struct #list_name<'a> {
+                    items: fast_forward::collections::ro::Slice<'a, #on>,
                     #(#fields)*
                 }
 
         });
 
-        // create impl for creating the indexed list
-        let on = self.on.clone();
-        let init_fields_borrowed = self
-            .indices
-            .to_init_struct_field_tokens(&self.on, &Borrowed);
-
+        // create impls
+        let init_fields = self.indices.to_init_struct_field_tokens(&self.on);
         tokens.extend(quote! {
 
             impl<'a> #list_name<'a> {
+                // borrowed
                 pub fn borrowed(slice: &'a [#on]) -> Self {
+                    use fast_forward::index::Store;
+
                     Self {
-                        #(#init_fields_borrowed)*
+                        #(#init_fields)*
+                        items: fast_forward::collections::ro::Slice(std::borrow::Cow::Borrowed(slice)),
                     }
                 }
+
+                // owned
+                pub fn owned(slice: Vec<#on>) -> Self {
+                    use fast_forward::index::Store;
+
+                    Self {
+                        #(#init_fields)*
+                        items: fast_forward::collections::ro::Slice(std::borrow::Cow::Owned(slice)),
+                    }
+                }
+
             }
         });
 
-        // owned
-        let init_fields_owned = self.indices.to_init_struct_field_tokens(&self.on, &Owned);
+        // retrieve method per store
+        let retrieves = self.indices.to_retrieve_tokens(&self.on);
+        tokens.extend(quote!(
 
-        // only possible with len == 1, the Vec is moving
-        if init_fields_owned.len() == 1 {
-            tokens.extend(quote! {
+            impl<'a> #list_name<'a> {
+                #(#retrieves)*
+            }
 
-                impl<'a> #list_name<'a> {
-                    pub fn owned(slice: Vec<#on>) -> Self {
-                        Self {
-                            #(#init_fields_owned)*
-                        }
-                    }
+        ));
+
+        // deref
+        tokens.extend(quote!(
+
+            impl<'a> std::ops::Deref for #list_name<'a> {
+                type Target = [#on];
+
+                fn deref(&self) -> &Self::Target {
+                    &self.items.0
                 }
-            });
-        }
+            }
+
+        ));
+
+        // indexed
+        tokens.extend(quote!(
+
+            impl std::ops::Index<usize> for #list_name<'_> {
+                type Output = #on;
+
+                fn index(&self, pos: usize) -> &Self::Output {
+                    &self.items[pos]
+                }
+            }
+
+        ));
     }
 }
 
