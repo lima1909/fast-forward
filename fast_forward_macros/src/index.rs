@@ -48,11 +48,11 @@ impl Parse for Indices {
 }
 
 impl Indices {
-    pub(crate) fn to_field_declare_tokens<'a>(
+    pub(crate) fn to_declare_struct_field_tokens<'a>(
         &'a self,
         on: &'a TypePath,
     ) -> impl Iterator<Item = TokenStream> + 'a {
-        self.0.iter().map(|i| i.to_field_declare_tokens(on))
+        self.0.iter().map(|i| i.to_declare_struct_field_tokens(on))
     }
 
     pub(crate) fn to_init_struct_field_tokens(
@@ -109,7 +109,7 @@ impl Parse for Index {
 }
 
 impl Index {
-    pub(crate) fn to_field_declare_tokens(&self, on: &TypePath) -> TokenStream {
+    pub(crate) fn to_declare_struct_field_tokens(&self, on: &TypePath) -> TokenStream {
         let name = self.name.clone();
         let store = self.store.clone();
 
@@ -151,7 +151,7 @@ mod tests {
         let idx = syn::parse_str::<Index>("id: UIntIndex => 0").unwrap();
         let on = syn::parse_str::<TypePath>("Car").unwrap();
 
-        let ts = idx.to_field_declare_tokens(&on);
+        let ts = idx.to_declare_struct_field_tokens(&on);
         let ts2: TokenStream =
             parse_quote!(id: fast_forward::collections::ro::ROIndexList<'a, Car, UIntIndex>,);
 

@@ -73,7 +73,7 @@ impl Parse for IndexedList {
 impl ToTokens for IndexedList {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let list_name = self.name.clone();
-        let fields = self.indices.to_field_declare_tokens(&self.on);
+        let fields = self.indices.to_declare_struct_field_tokens(&self.on);
 
         // create struct with declared fields
         tokens.extend(quote! {
