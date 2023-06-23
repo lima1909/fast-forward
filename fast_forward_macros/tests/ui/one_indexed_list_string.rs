@@ -1,9 +1,9 @@
-use fast_forward_macros::create_indexed_list;
+use fast_forward_macros::indexed_list;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Car(usize, String);
 
-create_indexed_list!(
+indexed_list!(
     create Cars on Car using {
         name: fast_forward::index::map::MapIndex => 1.to_lowercase
     }

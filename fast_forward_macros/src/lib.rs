@@ -1,29 +1,30 @@
-//! # Grammer for creating an Indexed List (like SQL).
+//! # Grammer for creating an Indexed List.
 //!
 //! ```text
-//! create [ro | rw | rwd] [name] on [struct] using {
+//! create [ro [default] | rw | rwd] [indexed-list-name] on [struct] using {
 //!     [index-name]: [store-impl] => [struct-field]
 //! }
-//! from [borrowed | owned] [slice]
 //! ```
+//! - `ro`: read only (default)
+//! - `rw`: read write
+//! - `rwd`: read writ delete
 //!
 //! ## Example:
 //!
 //! ```text
-//! #[derive(Debug, Eq, PartialEq, Clone)]
+//! use fast_forward_macros::indexed_list;
+//!
+//! #[derive(Clone)]
 //! pub struct Car(usize, String);
 //!
-//! create ro Cars on Car using {
-//!     id:   UIntIndex => pk,
-//!     name: MapIndex  => name.clone,
-//! }
-//! from [borrowed] &vec![...]
-//!
-//! struct Cars<'c> {
-//!     ids: ROIndexList<'c, Car, UIntIndex>,
-//!     names: ROIndexList<'c, Car, MapIndex>,
-//! }
+//! indexed_list!(
+//!     create ro Cars on Car using {
+//!         id:   fast_forward::index::uint::UIntIndex => 0,
+//!         name: fast_forward::index::map::MapIndex   => 1.clone,
+//!     }
+//! );
 //! ´´´
+//!
 
 mod index;
 mod list;
@@ -34,8 +35,25 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::parse_macro_input;
 
+/// Macro, which create the struct for an `Indexed List`.
+///
+/// ## Example
+///
+/// ```
+/// use fast_forward_macros::indexed_list;
+///
+/// #[derive(Clone)]
+/// pub struct Car(usize, String);
+///
+/// indexed_list!(
+///     create ro Cars on Car using {
+///         id:   fast_forward::index::uint::UIntIndex => 0,
+///         name: fast_forward::index::map::MapIndex   => 1.clone,
+///     }
+/// );
+/// ```
 #[proc_macro]
-pub fn create_indexed_list(input: TokenStream) -> TokenStream {
+pub fn indexed_list(input: TokenStream) -> TokenStream {
     let list = parse_macro_input!(input as IndexedList);
     TokenStream::from(list.into_token_stream())
 }

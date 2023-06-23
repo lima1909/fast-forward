@@ -1,16 +1,16 @@
-use fast_forward_macros::create_indexed_list;
+use fast_forward_macros::indexed_list;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Car(usize, String);
 
-create_indexed_list!(
+indexed_list!(
     create CarsBorrow on Car using {
         id: fast_forward::index::uint::UIntIndex => 0,
         name: fast_forward::index::map::MapIndex => 1.clone,
     }
 );
 
-create_indexed_list!(
+indexed_list!(
     create CarsOwned on Car using {
         id: fast_forward::index::uint::UIntIndex => 0,
         name: fast_forward::index::map::MapIndex => 1.clone,
