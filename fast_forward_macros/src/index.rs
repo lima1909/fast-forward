@@ -126,7 +126,7 @@ impl Index {
 
         quote! {
             pub fn #name(&self) -> fast_forward::collections::Retriever<'_, #store, fast_forward::collections::ro::Slice<'_, #on>> {
-                fast_forward::collections::Retriever::new(&self.#name, &self.items)
+                fast_forward::collections::Retriever::new(&self.#name, &self._items)
             }
         }
     }

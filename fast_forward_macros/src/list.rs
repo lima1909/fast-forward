@@ -9,6 +9,7 @@
 //! }
 //! ```
 //!
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
     braced,
@@ -75,81 +76,89 @@ impl ToTokens for IndexedList {
         let list_name = self.name.clone();
         let on = self.on.clone();
 
+        tokens.extend(self.create_struct(&list_name, &on));
+        tokens.extend(self.impl_new(&list_name, &on));
+        tokens.extend(self.retrieve(&list_name, &on));
+        tokens.extend(self.impl_deref(&list_name, &on));
+        tokens.extend(self.impl_index(&list_name, &on));
+    }
+}
+
+impl IndexedList {
+    // create struct
+    fn create_struct(&self, list_name: &Ident, on: &TypePath) -> TokenStream {
         let fields = self.indices.to_declare_struct_field_tokens();
 
-        // create struct
-        tokens.extend(quote! {
+        quote! (
+            pub struct #list_name<'a> {
+                #(#fields)*
+                _items: fast_forward::collections::ro::Slice<'a, #on>,
+            }
+        )
+    }
 
-                pub struct #list_name<'a> {
-                    items: fast_forward::collections::ro::Slice<'a, #on>,
-                    #(#fields)*
-                }
-
-        });
-
-        // create impls
+    // create impls for borrowed and owned
+    fn impl_new(&self, list_name: &Ident, on: &TypePath) -> TokenStream {
         let init_fields = self.indices.to_init_struct_field_tokens(&self.on);
-        tokens.extend(quote! {
 
+        quote! (
             impl<'a> #list_name<'a> {
-                // borrowed
                 pub fn borrowed(slice: &'a [#on]) -> Self {
                     use fast_forward::index::Store;
 
                     Self {
                         #(#init_fields)*
-                        items: fast_forward::collections::ro::Slice(std::borrow::Cow::Borrowed(slice)),
+                        _items: fast_forward::collections::ro::Slice(std::borrow::Cow::Borrowed(slice)),
                     }
                 }
 
-                // owned
                 pub fn owned(slice: Vec<#on>) -> Self {
                     use fast_forward::index::Store;
 
                     Self {
                         #(#init_fields)*
-                        items: fast_forward::collections::ro::Slice(std::borrow::Cow::Owned(slice)),
+                        _items: fast_forward::collections::ro::Slice(std::borrow::Cow::Owned(slice)),
                     }
                 }
-
             }
-        });
+        )
+    }
 
-        // retrieve method per store
-        let retrieves = self.indices.to_retrieve_tokens(&self.on);
-        tokens.extend(quote!(
+    // retrieve method per store
+    fn retrieve(&self, list_name: &Ident, on: &TypePath) -> TokenStream {
+        let retrieves = self.indices.to_retrieve_tokens(on);
 
+        quote!(
             impl<'a> #list_name<'a> {
                 #(#retrieves)*
             }
+        )
+    }
 
-        ));
-
-        // deref
-        tokens.extend(quote!(
-
-            impl<'a> std::ops::Deref for #list_name<'a> {
-                type Target = [#on];
-
-                fn deref(&self) -> &Self::Target {
-                    &self.items.0
-                }
-            }
-
-        ));
-
-        // indexed
-        tokens.extend(quote!(
-
+    // impl `std::ops::Index` trait
+    fn impl_index(&self, list_name: &Ident, on: &TypePath) -> TokenStream {
+        quote!(
             impl std::ops::Index<usize> for #list_name<'_> {
                 type Output = #on;
 
                 fn index(&self, pos: usize) -> &Self::Output {
-                    &self.items[pos]
+                    &self._items[pos]
                 }
             }
+        )
+    }
 
-        ));
+    // impl `std::ops::Deref` trait
+    fn impl_deref(&self, list_name: &Ident, on: &TypePath) -> TokenStream {
+        quote!(
+            impl<'a> std::ops::Deref for #list_name<'a> {
+                type Target = [#on];
+
+                fn deref(&self) -> &Self::Target {
+                    &self._items.0
+                }
+            }
+        )
     }
 }
 
@@ -186,6 +195,24 @@ impl Parse for Kind {
 mod tests {
     use super::*;
     use crate::index::Index;
+    use crate::list::IndexedList;
+    use syn::parse_quote;
+
+    #[test]
+    fn create_struct() {
+        let l = syn::parse_str::<IndexedList>("create rw Cars on Car using {}").unwrap();
+
+        let list_name = Ident::new("Cars", proc_macro2::Span::call_site());
+        let on = syn::parse_str::<TypePath>("Car").unwrap();
+        let ts = l.create_struct(&list_name, &on);
+        let ts2: TokenStream = parse_quote!(
+            pub struct #list_name<'a> {
+                _items: fast_forward::collections::ro::Slice<'a, #on>,
+            }
+        );
+
+        assert_eq!(ts.to_string(), ts2.to_string());
+    }
 
     #[test]
     fn kind() {
