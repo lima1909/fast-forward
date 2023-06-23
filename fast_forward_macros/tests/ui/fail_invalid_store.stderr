@@ -1,0 +1,21 @@
+error[E0412]: cannot find type `UIntIndex` in this scope
+ --> tests/ui/fail_invalid_store.rs:8:13
+  |
+8 |         id: UIntIndex => 0,
+  |             ^^^^^^^^^ not found in this scope
+  |
+help: consider importing this struct
+  |
+1 + use fast_forward::index::uint::UIntIndex;
+  |
+
+error[E0433]: failed to resolve: use of undeclared type `UIntIndex`
+ --> tests/ui/fail_invalid_store.rs:8:13
+  |
+8 |         id: UIntIndex => 0,
+  |             ^^^^^^^^^ use of undeclared type `UIntIndex`
+  |
+help: consider importing this struct
+  |
+1 + use fast_forward::index::uint::UIntIndex;
+  |

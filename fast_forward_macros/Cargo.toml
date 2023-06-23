@@ -30,4 +30,4 @@ path = "tests/run.rs"
 
 [[bin]]
 name = "ma"
-path = "tests/ui/func_macro_test.rs"
+path = "tests/ui/two_lists.rs"
