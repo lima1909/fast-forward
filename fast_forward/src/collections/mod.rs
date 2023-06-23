@@ -7,10 +7,9 @@ pub mod rw;
 
 use std::ops::Index;
 
-pub use crate::{
-    collections::rw::RWIndexList,
-    index::{self, Filterable, Indices, MetaData, Store},
-};
+pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
+
+use crate::index::{self, Filterable, Indices, MetaData};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'f, F, I> {
@@ -243,7 +242,7 @@ where
         predicate(&self.0).items(self.0.items)
     }
 
-    /// Returns Meta data, if the [`Store`] supports any.
+    /// Returns Meta data, if the [`crate::index::Store`] supports any.
     #[inline]
     pub fn meta(&self) -> F::Meta<'_>
     where
