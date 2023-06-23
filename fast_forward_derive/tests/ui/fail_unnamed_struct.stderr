@@ -1,5 +1,0 @@
-error: The field has no name. Please add for example: '#[index(name = "id")]'
- --> tests/ui/fail_unnamed_struct.rs:4:16
-  |
-4 | pub struct Car(#[index(fast_forward::index::uint::UIntIndex)] i32, String);
-  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

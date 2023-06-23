@@ -200,11 +200,12 @@ mod tests {
 
     #[test]
     fn create_struct() {
-        let l = syn::parse_str::<IndexedList>("create rw Cars on Car using {}").unwrap();
-
         let list_name = Ident::new("Cars", proc_macro2::Span::call_site());
         let on = syn::parse_str::<TypePath>("Car").unwrap();
+
+        let l = syn::parse_str::<IndexedList>("create rw Cars on Car using {}").unwrap();
         let ts = l.create_struct(&list_name, &on);
+
         let ts2: TokenStream = parse_quote!(
             pub struct #list_name<'a> {
                 _items: fast_forward::collections::ro::Slice<'a, #on>,

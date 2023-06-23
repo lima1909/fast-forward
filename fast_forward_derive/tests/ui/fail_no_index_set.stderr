@@ -1,5 +1,0 @@
-error: Field: 'id' must have an Index-Type. Please add for example: '#[index(fast_forward::index::uint::UIntIndex)]'
- --> tests/ui/fail_no_index_set.rs:4:16
-  |
-4 | pub struct Car(#[index(name = "id")] i32, String);
-  |                ^^^^^^^^^^^^^^^^^^^^^^^^^

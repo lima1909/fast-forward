@@ -227,17 +227,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fast_forward_derive"
-version = "0.0.1"
-dependencies = [
- "fast_forward",
- "proc-macro2",
- "quote",
- "syn 2.0.15",
- "trybuild",
-]
-
-[[package]]
 name = "fast_forward_macros"
 version = "0.0.1"
 dependencies = [

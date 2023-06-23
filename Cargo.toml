@@ -2,6 +2,4 @@
 members = [
     "fast_forward",
     "fast_forward_macros",
-    "fast_forward_derive",
-
 ]
