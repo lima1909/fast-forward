@@ -1,7 +1,7 @@
 use std::ops::Index;
 
 use fast_forward::{
-    collections::{Filter, OneIndexList},
+    collections::{Filter, RWIndexList},
     index::{store::Filterable, uint::UIntIndex},
     index::{Indices, Store},
 };
@@ -60,7 +60,7 @@ fn main() {
         Node::new(6, 5),
     ];
 
-    let n = OneIndexList::from_vec(
+    let n = RWIndexList::from_vec(
         UIntIndex::with_capacity(nodes.len()),
         |n: &Node| n.id,
         nodes,

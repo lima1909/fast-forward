@@ -1,12 +1,14 @@
 //! Different kinds of collections which are using `Indices`.
-pub mod list;
-pub mod one;
+//!
+#[doc(hidden)]
+pub(crate) mod list;
 pub mod ro;
+pub mod rw;
 
 use std::ops::Index;
 
 pub use crate::{
-    collections::one::OneIndexList,
+    collections::rw::RWIndexList,
     index::{self, Filterable, Indices, MetaData, Store},
 };
 

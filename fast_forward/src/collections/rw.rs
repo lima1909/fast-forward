@@ -1,3 +1,5 @@
+//! `Read-Write-List` with one index.
+//!
 use std::ops::Index;
 
 use crate::{
@@ -8,13 +10,13 @@ use crate::{
     index::Store,
 };
 
-pub struct OneIndexList<S, K, I, F: Fn(&I) -> K> {
+pub struct RWIndexList<S, K, I, F: Fn(&I) -> K> {
     store: S,
     items: List<I>,
     field: F,
 }
 
-impl<S, K, I, F> OneIndexList<S, K, I, F>
+impl<S, K, I, F> RWIndexList<S, K, I, F>
 where
     F: Fn(&I) -> K,
     S: Store<Key = K>,
@@ -86,7 +88,7 @@ where
     }
 }
 
-impl<S, K, I, F: Fn(&I) -> K> Index<usize> for OneIndexList<S, K, I, F> {
+impl<S, K, I, F: Fn(&I) -> K> Index<usize> for RWIndexList<S, K, I, F> {
     type Output = I;
 
     fn index(&self, pos: usize) -> &Self::Output {
@@ -96,10 +98,8 @@ impl<S, K, I, F: Fn(&I) -> K> Index<usize> for OneIndexList<S, K, I, F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        collections::OneIndexList,
-        index::{map::MapIndex, uint::UIntIndex, Store},
-    };
+    use super::*;
+    use crate::index::{map::MapIndex, uint::UIntIndex, Store};
     use rstest::{fixture, rstest};
 
     #[derive(Debug, Eq, PartialEq, Clone)]
@@ -117,8 +117,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_uint(cars: Vec<Car>) {
-        let cars =
-            OneIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+        let cars = RWIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
         assert!(cars.idx().contains(&2));
         assert!(cars.get(2).is_some());
@@ -143,7 +142,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_map(cars: Vec<Car>) {
-        let cars = OneIndexList::from_vec(
+        let cars = RWIndexList::from_vec(
             MapIndex::with_capacity(cars.len()),
             |c: &Car| c.1.clone(),
             cars,
@@ -168,7 +167,7 @@ mod tests {
     #[rstest]
     fn one_indexed_list_update(cars: Vec<Car>) {
         let mut cars =
-            OneIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+            RWIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
         // update name, where name is NOT a Index
         let updated = cars.update(0, |c| {
@@ -210,7 +209,7 @@ mod tests {
     #[rstest]
     fn one_indexed_list_delete(cars: Vec<Car>) {
         let mut cars =
-            OneIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+            RWIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
         // before delete: 2 Cars
         let r = cars.idx().get(&2).collect::<Vec<_>>();

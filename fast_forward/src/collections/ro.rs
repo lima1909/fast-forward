@@ -1,4 +1,5 @@
-//! Read-only-list with one index.
+//! `Read-Only-List` with one index.
+//!
 use std::{
     borrow::Cow,
     ops::{Deref, Index},
@@ -9,7 +10,8 @@ use crate::{
     index::{Filterable, Store},
 };
 
-/// [`ROIndexList`] is a read only list with one index.
+// [`ROIndexList`] is a read only list with one index.
+//
 pub struct ROIndexList<'i, I, S>
 where
     [I]: ToOwned,
