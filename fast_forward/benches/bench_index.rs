@@ -8,6 +8,7 @@ use fast_forward::index::{Filterable, Store};
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
 const FIND_ID_2: usize = 1_501;
+const FIND_ID_3: usize = 80_501;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Person(usize, String);
@@ -38,6 +39,8 @@ fn list_index(c: &mut Criterion) {
     let FIND_PERSON: Person = Person(FIND_ID, format!("Jasmin {FIND_ID}"));
     #[allow(non_snake_case)]
     let FIND_PERSON_2: Person = Person(FIND_ID_2, format!("Jasmin {FIND_ID_2}"));
+    #[allow(non_snake_case)]
+    let FIND_PERSON_3: Person = Person(FIND_ID_3, format!("Jasmin {FIND_ID_3}"));
 
     // read only index list
     let ro_idx = ROIndexList::<'_, _, UIntIndex>::borrowed(Person::id, &v);
@@ -54,45 +57,61 @@ fn list_index(c: &mut Criterion) {
 
     // group benchmark
     let mut group = c.benchmark_group("index");
-    group.bench_function("ff: ro pk get (one)", |b| {
+    group.bench_function("ff: ro pk get (1)", |b| {
         b.iter(|| {
             let p = ro_idx.idx().get(&FIND_ID).next().unwrap();
             assert_eq!(&FIND_PERSON, p);
         })
     });
 
-    group.bench_function("ff: ro pk get (two)", |b| {
+    group.bench_function("ff: ro pk get (3)", |b| {
         b.iter(|| {
             let p = ro_idx.idx().get(&FIND_ID).next().unwrap();
             assert_eq!(&FIND_PERSON, p);
 
             let p = ro_idx.idx().get(&FIND_ID_2).next().unwrap();
             assert_eq!(&FIND_PERSON_2, p);
+
+            let p = ro_idx.idx().get(&FIND_ID_3).next().unwrap();
+            assert_eq!(&FIND_PERSON_3, p);
         })
     });
 
-    group.bench_function("ff: ro pk get_many_cb (callback - two)", |b| {
+    group.bench_function("ff: ro pk get_many_cb (callback - 3)", |b| {
         b.iter(|| {
             ro_idx
                 .idx()
-                .get_many_cb([FIND_ID, FIND_ID_2], |k, mut items| match k {
+                .get_many_cb([FIND_ID, FIND_ID_2, FIND_ID_3], |k, mut items| match k {
                     &FIND_ID => assert_eq!(&FIND_PERSON, items.next().unwrap()),
                     &FIND_ID_2 => assert_eq!(&FIND_PERSON_2, items.next().unwrap()),
+                    &FIND_ID_3 => assert_eq!(&FIND_PERSON_3, items.next().unwrap()),
                     _ => unreachable!("invalid Key: {k}"),
                 });
         })
     });
 
-    group.bench_function("ff: ro pk get_many (two)", |b| {
+    group.bench_function("ff: ro pk view (3)", |b| {
         b.iter(|| {
-            let mut it = ro_idx.idx().get_many([FIND_ID, FIND_ID_2]);
+            let idx = ro_idx.idx();
+            let mut view = idx.create_view([FIND_ID, FIND_ID_2, FIND_ID_3]);
+            assert_eq!(&FIND_PERSON, view.next().unwrap());
+            assert_eq!(&FIND_PERSON_2, view.next().unwrap());
+            assert_eq!(&FIND_PERSON_3, view.next().unwrap());
+            assert_eq!(None, view.next());
+        })
+    });
+
+    group.bench_function("ff: ro pk get_many (3)", |b| {
+        b.iter(|| {
+            let mut it = ro_idx.idx().get_many([FIND_ID, FIND_ID_2, FIND_ID_3]);
             assert_eq!(&FIND_PERSON, it.next().unwrap());
             assert_eq!(&FIND_PERSON_2, it.next().unwrap());
+            assert_eq!(&FIND_PERSON_3, it.next().unwrap());
             assert_eq!(None, it.next());
         })
     });
 
-    group.bench_function("vec-iter: pk (one)", |b| {
+    group.bench_function("vec-iter: pk (1)", |b| {
         b.iter(|| {
             let mut it = v.iter().filter(|p| p.0 == FIND_ID);
             assert_eq!(Some(&FIND_PERSON), it.next());
@@ -100,11 +119,14 @@ fn list_index(c: &mut Criterion) {
         })
     });
 
-    group.bench_function("vec-iter: pk (two)", |b| {
+    group.bench_function("vec-iter: pk (3)", |b| {
         b.iter(|| {
-            let mut it = v.iter().filter(|p| p.0 == FIND_ID || p.0 == FIND_ID_2);
+            let mut it = v
+                .iter()
+                .filter(|p| p.0 == FIND_ID || p.0 == FIND_ID_2 || p.0 == FIND_ID_3);
             assert_eq!(Some(&FIND_PERSON), it.next());
             assert_eq!(Some(&FIND_PERSON_2), it.next());
+            assert_eq!(Some(&FIND_PERSON_3), it.next());
             assert_eq!(None, it.next());
         })
     });

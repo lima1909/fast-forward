@@ -152,6 +152,43 @@ pub trait MetaData {
     fn meta(&self) -> Self::Meta<'_>;
 }
 
+/// A `View` is a wrapper for an given [`Store`],
+/// that can be only use (read only) for [`Filterable`] operations.
+#[repr(transparent)]
+pub struct View<S>(S);
+
+impl<S: Store> View<S> {
+    pub fn new<I>(keys: I) -> Self
+    where
+        I: IntoIterator<Item = S::Key> + ExactSizeIterator,
+        Self: Sized,
+    {
+        Self(S::from_iter(keys))
+    }
+}
+
+impl<S: Store> Filterable for View<S> {
+    type Key = S::Key;
+
+    #[inline]
+    fn get(&self, key: &Self::Key) -> Indices<'_> {
+        self.0.get(key)
+    }
+
+    #[inline]
+    fn get_many<I>(&self, keys: I) -> Indices<'_>
+    where
+        I: IntoIterator<Item = Self::Key>,
+    {
+        self.0.get_many(keys)
+    }
+
+    #[inline]
+    fn contains(&self, key: &Self::Key) -> bool {
+        self.0.contains(key)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::ops::Deref;

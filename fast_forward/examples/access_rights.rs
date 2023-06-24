@@ -2,37 +2,51 @@
 
 use fast_forward::{collections::ROIndexList, index::uint::UIntIndex};
 
-pub struct Confidential {
+#[derive(Debug, Clone, PartialEq)]
+pub struct Car {
     id: usize,
-    text: &'static str,
-}
-
-pub struct UserAccessRights<'a> {
-    user_name: &'a str,
-    read: ROIndexList<'a, usize, UIntIndex>,
-}
-impl<'a> UserAccessRights<'a> {
-    fn new(user_name: &'a str, read: Vec<usize>) -> Self {
-        Self {
-            user_name,
-            read: ROIndexList::owned(|id: &usize| *id, read),
-        }
-    }
-    fn can_read(&self, secrets: &[Confidential]) {}
+    name: &'static str,
 }
 
 fn main() {
-    let secrets = vec![
-        Confidential {
-            id: 99,
-            text: "bla ...",
-        },
-        Confidential {
-            id: 2043,
-            text: "blub ...",
-        },
-    ];
+    let l: ROIndexList<'_, _, UIntIndex> = ROIndexList::owned(
+        |c| c.id,
+        vec![
+            Car {
+                id: 99,
+                name: "BMW 1",
+            },
+            Car {
+                id: 2043,
+                name: "Audi",
+            },
+            Car {
+                id: 99,
+                name: "BMW 2",
+            },
+        ],
+    );
 
-    let access = UserAccessRights::new("me", vec![1, 3, 99]);
-    access.can_read(&secrets);
+    let idx = l.idx();
+    let mut it = idx.create_view([1, 3, 99]).filter(|c| c.id < 10_000);
+
+    assert_eq!(
+        Some(&Car {
+            id: 99,
+            name: "BMW 1",
+        }),
+        it.next()
+    );
+    assert_eq!(
+        Some(&Car {
+            id: 99,
+            name: "BMW 2",
+        }),
+        it.next()
+    );
+    assert_eq!(None, it.next());
+
+    // TODO: it does not work!
+    // 2043 is NOT found, it is filter out
+    // assert!(idx.create_view(1..=99).contains(&2043))
 }

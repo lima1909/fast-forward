@@ -126,7 +126,11 @@ mod tests {
         let mut it = l.idx().filter(|f| {
             let idxs = f.eq(&99);
             assert_eq!([3], idxs);
-            let _porsche = f.get(3); // no panic
+
+            let mut it = f.items(&99);
+            assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+            assert_eq!(None, it.next());
+
             idxs
         });
         assert_eq!(Some(&Car(99, "Porsche".into())), it.next());

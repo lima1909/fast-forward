@@ -22,8 +22,7 @@ where
             return result;
         }
 
-        for i in self.eq(&key).iter() {
-            let n = self.get(*i);
+        for n in self.items(&key) {
             result = self.eq(&n.parent) | self.parents(n.parent, stop);
         }
 
