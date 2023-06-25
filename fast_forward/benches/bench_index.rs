@@ -90,17 +90,6 @@ fn list_index(c: &mut Criterion) {
         })
     });
 
-    group.bench_function("ff: ro pk view (3)", |b| {
-        b.iter(|| {
-            let idx = ro_idx.idx();
-            let mut view = idx.create_view([FIND_ID, FIND_ID_2, FIND_ID_3]);
-            assert_eq!(&FIND_PERSON, view.next().unwrap());
-            assert_eq!(&FIND_PERSON_2, view.next().unwrap());
-            assert_eq!(&FIND_PERSON_3, view.next().unwrap());
-            assert_eq!(None, view.next());
-        })
-    });
-
     group.bench_function("ff: ro pk get_many (3)", |b| {
         b.iter(|| {
             let mut it = ro_idx.idx().get_many([FIND_ID, FIND_ID_2, FIND_ID_3]);

@@ -2,7 +2,7 @@
 //! with the goal, to get the `Indices` as fast as possible.
 use std::ops::Index;
 
-use super::Indices;
+use super::{Indices, Iter};
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Filterable {
@@ -183,8 +183,7 @@ where
 pub struct Many<'m, K, F, I> {
     keys: K,
     filter: &'m F,
-    indices: Indices<'m>,
-    pos: usize,
+    iter: Iter<'m, I>,
     items: &'m I,
 }
 
@@ -195,16 +194,16 @@ where
     I: Index<usize>,
 {
     pub fn new(mut keys: K, filter: &'m F, items: &'m I) -> Self {
-        let indices = match keys.next() {
+        let iter = match keys.next() {
             Some(k) => filter.get(&k),
             None => Indices::empty(),
-        };
+        }
+        .items(items);
 
         Self {
             keys,
             filter,
-            indices,
-            pos: 0,
+            iter,
             items,
         }
     }
@@ -220,18 +219,17 @@ where
     type Item = &'m I::Output;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(i) = self.indices.get(self.pos) {
-            self.pos += 1;
-            return Some(&self.items[*i]);
+        if let Some(i) = self.iter.next() {
+            return Some(i);
         }
 
-        self.indices = self.filter.get(&self.keys.next()?);
-        while self.indices.is_empty() {
-            self.indices = self.filter.get(&self.keys.next()?);
+        let mut idx = self.filter.get(&self.keys.next()?);
+        while idx.is_empty() {
+            idx = self.filter.get(&self.keys.next()?);
         }
 
-        self.pos = 1;
-        Some(&self.items[self.indices[0]])
+        self.iter = idx.items(self.items);
+        self.iter.next()
     }
 }
 

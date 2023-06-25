@@ -9,7 +9,7 @@ use std::ops::Index;
 
 pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
 
-use crate::index::{self, store::Many, Filterable, Indices, Iter, MetaData};
+use crate::index::{self, store::Many, Filterable, Indices, MetaData};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'f, F, I> {
@@ -237,14 +237,6 @@ where
         predicate(&self.0).items(self.0._items)
     }
 
-    pub fn create_view<II>(&'r self, keys: II) -> View<'r, II::IntoIter, F, I>
-    where
-        II: IntoIterator<Item = F::Key>,
-        I: Index<usize>,
-    {
-        View::new(keys.into_iter(), &self.0)
-    }
-
     /// Returns Meta data, if the [`crate::index::Store`] supports any.
     #[inline]
     pub fn meta(&self) -> F::Meta<'_>
@@ -252,92 +244,5 @@ where
         F: MetaData,
     {
         self.0.filter.meta()
-    }
-}
-
-// ---------------------------------------------------------
-pub struct View<'v, Keys, Fltr, Items: Index<usize>> {
-    keys: Keys,
-    filter: &'v Filter<'v, Fltr, Items>,
-    iter: Iter<'v, Items>,
-}
-
-impl<'v, Keys, Fltr, Items> View<'v, Keys, Fltr, Items>
-where
-    Items: Index<usize>,
-    Fltr: Filterable,
-{
-    pub fn new(mut keys: Keys, filter: &'v Filter<'v, Fltr, Items>) -> Self
-    where
-        Keys: Iterator<Item = Fltr::Key>,
-    {
-        Self {
-            iter: match keys.next() {
-                Some(k) => filter.filter.get(&k),
-                None => Indices::empty(),
-            }
-            .items(filter._items),
-            keys,
-            filter,
-        }
-    }
-
-    #[inline]
-    pub fn contains(&self, key: &Fltr::Key) -> bool {
-        !self.filter.eq(key).is_empty()
-    }
-}
-
-impl<'v, Keys, Fltr, Items> Iterator for View<'v, Keys, Fltr, Items>
-where
-    Fltr: Filterable,
-    Keys: Iterator<Item = Fltr::Key>,
-    Items: Index<usize>,
-    <Items as Index<usize>>::Output: Sized,
-{
-    type Item = &'v Items::Output;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(i) = self.iter.next() {
-            return Some(i);
-        }
-
-        let mut key = self.keys.next()?;
-        let mut idx = self.filter.eq(&key);
-
-        while idx.is_empty() {
-            key = self.keys.next()?;
-            idx = self.filter.eq(&key);
-        }
-
-        self.iter = idx.items(self.filter._items);
-        self.iter.next()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::index::{map::MapIndex, Store};
-
-    use super::*;
-    use rstest::rstest;
-
-    #[rstest]
-    #[case::empty(vec![], vec![])]
-    #[case::one_found(vec!["c"], vec![&"c"])]
-    #[case::one_not_found(vec!["-"], vec![])]
-    #[case::m_z_a(vec!["m", "z", "a"], vec![&"z", &"a"])]
-    #[case::a_m_z(vec![ "a","m", "z"], vec![&"a", &"z"])]
-    #[case::z_m_a(vec![ "z","m", "a"], vec![&"z", &"a"])]
-    #[case::m_z_a_m(vec!["m", "z", "a", "m"], vec![&"z", &"a"])]
-    #[case::m_z_a_m_m(vec!["m", "z", "a", "m", "m"], vec![&"z", &"a"])]
-    #[case::double(vec!["x"], vec![&"x",&"x"])]
-    fn view_str(#[case] keys: Vec<&str>, #[case] expected: Vec<&&str>) {
-        let items = vec!["x", "a", "b", "c", "x", "y", "z"];
-        let map = MapIndex::from_iter(items.clone().into_iter());
-        let filter = Filter::new(&map, &items);
-        let result = View::new(keys.into_iter(), &filter).collect::<Vec<_>>();
-
-        assert_eq!(expected, result);
     }
 }
