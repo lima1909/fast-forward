@@ -161,19 +161,50 @@ mod tests {
 
         #[test]
         fn find_eq_many_unique() {
-            let mut idx = MapIndex::default();
-            idx.insert("Jasmin", 5);
-            idx.insert("Mario", 2);
-            idx.insert("Paul", 6);
+            let l = [
+                String::from("Jasmin"),
+                String::from("Mario"),
+                String::from("Paul"),
+            ];
+            let idx = MapIndex::from_iter(l.clone().into_iter());
 
-            assert_eq!(0, eq_many(&idx, []).iter().len());
-            assert_eq!(0, eq_many(&idx, ["NotFound"]).iter().len());
-            assert_eq!([2], eq_many(&idx, ["Mario"]));
-            assert_eq!([2, 6], eq_many(&idx, ["Paul", "Mario"]));
-            assert_eq!([2, 6], eq_many(&idx, ["NotFound", "Paul", "Mario"]));
+            assert_eq!(0, eq_many(&idx, [], &l).collect::<Vec<_>>().len());
             assert_eq!(
-                [2, 5, 6],
-                eq_many(&idx, ["Jasmin", "NotFound", "Mario", "Paul"])
+                0,
+                eq_many(&idx, ["NotFound".into()], &l)
+                    .collect::<Vec<_>>()
+                    .len()
+            );
+            assert_eq!(
+                vec![&String::from("Mario")],
+                eq_many(&idx, ["Mario".into()], &l).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                vec![&String::from("Paul"), &String::from("Mario")],
+                eq_many(&idx, ["Paul".into(), "Mario".into()], &l).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                vec![&String::from("Paul"), &String::from("Mario")],
+                eq_many(&idx, ["NotFound".into(), "Paul".into(), "Mario".into()], &l)
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(
+                vec![
+                    &String::from("Jasmin"),
+                    &String::from("Mario"),
+                    &String::from("Paul")
+                ],
+                eq_many(
+                    &idx,
+                    [
+                        "Jasmin".into(),
+                        "NotFound".into(),
+                        "Mario".into(),
+                        "Paul".into()
+                    ],
+                    &l
+                )
+                .collect::<Vec<_>>()
             );
         }
 

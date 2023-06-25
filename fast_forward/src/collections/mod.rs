@@ -153,12 +153,12 @@ where
     /// For performance reason it is better to use [`Self::get_many_cb()`] or
     /// to call [`Self::get()`] several times.
     #[inline]
-    pub fn get_many<II>(&self, keys: II) -> ManyItems<'r, <II as IntoIterator>::IntoIter, F, I>
+    pub fn get_many<II>(&self, keys: II) -> Many<'r, <II as IntoIterator>::IntoIter, F, I>
     where
         II: IntoIterator<Item = F::Key>,
         I: Index<usize>,
     {
-        ManyItems::new(keys.into_iter(), self.0.filter, self.0._items)
+        Many::new(keys.into_iter(), self.0.filter, self.0._items)
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -252,39 +252,6 @@ where
         F: MetaData,
     {
         self.0.filter.meta()
-    }
-}
-
-pub struct ManyItems<'m, K, F, Items> {
-    iter: Many<'m, K, F>,
-    items: &'m Items,
-}
-
-impl<'m, K, F, Items> ManyItems<'m, K, F, Items>
-where
-    Items: Index<usize>,
-    F: Filterable,
-    K: Iterator<Item = F::Key>,
-{
-    pub fn new(keys: K, filter: &'m F, items: &'m Items) -> Self {
-        Self {
-            iter: Many::new(keys, filter),
-            items,
-        }
-    }
-}
-
-impl<'m, K, F, Items> Iterator for ManyItems<'m, K, F, Items>
-where
-    F: Filterable,
-    K: Iterator<Item = F::Key>,
-    Items: Index<usize>,
-    <Items as Index<usize>>::Output: Sized + 'm,
-{
-    type Item = &'m Items::Output;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(&self.items[self.iter.next()?])
     }
 }
 

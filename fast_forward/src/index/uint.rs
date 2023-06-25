@@ -307,20 +307,27 @@ mod tests {
 
         #[test]
         fn find_eq_many_unique() {
-            let mut i = UIntIndex::<u8>::default();
-            i.insert(5, 5);
-            i.insert(2, 2);
-            i.insert(6, 6);
+            let l = [0, 1, 2, 3, 4, 5, 6];
+            let i = UIntIndex::<u8>::from_iter(l.into_iter());
 
-            assert_eq!(0, eq_many(&i, []).iter().len());
-            assert_eq!(0, eq_many(&i, [9]).iter().len());
-            assert_eq!([2], eq_many(&i, [2]));
-            assert_eq!([2, 6], eq_many(&i, [6, 2]));
-            assert_eq!([2, 6], eq_many(&i, [9, 6, 2]));
-            assert_eq!([2, 5, 6], eq_many(&i, [5, 9, 6, 2]));
+            assert_eq!(0, eq_many(&i, [], &l).collect::<Vec<_>>().len());
+            assert_eq!(0, eq_many(&i, [9], &l).collect::<Vec<_>>().len());
+            assert_eq!(vec![&2], eq_many(&i, [2], &l).collect::<Vec<_>>());
+            assert_eq!(vec![&6, &2], eq_many(&i, [6, 2], &l).collect::<Vec<_>>());
+            assert_eq!(vec![&6, &2], eq_many(&i, [9, 6, 2], &l).collect::<Vec<_>>());
+            assert_eq!(
+                vec![&5, &6, &2],
+                eq_many(&i, [5, 9, 6, 2], &l).collect::<Vec<_>>()
+            );
 
-            assert_eq!([2, 5, 6], eq_many(&i, 2..=6));
-            assert_eq!([2, 5, 6], eq_many(&i, 2..9));
+            assert_eq!(
+                vec![&2, &3, &4, &5, &6],
+                eq_many(&i, 2..=6, &l).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                vec![&2, &3, &4, &5, &6],
+                eq_many(&i, 2..9, &l).collect::<Vec<_>>()
+            );
         }
 
         #[test]
@@ -468,19 +475,25 @@ mod tests {
 
         #[test]
         fn find_eq_many_unique() {
-            let mut i = UIntIndex::<u8>::default();
-            i.insert(5, 5);
-            i.insert(2, 2);
-            i.insert(2, 1);
-            i.insert(6, 6);
+            let l = [0, 2, 2, 3, 4, 5, 6];
+            let i = UIntIndex::<u8>::from_iter(l.into_iter());
 
-            assert_eq!(0, eq_many(&i, []).iter().len());
-            assert_eq!(0, eq_many(&i, [9]).iter().len());
+            assert_eq!(0, eq_many(&i, [], &l).collect::<Vec<_>>().len());
+            assert_eq!(0, eq_many(&i, [9], &l).collect::<Vec<_>>().len());
 
-            assert_eq!([1, 2], eq_many(&i, [2]));
-            assert_eq!([1, 2, 6], eq_many(&i, [6, 2]));
-            assert_eq!([1, 2, 6], eq_many(&i, [9, 6, 2]));
-            assert_eq!([1, 2, 5, 6], eq_many(&i, [5, 9, 6, 2]));
+            assert_eq!(vec![&2, &2], eq_many(&i, [2], &l).collect::<Vec<_>>());
+            assert_eq!(
+                vec![&6, &2, &2],
+                eq_many(&i, [6, 2], &l).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                vec![&6, &2, &2],
+                eq_many(&i, [9, 6, 2], &l).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                vec![&5, &6, &2, &2],
+                eq_many(&i, [5, 9, 6, 2], &l).collect::<Vec<_>>()
+            );
         }
 
         #[test]

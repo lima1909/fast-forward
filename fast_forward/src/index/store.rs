@@ -1,5 +1,7 @@
 //! A `Store` is saving `Indices` for a given `Key`,
 //! with the goal, to get the `Indices` as fast as possible.
+use std::ops::Index;
+
 use super::Indices;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
@@ -164,30 +166,35 @@ impl<S: Store> Filterable for View<S> {
 /// [2..6] => get(2) OR get(3) OR get(4) OR get(5)
 /// ```
 
-pub fn eq_many<F, K>(filter: &F, keys: K) -> Indices<'_>
+pub fn eq_many<'m, F, K, I>(
+    filter: &'m F,
+    keys: K,
+    items: &'m I,
+) -> Many<'m, <K as IntoIterator>::IntoIter, F, I>
 where
     F: Filterable,
     K: IntoIterator<Item = F::Key>,
+    I: Index<usize>,
 {
-    Many::new(keys.into_iter(), filter)
-        .collect::<Vec<_>>()
-        .into()
+    Many::new(keys.into_iter(), filter, items)
 }
 
 /// `Many` collect many [`Indices`] for a given list of `Keys`.
-pub struct Many<'m, K, F> {
+pub struct Many<'m, K, F, I> {
     keys: K,
     filter: &'m F,
     indices: Indices<'m>,
     pos: usize,
+    items: &'m I,
 }
 
-impl<'m, K, F> Many<'m, K, F>
+impl<'m, K, F, I> Many<'m, K, F, I>
 where
     F: Filterable,
     K: Iterator<Item = F::Key>,
+    I: Index<usize>,
 {
-    pub fn new(mut keys: K, filter: &'m F) -> Self {
+    pub fn new(mut keys: K, filter: &'m F, items: &'m I) -> Self {
         let indices = match keys.next() {
             Some(k) => filter.get(&k),
             None => Indices::empty(),
@@ -198,21 +205,24 @@ where
             filter,
             indices,
             pos: 0,
+            items,
         }
     }
 }
 
-impl<'m, K, F> Iterator for Many<'m, K, F>
+impl<'m, K, F, I> Iterator for Many<'m, K, F, I>
 where
     F: Filterable,
     K: Iterator<Item = F::Key>,
+    I: Index<usize>,
+    <I as Index<usize>>::Output: Sized + 'm,
 {
-    type Item = usize;
+    type Item = &'m I::Output;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(i) = self.indices.get(self.pos) {
             self.pos += 1;
-            return Some(*i);
+            return Some(&self.items[*i]);
         }
 
         self.indices = self.filter.get(&self.keys.next()?);
@@ -220,9 +230,8 @@ where
             self.indices = self.filter.get(&self.keys.next()?);
         }
 
-        let idx = self.indices[0];
         self.pos = 1;
-        Some(idx)
+        Some(&self.items[self.indices[0]])
     }
 }
 
@@ -297,18 +306,18 @@ mod tests {
 
     #[rstest]
     #[case::empty(vec![], vec![])]
-    #[case::one_found(vec!["c"], vec![3])]
+    #[case::one_found(vec!["c"], vec![&"c"])]
     #[case::one_not_found(vec!["-"], vec![])]
-    #[case::m_z_a(vec!["m", "z", "a"], vec![1, 6])]
-    #[case::a_m_z(vec![ "a","m", "z"], vec![1, 6])]
-    #[case::z_m_a(vec![ "z","m", "a"], vec![1, 6])]
-    #[case::m_z_a_m(vec!["m", "z", "a", "m"], vec![1, 6])]
-    #[case::m_z_a_m_m(vec!["m", "z", "a", "m", "m"], vec![1, 6])]
-    #[case::double_x(vec!["x"], vec![0, 4])]
-    #[case::a_double_x(vec!["a", "x"], vec![0, 1, 4])]
-    fn view_str(#[case] keys: Vec<&str>, #[case] expected: Vec<usize>) {
+    #[case::m_z_a(vec!["m", "z", "a"], vec![&"z", &"a"])]
+    #[case::a_m_z(vec![ "a","m", "z"], vec![&"a", &"z"])]
+    #[case::z_m_a(vec![ "z","m", "a"], vec![&"z", &"a"])]
+    #[case::m_z_a_m(vec!["m", "z", "a", "m"], vec![&"z", &"a"])]
+    #[case::m_z_a_m_m(vec!["m", "z", "a", "m", "m"], vec![&"z", &"a"])]
+    #[case::double_x(vec!["x"], vec![&"x", &"x"])]
+    #[case::a_double_x(vec!["a", "x"], vec![&"a", &"x", &"x"])]
+    fn view_str(#[case] keys: Vec<&str>, #[case] expected: Vec<&&str>) {
         let items = vec!["x", "a", "b", "c", "x", "y", "z"];
         let map = MapIndex::from_iter(items.clone().into_iter());
-        assert_eq!(expected, eq_many(&map, keys));
+        assert_eq!(expected, eq_many(&map, keys, &items).collect::<Vec<_>>());
     }
 }
