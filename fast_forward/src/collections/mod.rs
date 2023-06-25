@@ -9,7 +9,7 @@ use std::ops::Index;
 
 pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
 
-use crate::index::{self, Filterable, Indices, Iter, MetaData};
+use crate::index::{self, store::Many, Filterable, Indices, Iter, MetaData};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'f, F, I> {
@@ -31,14 +31,6 @@ where
     #[inline]
     pub fn eq(&self, key: &F::Key) -> Indices<'f> {
         self.filter.get(key)
-    }
-
-    #[inline]
-    pub fn eq_many<It>(&self, keys: It) -> Indices<'f>
-    where
-        It: IntoIterator<Item = F::Key>,
-    {
-        self.filter.get_many(keys)
     }
 
     #[inline]
@@ -66,6 +58,29 @@ where
     #[inline]
     pub fn eq(&self, key: &F::Key) -> Indices<'r> {
         self.0.filter.get(key)
+    }
+
+    /// Checks whether the `Key` exists.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use fast_forward::index::{Store, uint::UIntIndex};
+    /// use fast_forward::collections::ro::ROIndexList;
+    ///
+    /// #[derive(Debug, Eq, PartialEq, Clone)]
+    /// pub struct Car(usize, String);
+    ///
+    /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
+    ///
+    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(|c: &Car| c.0, &cars);
+    ///
+    /// assert!(l.idx().contains(&2));
+    /// assert!(!l.idx().contains(&99));
+    /// ```
+    #[inline]
+    pub fn contains(&self, key: &F::Key) -> bool {
+        self.0.filter.contains(key)
     }
 
     /// Get all items for a given `Key`.
@@ -125,8 +140,8 @@ where
     /// let result = l.idx().get_many([2, 5]).collect::<Vec<_>>();
     /// assert_eq!(vec![
     ///     &Car(2, "BMW".into()),
-    ///     &Car(5, "Audi".into()),
     ///     &Car(2, "VW".into()),
+    ///     &Car(5, "Audi".into()),
     ///     ],
     ///     result);
     /// ```
@@ -138,12 +153,12 @@ where
     /// For performance reason it is better to use [`Self::get_many_cb()`] or
     /// to call [`Self::get()`] several times.
     #[inline]
-    pub fn get_many<II>(&self, keys: II) -> index::Iter<'r, I>
+    pub fn get_many<II>(&self, keys: II) -> ManyItems<'r, <II as IntoIterator>::IntoIter, F, I>
     where
         II: IntoIterator<Item = F::Key>,
         I: Index<usize>,
     {
-        self.0.filter.get_many(keys).items(self.0._items)
+        ManyItems::new(keys.into_iter(), self.0.filter, self.0._items)
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -187,29 +202,6 @@ where
         for k in keys {
             callback(&k, self.0.items(&k))
         }
-    }
-
-    /// Checks whether the `Key` exists.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// use fast_forward::index::{Store, uint::UIntIndex};
-    /// use fast_forward::collections::ro::ROIndexList;
-    ///
-    /// #[derive(Debug, Eq, PartialEq, Clone)]
-    /// pub struct Car(usize, String);
-    ///
-    /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
-    ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(|c: &Car| c.0, &cars);
-    ///
-    /// assert!(l.idx().contains(&2));
-    /// assert!(!l.idx().contains(&99));
-    /// ```
-    #[inline]
-    pub fn contains(&self, key: &F::Key) -> bool {
-        self.0.filter.contains(key)
     }
 
     /// Return filter methods from the `Store`.
@@ -263,6 +255,40 @@ where
     }
 }
 
+pub struct ManyItems<'m, K, F, Items> {
+    iter: Many<'m, K, F>,
+    items: &'m Items,
+}
+
+impl<'m, K, F, Items> ManyItems<'m, K, F, Items>
+where
+    Items: Index<usize>,
+    F: Filterable,
+    K: Iterator<Item = F::Key>,
+{
+    pub fn new(keys: K, filter: &'m F, items: &'m Items) -> Self {
+        Self {
+            iter: Many::new(keys, filter),
+            items,
+        }
+    }
+}
+
+impl<'m, K, F, Items> Iterator for ManyItems<'m, K, F, Items>
+where
+    F: Filterable,
+    K: Iterator<Item = F::Key>,
+    Items: Index<usize>,
+    <Items as Index<usize>>::Output: Sized + 'm,
+{
+    type Item = &'m Items::Output;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(&self.items[self.iter.next()?])
+    }
+}
+
+// ---------------------------------------------------------
 pub struct View<'v, Keys, Fltr, Items: Index<usize>> {
     keys: Keys,
     filter: &'v Filter<'v, Fltr, Items>,

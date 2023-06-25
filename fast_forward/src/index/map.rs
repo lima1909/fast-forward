@@ -100,6 +100,7 @@ mod tests {
 
     mod unique {
         use super::*;
+        use crate::index::eq_many;
 
         #[test]
         fn empty() {
@@ -165,14 +166,14 @@ mod tests {
             idx.insert("Mario", 2);
             idx.insert("Paul", 6);
 
-            assert_eq!(0, idx.get_many([]).iter().len());
-            assert_eq!(0, idx.get_many(["NotFound"]).iter().len());
-            assert_eq!([2], idx.get_many(["Mario"]));
-            assert_eq!([2, 6], idx.get_many(["Paul", "Mario"]));
-            assert_eq!([2, 6], idx.get_many(["NotFound", "Paul", "Mario"]));
+            assert_eq!(0, eq_many(&idx, []).iter().len());
+            assert_eq!(0, eq_many(&idx, ["NotFound"]).iter().len());
+            assert_eq!([2], eq_many(&idx, ["Mario"]));
+            assert_eq!([2, 6], eq_many(&idx, ["Paul", "Mario"]));
+            assert_eq!([2, 6], eq_many(&idx, ["NotFound", "Paul", "Mario"]));
             assert_eq!(
                 [2, 5, 6],
-                idx.get_many(["Jasmin", "NotFound", "Mario", "Paul"])
+                eq_many(&idx, ["Jasmin", "NotFound", "Mario", "Paul"])
             );
         }
 

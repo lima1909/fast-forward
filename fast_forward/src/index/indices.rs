@@ -124,6 +124,15 @@ where
     }
 }
 
+impl<'i, I> ExactSizeIterator for Iter<'i, I>
+where
+    I: Index<usize>,
+{
+    fn len(&self) -> usize {
+        self.indices.len()
+    }
+}
+
 impl Index<usize> for Indices<'_> {
     type Output = usize;
 
@@ -155,6 +164,18 @@ impl From<Vec<usize>> for Indices<'_> {
 impl<const N: usize> PartialEq<[usize; N]> for Indices<'_> {
     fn eq(&self, other: &[usize; N]) -> bool {
         (*self.0).eq(other)
+    }
+}
+
+impl PartialEq<Vec<usize>> for Indices<'_> {
+    fn eq(&self, other: &Vec<usize>) -> bool {
+        (*self.0).eq(other)
+    }
+}
+
+impl PartialEq<Indices<'_>> for Vec<usize> {
+    fn eq(&self, other: &Indices<'_>) -> bool {
+        other.0.eq(self)
     }
 }
 

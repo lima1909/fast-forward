@@ -115,31 +115,6 @@ pub trait Filterable {
     fn contains(&self, key: &Self::Key) -> bool {
         !self.get(key).is_empty()
     }
-
-    /// Combined all given `keys` with an logical `OR`.
-    ///
-    /// ## Example:
-    ///```text
-    /// get_many([2, 5, 6]) => get(2) OR get(5) OR get(6)
-    /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
-    /// ```
-    #[inline]
-    fn get_many<I>(&self, keys: I) -> Indices<'_>
-    where
-        I: IntoIterator<Item = Self::Key>,
-    {
-        let mut it = keys.into_iter();
-        match it.next() {
-            Some(key) => {
-                let mut c = self.get(&key);
-                for k in it {
-                    c = c | self.get(&k)
-                }
-                c
-            }
-            None => Indices::empty(),
-        }
-    }
 }
 
 /// Meta data from the [`Store`], like min or max value of the `Key`.
@@ -176,24 +151,88 @@ impl<S: Store> Filterable for View<S> {
     }
 
     #[inline]
-    fn get_many<I>(&self, keys: I) -> Indices<'_>
-    where
-        I: IntoIterator<Item = Self::Key>,
-    {
-        self.0.get_many(keys)
-    }
-
-    #[inline]
     fn contains(&self, key: &Self::Key) -> bool {
         self.0.contains(key)
     }
 }
 
+/// Combined all given `keys` with an logical `OR`.
+///
+/// ## Example:
+///```text
+/// [2, 5, 6] => get(2) OR get(5) OR get(6)
+/// [2..6] => get(2) OR get(3) OR get(4) OR get(5)
+/// ```
+
+pub fn eq_many<F, K>(filter: &F, keys: K) -> Indices<'_>
+where
+    F: Filterable,
+    K: IntoIterator<Item = F::Key>,
+{
+    Many::new(keys.into_iter(), filter)
+        .collect::<Vec<_>>()
+        .into()
+}
+
+/// `Many` collect many [`Indices`] for a given list of `Keys`.
+pub struct Many<'m, K, F> {
+    keys: K,
+    filter: &'m F,
+    indices: Indices<'m>,
+    pos: usize,
+}
+
+impl<'m, K, F> Many<'m, K, F>
+where
+    F: Filterable,
+    K: Iterator<Item = F::Key>,
+{
+    pub fn new(mut keys: K, filter: &'m F) -> Self {
+        let indices = match keys.next() {
+            Some(k) => filter.get(&k),
+            None => Indices::empty(),
+        };
+
+        Self {
+            keys,
+            filter,
+            indices,
+            pos: 0,
+        }
+    }
+}
+
+impl<'m, K, F> Iterator for Many<'m, K, F>
+where
+    F: Filterable,
+    K: Iterator<Item = F::Key>,
+{
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(i) = self.indices.get(self.pos) {
+            self.pos += 1;
+            return Some(*i);
+        }
+
+        self.indices = self.filter.get(&self.keys.next()?);
+        while self.indices.is_empty() {
+            self.indices = self.filter.get(&self.keys.next()?);
+        }
+
+        let idx = self.indices[0];
+        self.pos = 1;
+        Some(idx)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::ops::Deref;
-
     use super::*;
+    use crate::index::{map::MapIndex, Store};
+
+    use rstest::rstest;
+    use std::ops::Deref;
 
     impl<'s> Filterable for Vec<&'s str> {
         type Key = &'s str;
@@ -240,7 +279,7 @@ mod tests {
         let f = Filter(&list);
         assert!(f.contains(&"a"));
         assert_eq!(&[1], &f.get(&"b"));
-        assert_eq!(&[0, 1], &f.get_many(["a", "b"]));
+        assert_eq!(&[0, 1], &(f.get(&"a") | f.get(&"b")));
         assert_eq!(&[2], &f.get(&"c"));
         assert_eq!(&[], &f.get(&"zz"));
     }
@@ -254,5 +293,22 @@ mod tests {
         assert_eq!(&[0], &f.or(&"zz", &"a"));
         assert_eq!(&[], &f.or(&"zz", &"xx"));
         assert_eq!(&[2], &extended_filter(&f, &"c"));
+    }
+
+    #[rstest]
+    #[case::empty(vec![], vec![])]
+    #[case::one_found(vec!["c"], vec![3])]
+    #[case::one_not_found(vec!["-"], vec![])]
+    #[case::m_z_a(vec!["m", "z", "a"], vec![1, 6])]
+    #[case::a_m_z(vec![ "a","m", "z"], vec![1, 6])]
+    #[case::z_m_a(vec![ "z","m", "a"], vec![1, 6])]
+    #[case::m_z_a_m(vec!["m", "z", "a", "m"], vec![1, 6])]
+    #[case::m_z_a_m_m(vec!["m", "z", "a", "m", "m"], vec![1, 6])]
+    #[case::double_x(vec!["x"], vec![0, 4])]
+    #[case::a_double_x(vec!["a", "x"], vec![0, 1, 4])]
+    fn view_str(#[case] keys: Vec<&str>, #[case] expected: Vec<usize>) {
+        let items = vec!["x", "a", "b", "c", "x", "y", "z"];
+        let map = MapIndex::from_iter(items.clone().into_iter());
+        assert_eq!(expected, eq_many(&map, keys));
     }
 }

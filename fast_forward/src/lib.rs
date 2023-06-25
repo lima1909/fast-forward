@@ -216,8 +216,8 @@ mod tests {
         // many/iter equals filter
         let mut r = cars.id().get_many(2..6);
         assert_eq!(Some(&Car(2, "BMW".into())), r.next());
-        assert_eq!(Some(&Car(5, "Audi".into())), r.next());
         assert_eq!(Some(&Car(2, "VW".into())), r.next());
+        assert_eq!(Some(&Car(5, "Audi".into())), r.next());
         assert_eq!(None, r.next());
 
         // or equals query

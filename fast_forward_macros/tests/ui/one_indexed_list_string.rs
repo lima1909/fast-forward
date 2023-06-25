@@ -28,9 +28,9 @@ fn main() {
         .collect();
     assert_eq!(
         vec![
-            &Car(2, "BMW".into()),
-            &Car(5, "Audi".into()),
             &Car(2, "VW".into()),
+            &Car(5, "Audi".into()),
+            &Car(2, "BMW".into()),
         ],
         r
     );

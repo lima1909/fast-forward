@@ -218,6 +218,7 @@ mod tests {
 
     mod unique {
         use super::*;
+        use crate::index::eq_many;
 
         #[test]
         fn empty() {
@@ -311,15 +312,15 @@ mod tests {
             i.insert(2, 2);
             i.insert(6, 6);
 
-            assert_eq!(0, i.get_many([]).iter().len());
-            assert_eq!(0, i.get_many([9]).iter().len());
-            assert_eq!([2], i.get_many([2]));
-            assert_eq!([2, 6], i.get_many([6, 2]));
-            assert_eq!([2, 6], i.get_many([9, 6, 2]));
-            assert_eq!([2, 5, 6], i.get_many([5, 9, 6, 2]));
+            assert_eq!(0, eq_many(&i, []).iter().len());
+            assert_eq!(0, eq_many(&i, [9]).iter().len());
+            assert_eq!([2], eq_many(&i, [2]));
+            assert_eq!([2, 6], eq_many(&i, [6, 2]));
+            assert_eq!([2, 6], eq_many(&i, [9, 6, 2]));
+            assert_eq!([2, 5, 6], eq_many(&i, [5, 9, 6, 2]));
 
-            assert_eq!([2, 5, 6], i.get_many(2..=6));
-            assert_eq!([2, 5, 6], i.get_many(2..9));
+            assert_eq!([2, 5, 6], eq_many(&i, 2..=6));
+            assert_eq!([2, 5, 6], eq_many(&i, 2..9));
         }
 
         #[test]
@@ -438,6 +439,7 @@ mod tests {
 
     mod multi {
         use super::*;
+        use crate::index::eq_many;
 
         #[test]
         fn empty() {
@@ -472,13 +474,13 @@ mod tests {
             i.insert(2, 1);
             i.insert(6, 6);
 
-            assert_eq!(0, i.get_many([]).iter().len());
-            assert_eq!(0, i.get_many([9]).iter().len());
+            assert_eq!(0, eq_many(&i, []).iter().len());
+            assert_eq!(0, eq_many(&i, [9]).iter().len());
 
-            assert_eq!([1, 2], i.get_many([2]));
-            assert_eq!([1, 2, 6], i.get_many([6, 2]));
-            assert_eq!([1, 2, 6], i.get_many([9, 6, 2]));
-            assert_eq!([1, 2, 5, 6], i.get_many([5, 9, 6, 2]));
+            assert_eq!([1, 2], eq_many(&i, [2]));
+            assert_eq!([1, 2, 6], eq_many(&i, [6, 2]));
+            assert_eq!([1, 2, 6], eq_many(&i, [9, 6, 2]));
+            assert_eq!([1, 2, 5, 6], eq_many(&i, [5, 9, 6, 2]));
         }
 
         #[test]
