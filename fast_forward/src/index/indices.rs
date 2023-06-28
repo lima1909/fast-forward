@@ -35,6 +35,12 @@ impl KeyIndices {
         self.indices()
     }
 
+    // ???
+    #[inline]
+    pub fn iter(&self) -> slice::Iter<'_, usize> {
+        self.0.iter()
+    }
+
     /// Return all collected Indices.
     #[inline]
     pub fn indices(&self) -> Indices<'_> {
@@ -72,11 +78,13 @@ impl<'i> Indices<'i> {
         Self(Cow::Borrowed(&[]))
     }
 
+    // ???
     #[inline]
     pub fn iter(&self) -> slice::Iter<'_, usize> {
         self.0.iter()
     }
 
+    // ???
     #[inline]
     pub fn items<I>(self, list: &'i I) -> Iter<'i, I>
     where
@@ -105,6 +113,7 @@ impl<'i> Indices<'i> {
     }
 }
 
+// ----------------------- ???
 pub struct Iter<'i, I> {
     pos: usize,
     list: &'i I,
@@ -124,6 +133,7 @@ where
     }
 }
 
+// ???
 impl<'i, I> ExactSizeIterator for Iter<'i, I>
 where
     I: Index<usize>,

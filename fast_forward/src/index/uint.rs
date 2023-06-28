@@ -68,6 +68,14 @@ where
             _ => Indices::empty(),
         }
     }
+
+    fn iter(&self, key: &Self::Key) -> std::slice::Iter<'_, usize> {
+        let i: usize = (*key).into();
+        match self.data.get(i) {
+            Some(Some(idx)) => idx.iter(),
+            _ => [].iter(),
+        }
+    }
 }
 
 impl<K> Store for UIntIndex<K>
@@ -218,7 +226,6 @@ mod tests {
 
     mod unique {
         use super::*;
-        use crate::index::eq_many;
 
         #[test]
         fn empty() {
@@ -310,24 +317,15 @@ mod tests {
             let l = [0, 1, 2, 3, 4, 5, 6];
             let i = UIntIndex::<u8>::from_iter(l.into_iter());
 
-            assert_eq!(0, eq_many(&i, [], &l).collect::<Vec<_>>().len());
-            assert_eq!(0, eq_many(&i, [9], &l).collect::<Vec<_>>().len());
-            assert_eq!(vec![&2], eq_many(&i, [2], &l).collect::<Vec<_>>());
-            assert_eq!(vec![&6, &2], eq_many(&i, [6, 2], &l).collect::<Vec<_>>());
-            assert_eq!(vec![&6, &2], eq_many(&i, [9, 6, 2], &l).collect::<Vec<_>>());
-            assert_eq!(
-                vec![&5, &6, &2],
-                eq_many(&i, [5, 9, 6, 2], &l).collect::<Vec<_>>()
-            );
+            assert_eq!(0, i.get_many([]).items_vec(&l).len());
+            assert_eq!(0, i.get_many([9]).items_vec(&l).len());
+            assert_eq!(vec![&2], i.get_many([2]).items_vec(&l));
+            assert_eq!(vec![&6, &2], i.get_many([6, 2]).items_vec(&l));
+            assert_eq!(vec![&6, &2], i.get_many([9, 6, 2]).items_vec(&l));
+            assert_eq!(vec![&5, &6, &2], i.get_many([5, 9, 6, 2]).items_vec(&l));
 
-            assert_eq!(
-                vec![&2, &3, &4, &5, &6],
-                eq_many(&i, 2..=6, &l).collect::<Vec<_>>()
-            );
-            assert_eq!(
-                vec![&2, &3, &4, &5, &6],
-                eq_many(&i, 2..9, &l).collect::<Vec<_>>()
-            );
+            assert_eq!(vec![&2, &3, &4, &5, &6], i.get_many(2..=6).items_vec(&l));
+            assert_eq!(vec![&2, &3, &4, &5, &6], i.get_many(2..9).items_vec(&l));
         }
 
         #[test]
@@ -446,7 +444,6 @@ mod tests {
 
     mod multi {
         use super::*;
-        use crate::index::eq_many;
 
         #[test]
         fn empty() {
@@ -478,22 +475,13 @@ mod tests {
             let l = [0, 2, 2, 3, 4, 5, 6];
             let i = UIntIndex::<u8>::from_iter(l.into_iter());
 
-            assert_eq!(0, eq_many(&i, [], &l).collect::<Vec<_>>().len());
-            assert_eq!(0, eq_many(&i, [9], &l).collect::<Vec<_>>().len());
+            assert_eq!(0, i.get_many([]).items_vec(&l).len());
+            assert_eq!(0, i.get_many([9]).items_vec(&l).len());
 
-            assert_eq!(vec![&2, &2], eq_many(&i, [2], &l).collect::<Vec<_>>());
-            assert_eq!(
-                vec![&6, &2, &2],
-                eq_many(&i, [6, 2], &l).collect::<Vec<_>>()
-            );
-            assert_eq!(
-                vec![&6, &2, &2],
-                eq_many(&i, [9, 6, 2], &l).collect::<Vec<_>>()
-            );
-            assert_eq!(
-                vec![&5, &6, &2, &2],
-                eq_many(&i, [5, 9, 6, 2], &l).collect::<Vec<_>>()
-            );
+            assert_eq!(vec![&2, &2], i.get_many([2]).items_vec(&l));
+            assert_eq!(vec![&6, &2, &2], i.get_many([6, 2]).items_vec(&l));
+            assert_eq!(vec![&6, &2, &2], i.get_many([9, 6, 2]).items_vec(&l));
+            assert_eq!(vec![&5, &6, &2, &2], i.get_many([5, 9, 6, 2]).items_vec(&l));
         }
 
         #[test]

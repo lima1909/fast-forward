@@ -47,6 +47,13 @@ where
             None => Indices::empty(),
         }
     }
+
+    fn iter(&self, key: &Self::Key) -> std::slice::Iter<'_, usize> {
+        match self.0.get(key) {
+            Some(i) => i.iter(),
+            None => [].iter(),
+        }
+    }
 }
 
 impl<K> Store for MapIndex<K>
@@ -100,7 +107,6 @@ mod tests {
 
     mod unique {
         use super::*;
-        use crate::index::eq_many;
 
         #[test]
         fn empty() {
@@ -168,25 +174,20 @@ mod tests {
             ];
             let idx = MapIndex::from_iter(l.clone().into_iter());
 
-            assert_eq!(0, eq_many(&idx, [], &l).collect::<Vec<_>>().len());
-            assert_eq!(
-                0,
-                eq_many(&idx, ["NotFound".into()], &l)
-                    .collect::<Vec<_>>()
-                    .len()
-            );
+            assert_eq!(0, idx.get_many([]).items_vec(&l).len());
+            assert_eq!(0, idx.get_many(["NotFound".into()]).items_vec(&l).len());
             assert_eq!(
                 vec![&String::from("Mario")],
-                eq_many(&idx, ["Mario".into()], &l).collect::<Vec<_>>()
+                idx.get_many(["Mario".into()]).items_vec(&l)
             );
             assert_eq!(
                 vec![&String::from("Paul"), &String::from("Mario")],
-                eq_many(&idx, ["Paul".into(), "Mario".into()], &l).collect::<Vec<_>>()
+                idx.get_many(["Paul".into(), "Mario".into()]).items_vec(&l)
             );
             assert_eq!(
                 vec![&String::from("Paul"), &String::from("Mario")],
-                eq_many(&idx, ["NotFound".into(), "Paul".into(), "Mario".into()], &l)
-                    .collect::<Vec<_>>()
+                idx.get_many(["NotFound".into(), "Paul".into(), "Mario".into()])
+                    .items_vec(&l)
             );
             assert_eq!(
                 vec![
@@ -194,17 +195,13 @@ mod tests {
                     &String::from("Mario"),
                     &String::from("Paul")
                 ],
-                eq_many(
-                    &idx,
-                    [
-                        "Jasmin".into(),
-                        "NotFound".into(),
-                        "Mario".into(),
-                        "Paul".into()
-                    ],
-                    &l
-                )
-                .collect::<Vec<_>>()
+                idx.get_many([
+                    "Jasmin".into(),
+                    "NotFound".into(),
+                    "Mario".into(),
+                    "Paul".into()
+                ],)
+                    .items_vec(&l)
             );
         }
 

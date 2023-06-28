@@ -1,8 +1,9 @@
 //! A `Store` is saving `Indices` for a given `Key`,
 //! with the goal, to get the `Indices` as fast as possible.
+
 use std::ops::Index;
 
-use super::{Indices, Iter};
+use super::Indices;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Filterable {
@@ -112,6 +113,24 @@ pub trait Filterable {
     /// If the `Key` not exist, than this method returns [`Indices::empty()`]
     fn get(&self, key: &Self::Key) -> Indices<'_>;
 
+    fn iter(&self, key: &Self::Key) -> std::slice::Iter<'_, usize>;
+
+    /// Combined all given `keys` with an logical `OR`.
+    ///
+    /// ## Example:
+    ///```text
+    /// [2, 5, 6] => get(2) OR get(5) OR get(6)
+    /// [2..6] => get(2) OR get(3) OR get(4) OR get(5)
+    /// ```
+    fn get_many<'k, K>(&'k self, keys: K) -> Many<'k, Self, <K as IntoIterator>::IntoIter>
+    where
+        K: IntoIterator<Item = Self::Key>,
+        K: 'k,
+        Self: Sized,
+    {
+        Many::new(self, keys.into_iter())
+    }
+
     /// Checks whether the `Key` exists.
     #[inline]
     fn contains(&self, key: &Self::Key) -> bool {
@@ -129,109 +148,94 @@ pub trait MetaData {
     fn meta(&self) -> Self::Meta<'_>;
 }
 
-/// A `View` is a wrapper for an given [`Store`],
-/// that can be only use (read only) for [`Filterable`] operations.
-#[repr(transparent)]
-pub struct View<S>(S);
-
-impl<S: Store> View<S> {
-    pub fn new<I>(keys: I) -> Self
-    where
-        I: IntoIterator<Item = S::Key> + ExactSizeIterator,
-        Self: Sized,
-    {
-        Self(S::from_iter(keys))
-    }
-}
-
-impl<S: Store> Filterable for View<S> {
-    type Key = S::Key;
-
-    #[inline]
-    fn get(&self, key: &Self::Key) -> Indices<'_> {
-        self.0.get(key)
-    }
-
-    #[inline]
-    fn contains(&self, key: &Self::Key) -> bool {
-        self.0.contains(key)
-    }
-}
-
-/// Combined all given `keys` with an logical `OR`.
-///
-/// ## Example:
-///```text
-/// [2, 5, 6] => get(2) OR get(5) OR get(6)
-/// [2..6] => get(2) OR get(3) OR get(4) OR get(5)
-/// ```
-
-pub fn eq_many<'m, F, K, I>(
+pub struct Many<'m, F, K> {
     filter: &'m F,
     keys: K,
-    items: &'m I,
-) -> Many<'m, <K as IntoIterator>::IntoIter, F, I>
-where
-    F: Filterable,
-    K: IntoIterator<Item = F::Key>,
-    I: Index<usize>,
-{
-    Many::new(keys.into_iter(), filter, items)
+    iter: std::slice::Iter<'m, usize>,
 }
 
-/// `Many` collect many [`Indices`] for a given list of `Keys`.
-pub struct Many<'m, K, F, I> {
-    keys: K,
-    filter: &'m F,
-    iter: Iter<'m, I>,
-    items: &'m I,
-}
-
-impl<'m, K, F, I> Many<'m, K, F, I>
+impl<'m, F, K> Many<'m, F, K>
 where
     F: Filterable,
-    K: Iterator<Item = F::Key>,
-    I: Index<usize>,
+    K: Iterator<Item = F::Key> + 'm,
 {
-    pub fn new(mut keys: K, filter: &'m F, items: &'m I) -> Self {
+    pub fn new(filter: &'m F, mut keys: K) -> Self {
         let iter = match keys.next() {
-            Some(k) => filter.get(&k),
-            None => Indices::empty(),
-        }
-        .items(items);
+            Some(k) => filter.iter(&k),
+            None => [].iter(),
+        };
 
-        Self {
-            keys,
-            filter,
-            iter,
-            items,
-        }
+        Self { filter, keys, iter }
+    }
+
+    pub fn items<I>(self, items: &'m I) -> impl Iterator<Item = &'m <I as Index<usize>>::Output>
+    where
+        I: Index<usize>,
+        <I as Index<usize>>::Output: Sized,
+    {
+        self.map(|i| &items[*i])
+    }
+
+    pub fn items_vec<I>(self, items: &'m I) -> Vec<&'m <I as Index<usize>>::Output>
+    where
+        I: Index<usize>,
+        <I as Index<usize>>::Output: Sized,
+    {
+        self.map(|i| &items[*i]).collect()
     }
 }
 
-impl<'m, K, F, I> Iterator for Many<'m, K, F, I>
+impl<'m, F, K> Iterator for Many<'m, F, K>
 where
-    F: Filterable,
-    K: Iterator<Item = F::Key>,
-    I: Index<usize>,
-    <I as Index<usize>>::Output: Sized + 'm,
+    F: Filterable + 'm,
+    K: Iterator<Item = F::Key> + 'm,
+    Self: 'm,
 {
-    type Item = &'m I::Output;
+    type Item = &'m usize;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(i) = self.iter.next() {
             return Some(i);
         }
 
-        let mut idx = self.filter.get(&self.keys.next()?);
-        while idx.is_empty() {
-            idx = self.filter.get(&self.keys.next()?);
+        loop {
+            let key = self.keys.next()?;
+            self.iter = self.filter.iter(&key);
+            if let Some(i) = self.iter.next() {
+                return Some(i);
+            }
         }
-
-        self.iter = idx.items(self.items);
-        self.iter.next()
     }
 }
+
+/// A `View` is a wrapper for an given [`Store`],
+/// that can be only use (read only) for [`Filterable`] operations.
+// #[repr(transparent)]
+// pub struct View<S>(S);
+
+// impl<S: Store> View<S> {
+//     pub fn new<I>(keys: I) -> Self
+//     where
+//         I: IntoIterator<Item = S::Key> + ExactSizeIterator,
+//         Self: Sized,
+//     {
+//         Self(S::from_iter(keys))
+//     }
+// }
+
+// impl<S: Store> Filterable for View<S> {
+//     type Key = S::Key;
+
+//     #[inline]
+//     fn get(&self, key: &Self::Key) -> Indices<'_> {
+//         self.0.get(key)
+//     }
+
+//     #[inline]
+//     fn contains(&self, key: &Self::Key) -> bool {
+//         self.0.contains(key)
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -249,6 +253,15 @@ mod tests {
                 return idx.into();
             }
             Indices::empty()
+        }
+
+        fn iter<'a>(&'a self, _key: &Self::Key) -> std::slice::Iter<'a, usize> {
+            // if let Ok(idx) = self.binary_search(key) {
+            //     return self.as_slice().get(idx).iter();
+            // }
+
+            // [].iter()
+            todo!()
         }
     }
 
@@ -316,6 +329,6 @@ mod tests {
     fn view_str(#[case] keys: Vec<&str>, #[case] expected: Vec<&&str>) {
         let items = vec!["x", "a", "b", "c", "x", "y", "z"];
         let map = MapIndex::from_iter(items.clone().into_iter());
-        assert_eq!(expected, eq_many(&map, keys, &items).collect::<Vec<_>>());
+        assert_eq!(expected, map.get_many(keys).items_vec(&items));
     }
 }

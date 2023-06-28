@@ -35,7 +35,7 @@ use std::{
 };
 
 pub use indices::{Indices, Iter, KeyIndices};
-pub use store::{eq_many, Filterable, MetaData, Store};
+pub use store::{Filterable, MetaData, Store};
 
 /// Union is using for OR
 #[inline]

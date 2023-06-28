@@ -81,7 +81,7 @@ fn list_index(c: &mut Criterion) {
         b.iter(|| {
             ro_idx
                 .idx()
-                .get_many_cb([FIND_ID, FIND_ID_2, FIND_ID_3], |k, mut items| match k {
+                .get_many_cb([FIND_ID, FIND_ID_2, FIND_ID_3], |k, items| match k {
                     &FIND_ID => assert_eq!(&FIND_PERSON, items.next().unwrap()),
                     &FIND_ID_2 => assert_eq!(&FIND_PERSON_2, items.next().unwrap()),
                     &FIND_ID_3 => assert_eq!(&FIND_PERSON_3, items.next().unwrap()),

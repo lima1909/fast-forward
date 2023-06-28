@@ -9,7 +9,7 @@ use std::ops::Index;
 
 pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
 
-use crate::index::{self, store::Many, Filterable, Indices, MetaData};
+use crate::index::{self, Filterable, Indices, MetaData};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'f, F, I> {
@@ -34,11 +34,11 @@ where
     }
 
     #[inline]
-    pub fn items(&self, key: &F::Key) -> index::Iter<'f, I>
+    pub fn items(&self, key: &F::Key) -> impl Iterator<Item = &'f <I as Index<usize>>::Output>
     where
         I: Index<usize>,
     {
-        self.filter.get(key).items(self._items)
+        self.filter.iter(key).map(|i| &self._items[*i])
     }
 }
 
@@ -105,11 +105,11 @@ where
     /// assert_eq!(Some(&Car(2, "BMW".into())), l.idx().get(&2).next());
     /// ```
     #[inline]
-    pub fn get(&self, key: &F::Key) -> index::Iter<'r, I>
+    pub fn get(&self, key: &F::Key) -> impl Iterator<Item = &'r <I as Index<usize>>::Output>
     where
         I: Index<usize>,
     {
-        self.0.items(key)
+        self.0.filter.iter(key).map(|i| &self.0._items[*i])
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -153,12 +153,13 @@ where
     /// For performance reason it is better to use [`Self::get_many_cb()`] or
     /// to call [`Self::get()`] several times.
     #[inline]
-    pub fn get_many<II>(&self, keys: II) -> Many<'r, <II as IntoIterator>::IntoIter, F, I>
+    pub fn get_many<II>(&self, keys: II) -> impl Iterator<Item = &'r <I as Index<usize>>::Output>
     where
-        II: IntoIterator<Item = F::Key>,
+        II: IntoIterator<Item = F::Key> + 'r,
         I: Index<usize>,
+        <I as Index<usize>>::Output: Sized,
     {
-        Many::new(keys.into_iter(), self.0.filter, self.0._items)
+        self.0.filter.get_many(keys).map(|i| &self.0._items[*i])
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -197,10 +198,10 @@ where
     where
         II: IntoIterator<Item = F::Key>,
         I: Index<usize>,
-        C: Fn(&F::Key, index::Iter<'r, I>),
+        C: Fn(&F::Key, &mut dyn Iterator<Item = &'r <I as Index<usize>>::Output>),
     {
         for k in keys {
-            callback(&k, self.0.items(&k))
+            callback(&k, &mut self.0.filter.iter(&k).map(|i| &self.0._items[*i]))
         }
     }
 
