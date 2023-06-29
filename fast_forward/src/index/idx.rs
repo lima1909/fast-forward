@@ -1,8 +1,16 @@
+//! An `Index` is the position in a list for an giben `Key`.
+//!
+//! There are three kind of indices:
+//! - [`KeyIndices`]:, is using internal in the [`crate::index::Store`] implementation.
+//! - [`Indices`]: are a read only reference of indices.
+//! - [`CmpIndices`]: list of indices, which you can use in [`std::ops::BitOr`] and [`std::ops::BitAnd`] operations.
+//!
 use std::{
     borrow::Cow,
     ops::{BitAnd, BitOr, Deref, Index},
 };
 
+/// The possibiliy to get `Indices` by a given `Key`.
 pub trait Filterable {
     type Key;
 
@@ -10,12 +18,7 @@ pub trait Filterable {
     /// If the `Key` not exist, than this method returns [`Indices::empty()`]
     fn get<'a>(&'a self, key: &Self::Key) -> Indices<'a>;
 
-    /// ???
-    fn get_cmp<'a>(&'a self, key: &Self::Key) -> CmpIndices<'a> {
-        CmpIndices::indices(self.get(key))
-    }
-
-    /// Combined all given `keys` with an logical `OR`.
+    /// Combined all given `Keys` with an logical `OR`.
     ///
     /// ## Example:
     ///```text
@@ -38,7 +41,9 @@ pub trait Filterable {
     }
 }
 
+///
 /// Is using from the [`crate::index::Store`] to save the `Indices` for a given `Key`.
+///
 #[repr(transparent)]
 pub struct KeyIndices(Vec<usize>);
 
@@ -65,8 +70,18 @@ impl KeyIndices {
     }
 }
 
+impl Deref for KeyIndices {
+    type Target = [usize];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+///
 /// Is a wrapper for selected `Indices`, e.g. by using the [`Filterable`] trait, the `get` method.
 /// You can create an instance with: [`Indices::empty()`] or `KeyIndices::into()` (ordered list of indices).
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Indices<'i>(&'i [usize]);
@@ -107,6 +122,66 @@ impl<'i> From<&'i KeyIndices> for Indices<'i> {
     }
 }
 
+///
+/// Indices for using BitOr and BitAnd operations.
+///
+#[derive(Debug, PartialEq)]
+#[repr(transparent)]
+pub struct CmpIndices<'i>(Cow<'i, [usize]>);
+
+impl<'i> From<Indices<'i>> for CmpIndices<'i> {
+    fn from(i: Indices<'i>) -> Self {
+        Self(Cow::Borrowed(i.0))
+    }
+}
+
+impl From<KeyIndices> for CmpIndices<'_> {
+    fn from(i: KeyIndices) -> Self {
+        Self(Cow::Owned(i.0))
+    }
+}
+
+impl From<Vec<usize>> for CmpIndices<'_> {
+    fn from(mut v: Vec<usize>) -> Self {
+        // !!! must sorted before can use BitOr or BitAnd !!!
+        v.sort();
+        Self(Cow::Owned(v))
+    }
+}
+
+impl Deref for CmpIndices<'_> {
+    type Target = [usize];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsRef<[usize]> for CmpIndices<'_> {
+    fn as_ref(&self) -> &[usize] {
+        &self.0
+    }
+}
+
+impl BitOr for CmpIndices<'_> {
+    type Output = Self;
+
+    fn bitor(self, other: Self) -> Self::Output {
+        CmpIndices(super::union(self.0, other.0))
+    }
+}
+
+impl BitAnd for CmpIndices<'_> {
+    type Output = Self;
+
+    fn bitand(self, other: Self) -> Self::Output {
+        CmpIndices(super::intersection(self.0, other.0))
+    }
+}
+
+///
+/// Iterator for iterate over many Indices.
+///
 pub struct Many<'m, F, K> {
     filter: &'m F,
     keys: K,
@@ -184,50 +259,27 @@ where
     }
 }
 
-#[repr(transparent)]
-pub struct CmpIndices<'i>(Cow<'i, [usize]>);
-
-impl<'i> CmpIndices<'i> {
-    pub fn indices(Indices(idx): Indices<'i>) -> Self {
-        Self(Cow::Borrowed(idx))
-    }
-}
-
-impl Deref for CmpIndices<'_> {
-    type Target = [usize];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl AsRef<[usize]> for CmpIndices<'_> {
-    fn as_ref(&self) -> &[usize] {
-        &self.0
-    }
-}
-
-impl BitOr for CmpIndices<'_> {
-    type Output = Self;
-
-    fn bitor(self, other: Self) -> Self::Output {
-        CmpIndices(super::union(self.0, other.0))
-    }
-}
-
-impl BitAnd for CmpIndices<'_> {
-    type Output = Self;
-
-    fn bitand(self, other: Self) -> Self::Output {
-        CmpIndices(super::intersection(self.0, other.0))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
+    use std::collections::HashMap;
 
-    use std::{collections::HashMap, ops::Deref};
+    impl<'i> Indices<'i> {
+        const fn borrowed(s: &'i [usize]) -> Self {
+            Self(s)
+        }
+    }
+
+    impl<'i> CmpIndices<'i> {
+        const fn borrowed(s: &'i [usize]) -> Self {
+            Self(Cow::Borrowed(s))
+        }
+
+        const fn owned(v: Vec<usize>) -> Self {
+            Self(Cow::Owned(v))
+        }
+    }
 
     #[allow(non_upper_case_globals)]
     const values: [&str; 5] = ["a", "b", "c", "a", "s"];
@@ -240,6 +292,7 @@ mod tests {
         fn new() -> Self {
             let mut double_a = KeyIndices::new(0);
             double_a.add(3);
+
             let mut idx = HashMap::new();
             idx.insert("a", double_a);
             idx.insert("b", KeyIndices::new(1));
@@ -260,13 +313,14 @@ mod tests {
         }
     }
 
-    struct Filter<'f, F: Filterable>(&'f F);
+    struct Filter<'f, F>(&'f F);
 
-    impl<'f, F: Filterable> Deref for Filter<'f, F> {
-        type Target = F;
-
-        fn deref(&self) -> &Self::Target {
-            self.0
+    impl<'f, F> Filter<'f, F>
+    where
+        F: Filterable,
+    {
+        fn eq(&self, key: &F::Key) -> CmpIndices {
+            self.0.get(key).into()
         }
     }
 
@@ -280,12 +334,349 @@ mod tests {
         type Key = F::Key;
 
         fn or(&'f self, key1: &Self::Key, key2: &Self::Key) -> CmpIndices<'f> {
-            self.get_cmp(key1) | self.get_cmp(key2)
+            self.eq(key1) | self.eq(key2)
         }
     }
 
     fn extended_filter<'i>(f: &'i Filter<'i, StrIndex>, key: &'static &str) -> Indices<'i> {
         f.0.get(key)
+    }
+
+    mod key_indices {
+        use super::*;
+
+        impl CmpIndices<'_> {
+            fn new(idx: KeyIndices) -> Self {
+                idx.into()
+            }
+        }
+
+        #[test]
+        fn unique() {
+            assert_eq!([0], KeyIndices::new(0).as_ref());
+        }
+
+        #[test]
+        fn multi() {
+            let mut m = KeyIndices::new(2);
+            assert_eq!([2], m.as_ref());
+
+            m.add(1);
+            assert_eq!([1, 2], m.as_ref());
+        }
+
+        #[test]
+        fn multi_duplicate() {
+            let mut m = KeyIndices::new(1);
+            assert_eq!([1], m.as_ref());
+
+            // ignore add: 1, 1 exists already
+            m.add(1);
+            assert_eq!([1], m.as_ref());
+        }
+
+        #[test]
+        fn multi_ordered() {
+            let mut m = KeyIndices::new(5);
+            assert_eq!([5], m.as_ref());
+
+            m.add(3);
+            m.add(1);
+            m.add(4);
+
+            assert_eq!([1, 3, 4, 5], m.as_ref());
+        }
+
+        #[test]
+        fn container_multi() {
+            let mut lhs = KeyIndices::new(5);
+            lhs.add(3);
+            lhs.add(2);
+            lhs.add(4);
+
+            let mut rhs = KeyIndices::new(5);
+            rhs.add(2);
+            rhs.add(9);
+
+            assert_eq!(
+                [2, 3, 4, 5, 9],
+                (CmpIndices::new(lhs) | CmpIndices::new(rhs)).as_ref()
+            );
+        }
+
+        #[test]
+        fn container_unique() {
+            let lhs = KeyIndices::new(5);
+
+            let rhs = KeyIndices::new(5);
+            assert_eq!([5], (CmpIndices::new(lhs) | CmpIndices::new(rhs)).as_ref());
+
+            let mut lhs = KeyIndices::new(5);
+            lhs.add(0);
+            let rhs = KeyIndices::new(5);
+            assert_eq!(
+                [0, 5],
+                (CmpIndices::new(lhs) | CmpIndices::new(rhs)).as_ref()
+            );
+        }
+
+        #[test]
+        fn remove() {
+            let mut pos = KeyIndices::new(5);
+            assert_eq!([5], pos.as_ref());
+
+            assert!(pos.remove(5).is_empty());
+            // double remove
+            assert!(pos.remove(5).is_empty());
+
+            let mut pos = KeyIndices::new(5);
+            pos.add(2);
+            assert_eq!([2], pos.remove(5).as_ref());
+
+            let mut pos = KeyIndices::new(5);
+            pos.add(2);
+            assert_eq!([5], pos.remove(2).as_ref());
+        }
+    }
+
+    mod indices_or {
+        use super::*;
+
+        // Indices - ORs:
+        // left | right
+        // expected
+        #[rstest]
+        #[case::empty(Indices::empty(), Indices::empty(), Indices::empty())]
+        #[case::only_left(
+            Indices::borrowed(&[1, 2]), Indices::empty(),
+            Indices::borrowed(&[1, 2]),
+        )]
+        #[case::only_right(
+            Indices::empty(), Indices::borrowed(&[1, 2]),
+            Indices::borrowed(&[1, 2]),
+        )]
+        #[case::diff_len1(
+            Indices::borrowed(&[1]), Indices::borrowed(&[2, 3]),
+            Indices::borrowed(&[1, 2, 3]),
+        )]
+        #[case::diff_len2(
+            Indices::borrowed(&[2, 3]), Indices::borrowed(&[1]),
+            Indices::borrowed(&[1, 2, 3]),
+        )]
+        #[case::overlapping_simple1(
+            Indices::borrowed(&[1, 2]), Indices::borrowed(&[2, 3]),
+            Indices::borrowed(&[1, 2, 3]),
+        )]
+        #[case::overlapping_simple2(
+            Indices::borrowed(&[2, 3]), Indices::borrowed(&[1, 2]),
+            Indices::borrowed(&[1, 2, 3]),
+        )]
+        #[case::overlapping_diff_len1(
+            // 1, 2, 8, 9, 12
+            // 2, 5, 6, 10
+            Indices::borrowed(&[1, 2, 8, 9, 12]), Indices::borrowed(&[2, 5, 6, 10]),
+            Indices::borrowed(&[1, 2, 5, 6, 8, 9, 10, 12]),
+        )]
+        #[case::overlapping_diff_len1(
+            // 2, 5, 6, 10
+            // 1, 2, 8, 9, 12
+            Indices::borrowed(&[2, 5, 6, 10]), Indices::borrowed(&[1, 2, 8, 9, 12]),
+            Indices::borrowed(&[1, 2, 5, 6, 8, 9, 10, 12]),
+        )]
+        fn ors(#[case] left: Indices, #[case] right: Indices, #[case] expected: Indices) {
+            let left: CmpIndices = left.into();
+            let right: CmpIndices = right.into();
+            let expected: CmpIndices = expected.into();
+
+            assert_eq!(expected.as_ref(), (left | right).as_ref());
+        }
+    }
+
+    mod indices_and {
+        use super::*;
+
+        // Indices - ANDs:
+        // left | right
+        // expected
+        #[rstest]
+        #[case::empty(Indices::empty(), Indices::empty(), Indices::empty())]
+        #[case::only_left(Indices::borrowed(&[1, 2]), Indices::empty(), Indices::empty())]
+        #[case::only_right(Indices::empty(), Indices::borrowed(&[1, 2]), Indices::empty())]
+        #[case::overlapping(Indices::borrowed(&[2, 3]), Indices::borrowed(&[1, 2]), Indices::borrowed(&[2]))]
+        fn ands(#[case] left: Indices, #[case] right: Indices, #[case] expected: Indices) {
+            let left: CmpIndices = left.into();
+            let right: CmpIndices = right.into();
+            let expected: CmpIndices = expected.into();
+
+            assert_eq!(expected.as_ref(), (left & right).as_ref());
+        }
+
+        #[test]
+        fn diff_len() {
+            assert_eq!(
+                CmpIndices::borrowed(&[]),
+                CmpIndices::borrowed(&[1]) & CmpIndices::borrowed(&[2, 3])
+            );
+            assert_eq!(
+                CmpIndices::borrowed(&[]),
+                CmpIndices::borrowed(&[2, 3]) & CmpIndices::borrowed(&[1])
+            );
+
+            assert_eq!(
+                CmpIndices::borrowed(&[2]),
+                CmpIndices::borrowed(&[2]) & CmpIndices::borrowed(&[2, 5])
+            );
+            assert_eq!(
+                CmpIndices::borrowed(&[2]),
+                CmpIndices::borrowed(&[2]) & CmpIndices::borrowed(&[1, 2, 3])
+            );
+            assert_eq!(
+                CmpIndices::borrowed(&[2]),
+                CmpIndices::borrowed(&[2]) & CmpIndices::borrowed(&[0, 1, 2])
+            );
+
+            assert_eq!(
+                CmpIndices::borrowed(&[2]),
+                CmpIndices::borrowed(&[2, 5]) & CmpIndices::borrowed(&[2])
+            );
+            assert_eq!(
+                CmpIndices::borrowed(&[2]),
+                CmpIndices::borrowed(&[1, 2, 3]) & CmpIndices::borrowed(&[2])
+            );
+            assert_eq!(
+                CmpIndices::borrowed(&[2]),
+                CmpIndices::borrowed(&[0, 1, 2]) & CmpIndices::borrowed(&[2])
+            );
+        }
+
+        #[test]
+        fn overlapping_simple() {
+            assert_eq!(
+                CmpIndices::borrowed(&[2]),
+                CmpIndices::borrowed(&[1, 2]) & CmpIndices::borrowed(&[2, 3]),
+            );
+            assert_eq!(
+                CmpIndices::borrowed(&[2]),
+                CmpIndices::borrowed(&[2, 3]) & CmpIndices::borrowed(&[1, 2]),
+            );
+
+            assert_eq!(
+                CmpIndices::borrowed(&[1]),
+                CmpIndices::borrowed(&[1, 2]) & CmpIndices::borrowed(&[1, 3]),
+            );
+            assert_eq!(
+                CmpIndices::borrowed(&[1]),
+                CmpIndices::borrowed(&[1, 3]) & CmpIndices::borrowed(&[1, 2]),
+            );
+        }
+
+        #[test]
+        fn overlapping_diff_len() {
+            // 1, 2, 8, 9, 12
+            // 2, 5, 6, 10
+            assert_eq!(
+                CmpIndices::borrowed(&[2, 12]),
+                CmpIndices::borrowed(&[1, 2, 8, 9, 12])
+                    & CmpIndices::borrowed(&[2, 5, 6, 10, 12, 13, 15])
+            );
+
+            // 2, 5, 6, 10
+            // 1, 2, 8, 9, 12
+            assert_eq!(
+                CmpIndices::borrowed(&[2, 12]),
+                CmpIndices::borrowed(&[2, 5, 6, 10, 12, 13, 15])
+                    & CmpIndices::borrowed(&[1, 2, 8, 9, 12])
+            );
+        }
+    }
+
+    mod indices_query {
+        use super::*;
+
+        struct List(Vec<usize>);
+
+        impl List {
+            fn eq(&self, i: usize) -> CmpIndices<'_> {
+                match self.0.binary_search(&i) {
+                    Ok(pos) => CmpIndices::owned(vec![pos]),
+                    Err(_) => Indices::empty().into(),
+                }
+            }
+        }
+
+        fn values() -> List {
+            List(vec![0, 1, 2, 3])
+        }
+
+        #[test]
+        fn filter() {
+            let l = values();
+            assert_eq!(1, l.eq(1)[0]);
+            assert_eq!(Indices::empty().as_ref(), values().eq(99).as_ref());
+        }
+
+        #[test]
+        fn and() {
+            let l = values();
+            assert_eq!(1, (l.eq(1) & l.eq(1))[0]);
+            assert_eq!(Indices::empty().as_ref(), (l.eq(1) & l.eq(2)).as_ref());
+        }
+
+        #[test]
+        fn or() {
+            let l = values();
+            assert_eq!([1, 2], (l.eq(1) | l.eq(2)).as_ref());
+            assert_eq!([1], (l.eq(1) | l.eq(99)).as_ref());
+            assert_eq!([1], (l.eq(99) | l.eq(1)).as_ref());
+        }
+
+        #[test]
+        fn and_or() {
+            let l = values();
+            // (1 and 1) or 2 => [1, 2]
+            assert_eq!([1, 2], (l.eq(1) & l.eq(1) | l.eq(2)).as_ref());
+            // (1 and 2) or 3 => [3]
+            assert_eq!([3], (l.eq(1) & l.eq(2) | l.eq(3)).as_ref());
+        }
+
+        #[test]
+        fn or_and_12() {
+            let l = values();
+            // 1 or (2 and 2) => [1, 2]
+            assert_eq!([1, 2], (l.eq(1) | l.eq(2) & l.eq(2)).as_ref());
+            // 1 or (3 and 2) => [1]
+            assert_eq!([1], (l.eq(1) | l.eq(3) & l.eq(2)).as_ref());
+        }
+
+        #[test]
+        fn or_and_3() {
+            let l = values();
+            // 3 or (2 and 1) => [3]
+            assert_eq!([3], (l.eq(3) | l.eq(2) & l.eq(1)).as_ref());
+        }
+
+        #[test]
+        fn and_or_and_2() {
+            let l = values();
+            // (2 and 2) or (2 and 1) => [2]
+            assert_eq!([2], (l.eq(2) & l.eq(2) | l.eq(2) & l.eq(1)).as_ref());
+        }
+
+        #[test]
+        fn and_or_and_03() {
+            let l = values();
+            // 0 or (1 and 2) or 3) => [0, 3]
+            assert_eq!([0, 3], (l.eq(0) | l.eq(1) & l.eq(2) | l.eq(3)).as_ref());
+        }
+
+        #[test]
+        fn iter() {
+            let idxs = CmpIndices::owned(vec![1, 3, 2]);
+            let mut it = idxs.iter();
+            assert_eq!(Some(&1), it.next());
+            assert_eq!(Some(&3), it.next());
+            assert_eq!(Some(&2), it.next());
+        }
     }
 
     #[test]
@@ -298,16 +689,16 @@ mod tests {
     }
 
     #[test]
-    fn filter_get_cmp() {
+    fn filter_eq() {
         let list = StrIndex::new();
+        let f = Filter(&list);
 
-        assert_eq!([1, 2], *(list.get_cmp(&"c") | list.get_cmp(&"b")));
-        assert_eq!([0, 1, 3], *(list.get_cmp(&"a") | list.get_cmp(&"b")));
-        assert_eq!([0, 3], *(list.get_cmp(&"a") | list.get_cmp(&"a")));
-        assert_eq!(
-            [0, 1, 3],
-            *(list.get_cmp(&"a") | list.get_cmp(&"b") | list.get_cmp(&"z"))
-        );
+        assert_eq!([1, 2], *(f.eq(&"c") | f.eq(&"b")));
+        assert_eq!([0, 1, 3], *(f.eq(&"a") | f.eq(&"b")));
+        assert_eq!([0, 3], *(f.eq(&"a") | f.eq(&"a")));
+        assert_eq!([0, 1, 3], *(f.eq(&"a") | f.eq(&"b") | f.eq(&"z")));
+
+        assert_eq!(Vec::<usize>::new(), *(f.eq(&"c") & f.eq(&"b")));
     }
 
     #[test]
@@ -347,23 +738,13 @@ mod tests {
 
         assert_eq!([0, 2, 3], *f.or(&"c", &"a"));
         assert_eq!([0, 3], *f.or(&"zz", &"a"));
+
         assert_eq!([2], *extended_filter(&f, &"c"));
     }
 
-    // #[rstest]
-    // #[case::empty(vec![], vec![])]
-    // #[case::one_found(vec!["c"], vec![&"c"])]
-    // #[case::one_not_found(vec!["-"], vec![])]
-    // #[case::m_z_a(vec!["m", "z", "a"], vec![&"z", &"a"])]
-    // #[case::a_m_z(vec![ "a","m", "z"], vec![&"a", &"z"])]
-    // #[case::z_m_a(vec![ "z","m", "a"], vec![&"z", &"a"])]
-    // #[case::m_z_a_m(vec!["m", "z", "a", "m"], vec![&"z", &"a"])]
-    // #[case::m_z_a_m_m(vec!["m", "z", "a", "m", "m"], vec![&"z", &"a"])]
-    // #[case::double_x(vec!["x"], vec![&"x", &"x"])]
-    // #[case::a_double_x(vec!["a", "x"], vec![&"a", &"x", &"x"])]
-    // fn view_str(#[case] keys: Vec<&str>, #[case] expected: Vec<&&str>) {
-    //     let items = vec!["x", "a", "b", "c", "x", "y", "z"];
-    //     let map = MapIndex::from_iter(items.clone().into_iter());
-    //     assert_eq!(expected, map.get_many(keys).items_vec(&items));
-    // }
+    #[test]
+    fn cmp_indices() {
+        let idx: CmpIndices = vec![3, 2, 4, 1].into();
+        assert_eq!([1, 2, 3, 4], idx.as_ref());
+    }
 }
