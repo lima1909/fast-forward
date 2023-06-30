@@ -41,7 +41,7 @@ fn main() {
     // ----------------------------
     // combine two indices: id and name
     let idxs = cars.id().eq(&2) & cars.name().eq(&"VW".into());
-    let mut it = idxs.items(&cars);
+    let mut it = idxs.as_slice().iter().map(|i| &cars[*i]);
     assert_eq!(Some(&Car(2, "VW".into())), it.next());
     assert_eq!(None, it.next());
 }

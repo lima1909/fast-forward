@@ -1,15 +1,18 @@
 //! There are two kind of `Indices`
 //! - KeyIndices: is a collection of all `Indices`for a given `Key`
-//! - Indices: is a collection (read only) of selected `Indices`
+//! - Indices: is a collection (read only) of selected `Indices`,
+//! which you can use for operations like [`std::ops::BitOr`] and [`std::ops::BitAnd`].
 use std::{
     borrow::Cow,
     ops::{BitAnd, BitOr, Index},
-    slice,
 };
+
+/// An empty list of `Indices`.
+pub const EMPTY_INDICES: &[usize] = &[];
 
 /// `KeyIndices` contains all indices for a given `Key`.
 /// Important: the collection must be sorted!
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[repr(transparent)]
 pub struct KeyIndices(Vec<usize>);
 
@@ -21,6 +24,7 @@ impl KeyIndices {
     }
 
     /// Add new Index to a sorted collection.
+    /// The collection is unique.
     #[inline]
     pub fn add(&mut self, idx: usize) {
         if let Err(pos) = self.0.binary_search(&idx) {
@@ -30,61 +34,45 @@ impl KeyIndices {
 
     /// Remove one Index and return left free Indices.
     #[inline]
-    pub fn remove(&mut self, idx: usize) -> Indices<'_> {
+    pub fn remove(&mut self, idx: usize) -> &[usize] {
         self.0.retain(|v| v != &idx);
-        self.indices()
+        self.0.as_ref()
     }
 
-    // ???
     #[inline]
-    pub fn iter(&self) -> slice::Iter<'_, usize> {
-        self.0.iter()
-    }
-
-    /// Return all collected Indices.
-    #[inline]
-    pub fn indices(&self) -> Indices<'_> {
-        Indices(Cow::Borrowed(&self.0))
-    }
-}
-
-impl<const N: usize> PartialEq<[usize; N]> for KeyIndices {
-    fn eq(&self, other: &[usize; N]) -> bool {
-        (*self.0).eq(other)
-    }
-}
-
-impl<const N: usize> PartialEq<KeyIndices> for [usize; N] {
-    fn eq(&self, other: &KeyIndices) -> bool {
-        (self).eq(&*other.0)
-    }
-}
-
-impl PartialEq for KeyIndices {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+    pub fn as_slice(&self) -> &[usize] {
+        self.0.as_ref()
     }
 }
 
 /// `Indices` is a read only collection of selected Indices.
 /// The `Indices` can be created as result from quering (filtering) a list.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 #[repr(transparent)]
 pub struct Indices<'i>(Cow<'i, [usize]>);
 
 impl<'i> Indices<'i> {
+    /// Create a new empty list.
     #[inline]
     pub const fn empty() -> Self {
-        Self(Cow::Borrowed(&[]))
+        Self(Cow::Borrowed(EMPTY_INDICES))
     }
 
-    // ???
     #[inline]
-    pub fn iter(&self) -> slice::Iter<'_, usize> {
-        self.0.iter()
+    pub fn as_slice(&self) -> &[usize] {
+        self.0.as_ref()
     }
 
     // ???
+    // #[inline]
+    // pub fn items<F, B>(self, map: F) -> std::iter::Map<std::vec::IntoIter<usize>, F>
+    // where
+    //     F: FnMut(usize) -> B,
+    // {
+    //     #[allow(clippy::unnecessary_to_owned)]
+    //     self.0.into_owned().into_iter().map(map)
+    // }
+
     #[inline]
     pub fn items<I>(self, list: &'i I) -> Iter<'i, I>
     where
@@ -96,24 +84,8 @@ impl<'i> Indices<'i> {
             indices: self,
         }
     }
-
-    #[inline]
-    pub fn get(&self, index: usize) -> Option<&usize> {
-        self.0.get(index)
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
 }
 
-// ----------------------- ???
 pub struct Iter<'i, I> {
     pos: usize,
     list: &'i I,
@@ -127,33 +99,16 @@ where
     type Item = &'i I::Output;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let idx = self.indices.get(self.pos)?;
+        let idx = self.indices.0.get(self.pos)?;
         self.pos += 1;
         Some(&self.list[*idx])
     }
 }
 
-// ???
-impl<'i, I> ExactSizeIterator for Iter<'i, I>
-where
-    I: Index<usize>,
-{
-    fn len(&self) -> usize {
-        self.indices.len()
-    }
-}
-
-impl Index<usize> for Indices<'_> {
-    type Output = usize;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
-    }
-}
-
-impl From<usize> for Indices<'_> {
-    fn from(u: usize) -> Self {
-        Self(Cow::Owned(vec![u]))
+/// !!! The slice must be ordered !!!
+impl<'i> From<&'i [usize]> for Indices<'i> {
+    fn from(s: &'i [usize]) -> Self {
+        Self(Cow::Borrowed(s))
     }
 }
 
@@ -164,40 +119,9 @@ impl<const N: usize> From<[usize; N]> for Indices<'_> {
     }
 }
 
-impl From<Vec<usize>> for Indices<'_> {
-    fn from(mut v: Vec<usize>) -> Self {
-        v.sort();
-        Self(Cow::Owned(v))
-    }
-}
-
-impl<const N: usize> PartialEq<[usize; N]> for Indices<'_> {
-    fn eq(&self, other: &[usize; N]) -> bool {
-        (*self.0).eq(other)
-    }
-}
-
-impl PartialEq<Vec<usize>> for Indices<'_> {
-    fn eq(&self, other: &Vec<usize>) -> bool {
-        (*self.0).eq(other)
-    }
-}
-
-impl PartialEq<Indices<'_>> for Vec<usize> {
-    fn eq(&self, other: &Indices<'_>) -> bool {
-        other.0.eq(self)
-    }
-}
-
 impl<const N: usize> PartialEq<Indices<'_>> for [usize; N] {
     fn eq(&self, other: &Indices) -> bool {
         (self).eq(&*other.0)
-    }
-}
-
-impl PartialEq for Indices<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
     }
 }
 
@@ -237,38 +161,38 @@ mod tests {
 
         #[test]
         fn unique() {
-            assert_eq!([0], KeyIndices::new(0));
+            assert_eq!([0], KeyIndices::new(0).as_slice());
         }
 
         #[test]
         fn multi() {
             let mut m = KeyIndices::new(2);
-            assert_eq!([2], m);
+            assert_eq!([2], m.as_slice());
 
             m.add(1);
-            assert_eq!([1, 2], m);
+            assert_eq!([1, 2], m.as_slice());
         }
 
         #[test]
         fn multi_duplicate() {
             let mut m = KeyIndices::new(1);
-            assert_eq!([1], m);
+            assert_eq!([1], m.as_slice());
 
             // ignore add: 1, 1 exists already
             m.add(1);
-            assert_eq!([1], m);
+            assert_eq!([1], m.as_slice());
         }
 
         #[test]
         fn multi_ordered() {
             let mut m = KeyIndices::new(5);
-            assert_eq!([5], m);
+            assert_eq!([5], m.as_slice());
 
             m.add(3);
             m.add(1);
             m.add(4);
 
-            assert_eq!([1, 3, 4, 5], m);
+            assert_eq!([1, 3, 4, 5], m.as_slice());
         }
 
         #[test]
@@ -282,24 +206,33 @@ mod tests {
             rhs.add(2);
             rhs.add(9);
 
-            assert_eq!([2, 3, 4, 5, 9], lhs.indices() | rhs.indices());
+            let l: Indices = lhs.as_slice().into();
+            let r: Indices = rhs.as_slice().into();
+            assert_eq!([2, 3, 4, 5, 9], l | r);
         }
 
         #[test]
         fn container_unique() {
             let mut lhs = KeyIndices::new(5);
-
             let rhs = KeyIndices::new(5);
-            assert_eq!([5], lhs.indices() | rhs.indices());
+
+            let r: Indices = rhs.as_slice().into();
+            {
+                let l: Indices = lhs.as_slice().into();
+                assert_eq!([5], l | r);
+            }
 
             lhs.add(0);
-            assert_eq!([0, 5], lhs.indices() | rhs.indices());
+            let l: Indices = lhs.as_slice().into();
+            let r: Indices = rhs.as_slice().into();
+            assert_eq!([0, 5], l | r);
         }
 
         #[test]
         fn remove() {
             let mut pos = KeyIndices::new(5);
-            assert_eq!([5], pos.indices());
+            let p: Indices = pos.as_slice().into();
+            assert_eq!([5], p);
 
             assert!(pos.remove(5).is_empty());
             // double remove
@@ -443,14 +376,14 @@ mod tests {
         #[test]
         fn filter() {
             let l = values();
-            assert_eq!(1, l.eq(1)[0]);
+            assert_eq!(1, l.eq(1).as_slice()[0]);
             assert_eq!(Indices::empty(), values().eq(99));
         }
 
         #[test]
         fn and() {
             let l = values();
-            assert_eq!(1, (l.eq(1) & l.eq(1))[0]);
+            assert_eq!(1, (l.eq(1) & l.eq(1)).as_slice()[0]);
             assert_eq!(Indices::empty(), (l.eq(1) & l.eq(2)));
         }
 
@@ -504,7 +437,7 @@ mod tests {
         #[test]
         fn iter() {
             let idxs = Indices::owned(vec![1, 3, 2]);
-            let mut it = idxs.iter();
+            let mut it = idxs.as_slice().iter();
             assert_eq!(Some(&1), it.next());
             assert_eq!(Some(&3), it.next());
             assert_eq!(Some(&2), it.next());

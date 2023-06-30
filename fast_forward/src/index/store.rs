@@ -3,7 +3,7 @@
 
 use std::ops::Index;
 
-use super::Indices;
+use super::{indices::EMPTY_INDICES, Indices};
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Filterable {
@@ -110,10 +110,8 @@ pub trait Filterable {
     type Key;
 
     /// Get all indices for a given `Key`.
-    /// If the `Key` not exist, than this method returns [`Indices::empty()`]
-    fn get(&self, key: &Self::Key) -> Indices<'_>;
-
-    fn iter(&self, key: &Self::Key) -> std::slice::Iter<'_, usize>;
+    /// If the `Key` not exist, than this method returns [`crate::index::indices::EMPTY_INDICES`]
+    fn get(&self, key: &Self::Key) -> &[usize];
 
     /// Combined all given `keys` with an logical `OR`.
     ///
@@ -148,6 +146,42 @@ pub trait MetaData {
     fn meta(&self) -> Self::Meta<'_>;
 }
 
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct Filter<'f, F>(&'f F);
+
+impl<'f, F> Filter<'f, F>
+where
+    F: Filterable,
+{
+    pub const fn new(filter: &'f F) -> Self {
+        Self(filter)
+    }
+
+    #[inline]
+    pub fn eq(&self, key: &F::Key) -> Indices<'f> {
+        self.0.get(key).into()
+    }
+
+    #[inline]
+    pub fn contains(&self, key: &F::Key) -> bool {
+        self.0.contains(key)
+    }
+
+    // ???
+    // #[inline]
+    // pub fn items<M, B>(
+    //     &self,
+    //     key: &F::Key,
+    //     map: M,
+    // ) -> std::iter::Map<std::slice::Iter<'f, usize>, M>
+    // where
+    //     M: FnMut(&usize) -> B,
+    // {
+    //     self.0.get(key).iter().map(map)
+    // }
+}
+
 pub struct Many<'m, F, K> {
     filter: &'m F,
     keys: K,
@@ -161,8 +195,8 @@ where
 {
     pub fn new(filter: &'m F, mut keys: K) -> Self {
         let iter = match keys.next() {
-            Some(k) => filter.iter(&k),
-            None => [].iter(),
+            Some(k) => filter.get(&k).iter(),
+            None => EMPTY_INDICES.iter(),
         };
 
         Self { filter, keys, iter }
@@ -200,7 +234,7 @@ where
 
         loop {
             let key = self.keys.next()?;
-            self.iter = self.filter.iter(&key);
+            self.iter = self.filter.get(&key).iter();
             if let Some(i) = self.iter.next() {
                 return Some(i);
             }
@@ -240,38 +274,36 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::{map::MapIndex, Store};
-
+    use crate::index::{map::MapIndex, KeyIndices, Store};
     use rstest::rstest;
-    use std::ops::Deref;
+    use std::collections::HashMap;
 
-    impl<'s> Filterable for Vec<&'s str> {
-        type Key = &'s str;
+    struct StrIndex {
+        idx: HashMap<&'static str, KeyIndices>,
+    }
 
-        fn get(&self, key: &Self::Key) -> Indices<'_> {
-            if let Ok(idx) = self.binary_search(key) {
-                return idx.into();
-            }
-            Indices::empty()
-        }
+    impl StrIndex {
+        fn new() -> Self {
+            let mut double_a = KeyIndices::new(0);
+            double_a.add(3);
 
-        fn iter<'a>(&'a self, _key: &Self::Key) -> std::slice::Iter<'a, usize> {
-            // if let Ok(idx) = self.binary_search(key) {
-            //     return self.as_slice().get(idx).iter();
-            // }
-
-            // [].iter()
-            todo!()
+            let mut idx = HashMap::new();
+            idx.insert("a", double_a);
+            idx.insert("b", KeyIndices::new(1));
+            idx.insert("c", KeyIndices::new(2));
+            idx.insert("s", KeyIndices::new(4));
+            Self { idx }
         }
     }
 
-    struct Filter<'f, F>(&'f F);
+    impl Filterable for StrIndex {
+        type Key = &'static str;
 
-    impl<'f, F> Deref for Filter<'f, F> {
-        type Target = F;
-
-        fn deref(&self) -> &Self::Target {
-            self.0
+        fn get(&self, key: &Self::Key) -> &[usize] {
+            match self.idx.get(key) {
+                Some(i) => i.as_slice(),
+                None => EMPTY_INDICES,
+            }
         }
     }
 
@@ -285,34 +317,37 @@ mod tests {
         type Key = F::Key;
 
         fn or(&'f self, key1: &Self::Key, key2: &Self::Key) -> Indices<'f> {
-            self.get(key1) | self.get(key2)
+            self.eq(key1) | self.eq(key2)
         }
     }
 
-    fn extended_filter<'i>(f: &'i Filter<'i, Vec<&'i str>>, key: &'i &str) -> Indices<'i> {
-        f.get(key)
+    fn extended_filter<'i>(f: &'i Filter<'i, StrIndex>, key: &'static &str) -> &'i [usize] {
+        f.0.get(key)
     }
 
     #[test]
     fn filter() {
-        let list = vec!["a", "b", "c"];
-        let f = Filter(&list);
+        let list = StrIndex::new();
+        let f = Filter::new(&list);
+
         assert!(f.contains(&"a"));
-        assert_eq!(&[1], &f.get(&"b"));
-        assert_eq!(&[0, 1], &(f.get(&"a") | f.get(&"b")));
-        assert_eq!(&[2], &f.get(&"c"));
-        assert_eq!(&[], &f.get(&"zz"));
+        assert!(!f.contains(&"zz"));
+
+        assert_eq!([1], f.eq(&"b"));
+        assert_eq!([0, 1, 3], (f.eq(&"a") | f.eq(&"b")));
+        assert_eq!([2], f.eq(&"c"));
+        assert_eq!([], f.eq(&"zz"));
     }
 
     #[test]
     fn extend_filter() {
-        let list = vec!["a", "b", "c"];
-        let f = Filter(&list);
+        let list = StrIndex::new();
+        let f = Filter::new(&list);
 
-        assert_eq!(&[0, 2], &f.or(&"c", &"a"));
-        assert_eq!(&[0], &f.or(&"zz", &"a"));
-        assert_eq!(&[], &f.or(&"zz", &"xx"));
-        assert_eq!(&[2], &extended_filter(&f, &"c"));
+        assert_eq!([0, 2, 3], f.or(&"c", &"a"));
+        assert_eq!([0, 3], f.or(&"zz", &"a"));
+        assert_eq!([], f.or(&"zz", &"xx"));
+        assert_eq!([2], extended_filter(&f, &"c"));
     }
 
     #[rstest]

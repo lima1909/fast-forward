@@ -2,8 +2,9 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 use fast_forward::collections::ro::ROIndexList;
 use fast_forward::index::map::MapIndex;
+use fast_forward::index::store::Filter;
 use fast_forward::index::uint::UIntIndex;
-use fast_forward::index::{Filterable, Store};
+use fast_forward::index::Store;
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
@@ -77,19 +78,6 @@ fn list_index(c: &mut Criterion) {
         })
     });
 
-    group.bench_function("ff: ro pk get_many_cb (callback - 3)", |b| {
-        b.iter(|| {
-            ro_idx
-                .idx()
-                .get_many_cb([FIND_ID, FIND_ID_2, FIND_ID_3], |k, items| match k {
-                    &FIND_ID => assert_eq!(&FIND_PERSON, items.next().unwrap()),
-                    &FIND_ID_2 => assert_eq!(&FIND_PERSON_2, items.next().unwrap()),
-                    &FIND_ID_3 => assert_eq!(&FIND_PERSON_3, items.next().unwrap()),
-                    _ => unreachable!("invalid Key: {k}"),
-                });
-        })
-    });
-
     group.bench_function("ff: ro pk get_many (3)", |b| {
         b.iter(|| {
             let mut it = ro_idx.idx().get_many([FIND_ID, FIND_ID_2, FIND_ID_3]);
@@ -122,8 +110,11 @@ fn list_index(c: &mut Criterion) {
 
     group.bench_function("ff: pk and name", |b| {
         b.iter(|| {
-            let i = (idx.pk.get(&FIND_ID) & idx.name.get(&FIND_PERSON.1))[0];
-            assert_eq!(&FIND_PERSON, &v[i]);
+            let f_pk = Filter::new(&idx.pk);
+            let f_name = Filter::new(&idx.name);
+
+            let mut it = (f_pk.eq(&FIND_ID) & f_name.eq(&FIND_PERSON.1)).items(&v);
+            assert_eq!(&FIND_PERSON, it.next().unwrap());
         })
     });
 

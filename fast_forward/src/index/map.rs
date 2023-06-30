@@ -26,7 +26,7 @@
 //!   ...     | ...
 //!
 //! ```
-use crate::index::{store::Filterable, Indices, KeyIndices, Store};
+use crate::index::{indices::EMPTY_INDICES, store::Filterable, KeyIndices, Store};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
@@ -41,17 +41,10 @@ where
     type Key = K;
 
     #[inline]
-    fn get(&self, key: &Self::Key) -> Indices<'_> {
+    fn get(&self, key: &Self::Key) -> &[usize] {
         match self.0.get(key) {
-            Some(i) => i.indices(),
-            None => Indices::empty(),
-        }
-    }
-
-    fn iter(&self, key: &Self::Key) -> std::slice::Iter<'_, usize> {
-        match self.0.get(key) {
-            Some(i) => i.iter(),
-            None => [].iter(),
+            Some(i) => i.as_slice(),
+            None => EMPTY_INDICES,
         }
     }
 }
@@ -107,6 +100,7 @@ mod tests {
 
     mod unique {
         use super::*;
+        use crate::index::store::Filter;
 
         #[test]
         fn empty() {
@@ -149,14 +143,16 @@ mod tests {
             idx.insert("Mario", 8);
             idx.insert("Paul", 6);
 
-            let r = idx.get(&"Mario") | idx.get(&"Paul");
-            assert_eq!(r, [6, 8]);
+            let f = Filter::new(&idx);
 
-            let r = idx.get(&"Paul") | idx.get(&"Blub");
-            assert_eq!(r, [6]);
+            let r = f.eq(&"Mario") | f.eq(&"Paul");
+            assert_eq!([6, 8], r);
 
-            let r = idx.get(&"Blub") | idx.get(&"Mario");
-            assert_eq!(r, [8]);
+            let r = f.eq(&"Paul") | f.eq(&"Blub");
+            assert_eq!([6], r);
+
+            let r = f.eq(&"Blub") | f.eq(&"Mario");
+            assert_eq!([8], r);
         }
 
         #[test]

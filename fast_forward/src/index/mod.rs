@@ -24,7 +24,6 @@
 //!  "Inge"    | 2
 //!   ...      | ...
 //! ```
-pub mod idx;
 pub mod indices;
 pub mod map;
 pub mod store;
@@ -35,7 +34,7 @@ use std::{
     cmp::{min, Ordering::*},
 };
 
-pub use indices::{Indices, Iter, KeyIndices};
+pub use indices::{Indices, KeyIndices};
 pub use store::{Filterable, MetaData, Store};
 
 /// Union is using for OR

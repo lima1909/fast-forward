@@ -115,17 +115,6 @@ macro_rules! fast {
                 })
             }
 
-            /// Create an Iterator for the given Filter.
-            ///
-            /// # Panics
-            ///
-            /// Panics if the positions are out of bound.
-            ///
-            #[allow(dead_code)]
-            fn filter<'i>(&'i self, filter: $crate::index::Indices<'i>) -> $crate::index::Iter<'i, $crate::collections::list::List<$item>> {
-                filter.items(&self._items_)
-            }
-
             #[allow(dead_code)]
             fn iter(&self) -> $crate::collections::list::Iter<'_, $item> {
                 self._items_.iter()
@@ -152,7 +141,11 @@ macro_rules! fast {
 mod tests {
     use crate::{
         fast,
-        index::{map::MapIndex, store::Filterable, uint::UIntIndex},
+        index::{
+            map::MapIndex,
+            store::{Filter, Filterable},
+            uint::UIntIndex,
+        },
     };
 
     #[derive(Debug, Eq, PartialEq, Clone)]
@@ -270,14 +263,11 @@ mod tests {
         fast_cars.insert(Car(1, "Mercedes".into()));
         fast_cars.insert(Car(4, "Porsche".into()));
 
-        assert_eq!([0], fast_cars.id_map.get(&1));
-        assert_eq!(
-            [1],
-            fast_cars.id.get(&4) | fast_cars.name.get(&"Porsche".into())
-        );
+        let fid = Filter::new(&fast_cars.id);
+        let fname = Filter::new(&fast_cars.name);
 
-        let r = fast_cars.filter(fast_cars.id.get(&4) & fast_cars.name.get(&"Porsche".into()));
-        assert_eq!(vec![&Car(4, "Porsche".into())], r.collect::<Vec<_>>())
+        assert_eq!([0], fast_cars.id_map.get(&1));
+        assert_eq!([1], fid.eq(&4) | fname.eq(&"Porsche".into()));
     }
 
     #[derive(Clone, Copy, Default)]
@@ -340,13 +330,13 @@ mod tests {
 
         assert_eq!([0, 1], persons.multi.get(&7));
 
-        let r = persons.multi.get(&3) | persons.multi.get(&7);
-        assert_eq!([0, 1], r);
+        let f = Filter::new(&persons.multi);
+        assert_eq!([0, 1], f.eq(&3) | f.eq(&7));
 
         assert_eq!([0], persons.name.get(&"Jasmin".into()));
 
-        let r = persons.name.get(&"Jasmin".into()) | persons.name.get(&"Mario".into());
-        assert_eq!([0, 1], r);
+        let f = Filter::new(&persons.name);
+        assert_eq!([0, 1], f.eq(&"Jasmin".into()) | f.eq(&"Mario".into()));
 
         assert_eq!([1, 2], persons.gender.get(&Male));
         assert_eq!([0], persons.gender.get(&Female));
@@ -369,12 +359,15 @@ mod tests {
         name.insert("b", 2);
         name.insert("z", 0);
 
-        assert_eq!([1], gender.get(&Female) & name.get(&"Julia"));
+        let fname = Filter::new(&name);
+        let fgender = Filter::new(&gender);
+
+        assert_eq!([1], fgender.eq(&Female) & fname.eq(&"Julia"));
 
         // = "z" or = 1 and = "a" => (= 1 and "a") or "z"
         assert_eq!(
             [0, 1],
-            name.get(&"z") | gender.get(&Female) & name.get(&"Julia")
+            fname.eq(&"z") | fgender.eq(&Female) & fname.eq(&"Julia")
         );
     }
 }

@@ -9,7 +9,7 @@ use std::ops::Index;
 
 pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
 
-use crate::index::{self, Filterable, Indices, MetaData};
+use crate::index::{indices, Filterable, Indices, MetaData};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'f, F, I> {
@@ -30,7 +30,7 @@ where
 
     #[inline]
     pub fn eq(&self, key: &F::Key) -> Indices<'f> {
-        self.filter.get(key)
+        self.filter.get(key).into()
     }
 
     #[inline]
@@ -38,7 +38,7 @@ where
     where
         I: Index<usize>,
     {
-        self.filter.iter(key).map(|i| &self._items[*i])
+        self.filter.get(key).iter().map(|i| &self._items[*i])
     }
 }
 
@@ -57,7 +57,7 @@ where
 
     #[inline]
     pub fn eq(&self, key: &F::Key) -> Indices<'r> {
-        self.0.filter.get(key)
+        self.0.eq(key)
     }
 
     /// Checks whether the `Key` exists.
@@ -109,7 +109,7 @@ where
     where
         I: Index<usize>,
     {
-        self.0.filter.iter(key).map(|i| &self.0._items[*i])
+        self.0.filter.get(key).iter().map(|i| &self.0._items[*i])
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -162,49 +162,6 @@ where
         self.0.filter.get_many(keys).map(|i| &self.0._items[*i])
     }
 
-    /// Combined all given `keys` with an logical `OR`.
-    /// The result is getting per callback function with the args:
-    /// `key` and an Iterator over all filtering Items.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// use fast_forward::index::{Store, uint::UIntIndex};
-    /// use fast_forward::collections::ro::ROIndexList;
-    ///
-    /// #[derive(Debug, Eq, PartialEq, Clone)]
-    /// pub struct Car(usize, String);
-    ///
-    /// let cars = vec![
-    ///     Car(2, "BMW".into()),
-    ///     Car(5, "Audi".into()),
-    ///     Car(2, "VW".into()),
-    ///     Car(99, "Porsche".into()),
-    /// ];
-    ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(|c: &Car| c.0, &cars);
-    ///
-    /// l.idx().get_many_cb([2, 5], |k, items| {
-    ///     let l = items.collect::<Vec<_>>();
-    ///     match k {
-    ///         2 => assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], l),
-    ///         5 => assert_eq!(vec![&Car(5, "Audi".into())], l),
-    ///         _ => unreachable!("invalid Key: {k}"),
-    ///     }
-    /// });
-    /// ```
-    #[inline]
-    pub fn get_many_cb<II, C>(&self, keys: II, callback: C)
-    where
-        II: IntoIterator<Item = F::Key>,
-        I: Index<usize>,
-        C: Fn(&F::Key, &mut dyn Iterator<Item = &'r <I as Index<usize>>::Output>),
-    {
-        for k in keys {
-            callback(&k, &mut self.0.filter.iter(&k).map(|i| &self.0._items[*i]))
-        }
-    }
-
     /// Return filter methods from the `Store`.
     ///
     /// ## Example
@@ -230,13 +187,26 @@ where
     ///
     /// The `OR` (`|`) generated a extra allocation.
     #[inline]
-    pub fn filter<P>(&self, predicate: P) -> index::Iter<'r, I>
+    pub fn filter<P>(&self, predicate: P) -> indices::Iter<'r, I>
     where
         P: Fn(&Filter<'r, F, I>) -> Indices<'r>,
         I: Index<usize>,
     {
         predicate(&self.0).items(self.0._items)
     }
+
+    // ???
+    // #[inline]
+    // pub fn filter<P>(
+    //     &self,
+    //     predicate: P,
+    // ) -> impl Iterator<Item = &'r <I as Index<usize>>::Output> + '_
+    // where
+    //     P: Fn(&Filter<'r, F, I>) -> Indices<'r>,
+    //     I: Index<usize>,
+    // {
+    //     predicate(&self.0).items(|i| &self.0._items[i])
+    // }
 
     /// Returns Meta data, if the [`crate::index::Store`] supports any.
     #[inline]

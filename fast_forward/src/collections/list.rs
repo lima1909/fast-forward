@@ -160,9 +160,8 @@ impl<'i, T> Iterator for Iter<'i, T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::index::Indices;
-
     use super::*;
+    use crate::index::Indices;
 
     impl<T> From<Vec<T>> for List<T> {
         fn from(v: Vec<T>) -> Self {
@@ -329,7 +328,7 @@ mod tests {
         let mut l: List<_> = vec![1, 2, 3].into();
         l.delete(1, |_, _| {});
 
-        let idx: Indices = 1.into();
+        let idx: Indices = [1].into();
         let mut it = idx.items(&l);
         assert_eq!(Some(&1), it.next());
         assert_eq!(None, it.next());
@@ -338,7 +337,7 @@ mod tests {
     #[test]
     fn filter_first() {
         let l: List<_> = vec![1, 2, 3].into();
-        let idx: Indices = vec![1, 0].into();
+        let idx: Indices = [1, 0].into();
         let mut it = idx.items(&l);
 
         assert_eq!(Some(&1), it.next());

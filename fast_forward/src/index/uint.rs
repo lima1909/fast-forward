@@ -31,8 +31,9 @@
 //! ...  | ...
 //! ```
 use crate::index::{
+    indices::EMPTY_INDICES,
     store::{Filterable, MetaData},
-    Indices, KeyIndices, MinMax, Store,
+    KeyIndices, MinMax, Store,
 };
 use std::marker::PhantomData;
 
@@ -61,19 +62,11 @@ where
     type Key = K;
 
     #[inline]
-    fn get(&self, key: &Self::Key) -> Indices<'_> {
+    fn get(&self, key: &Self::Key) -> &[usize] {
         let i: usize = (*key).into();
         match self.data.get(i) {
-            Some(Some(idx)) => idx.indices(),
-            _ => Indices::empty(),
-        }
-    }
-
-    fn iter(&self, key: &Self::Key) -> std::slice::Iter<'_, usize> {
-        let i: usize = (*key).into();
-        match self.data.get(i) {
-            Some(Some(idx)) => idx.iter(),
-            _ => [].iter(),
+            Some(Some(idx)) => idx.as_slice(),
+            _ => EMPTY_INDICES,
         }
     }
 }
@@ -184,6 +177,7 @@ impl<K: Default> UIntIndex<K> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::index::store::Filter;
 
     #[test]
     fn retrieve() {
@@ -208,7 +202,8 @@ mod tests {
         assert_eq!(i.get(&2), [4]);
 
         i.insert(1, 3);
-        assert_eq!(i.get(&2) | i.get(&1), [3, 4]);
+        let f = Filter::new(&i);
+        assert_eq!([3, 4], (f.eq(&2) | f.eq(&1)));
     }
 
     #[test]
@@ -268,13 +263,13 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            let r = idx.get(&3) | idx.get(&4);
-            assert_eq!(r, [6, 8]);
+            let f = Filter::new(&idx);
 
-            assert_eq!([6], idx.get(&3) & idx.get(&3));
-            assert_eq!([6], idx.get(&3) | idx.get(&99));
-            assert_eq!([8], idx.get(&99) | idx.get(&4));
-            assert_eq!(Indices::empty(), idx.get(&3) & idx.get(&4));
+            assert_eq!([6, 8], f.eq(&3) | f.eq(&4));
+            assert_eq!([6], f.eq(&3) & f.eq(&3));
+            assert_eq!([6], f.eq(&3) | f.eq(&99));
+            assert_eq!([8], f.eq(&99) | f.eq(&4));
+            assert_eq!([], f.eq(&3) & f.eq(&4));
 
             idx.insert(99, 0);
             assert_eq!([0], idx.get(&99));
@@ -287,7 +282,9 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            assert_eq!(Indices::empty(), idx.get(&3) & idx.get(&2));
+            let f = Filter::new(&idx);
+
+            assert_eq!([], f.eq(&3) & f.eq(&2));
 
             // =3 or =4 and =2 =>
             // (
@@ -295,7 +292,7 @@ mod tests {
             //  or 3 = true
             // )
             // => 3 -> 6
-            assert_eq!([6], idx.get(&3) | idx.get(&4) & idx.get(&2));
+            assert_eq!([6], f.eq(&3) | f.eq(&4) & f.eq(&2));
         }
 
         #[test]
