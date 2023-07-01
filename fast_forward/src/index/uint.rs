@@ -69,6 +69,11 @@ where
             _ => EMPTY_INDICES,
         }
     }
+
+    fn contains(&self, key: &Self::Key) -> bool {
+        let i: usize = (*key).into();
+        matches!(self.data.get(i), Some(Some(_)))
+    }
 }
 
 impl<K> Store for UIntIndex<K>

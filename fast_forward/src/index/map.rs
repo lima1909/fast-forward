@@ -47,6 +47,10 @@ where
             None => EMPTY_INDICES,
         }
     }
+
+    fn contains(&self, key: &Self::Key) -> bool {
+        self.0.contains_key(key)
+    }
 }
 
 impl<K> Store for MapIndex<K>

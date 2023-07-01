@@ -1,81 +1,79 @@
 #![allow(dead_code, unused_variables)]
 
-use fast_forward::{collections::ROIndexList, index::uint::UIntIndex};
+use fast_forward::{collections::ROIndexList, index::map::MapIndex};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Car {
     id: usize,
-    name: &'static str,
+    name: String,
 }
 
 fn main() {
-    let l: ROIndexList<'_, _, UIntIndex> = ROIndexList::owned(
-        |c| c.id,
+    let l: ROIndexList<'_, _, MapIndex> = ROIndexList::owned(
+        |c| c.name.clone(),
         vec![
             Car {
                 id: 99,
-                name: "BMW 1",
+                name: "BMW".into(),
             },
             Car {
                 id: 7,
-                name: "Audi",
+                name: "Audi".into(),
             },
             Car {
-                id: 99,
-                name: "BMW 2",
+                id: 6,
+                name: "BMW".into(),
             },
             Car {
                 id: 1,
-                name: "Porsche",
+                name: "Porsche".into(),
             },
         ],
     );
 
     // let mut it = l.idx().create_view([1, 3, 99]).filter(|c| c.id < 10_000);
-    let view = l.idx().create_view(vec![1, 3, 99].into_iter());
+    let view = l
+        .idx()
+        .create_view(vec![String::from("Porsche"), String::from("BMW")].into_iter());
 
-    // no ACL, can not see car 7
-    assert!(!view.contains(&7));
-    assert!(view.get(&7).is_none());
-    assert!(view.get_many([7]).next().is_none());
+    // no ACL, can not see car Ferrari
+    assert!(!view.contains(&String::from("Ferrari")));
+    assert_eq!(None, view.get(&String::from("Ferrari")).next());
+    assert!(view.get_many([String::from("Ferrari")]).next().is_none());
 
-    assert_eq!(3, view.get_many([1, 99, 7]).collect::<Vec<_>>().len());
+    assert_eq!(
+        3,
+        view.get_many([String::from("BMW"), String::from("Porsche")])
+            .collect::<Vec<_>>()
+            .len()
+    );
 
-    let mut it = view.get(&99).unwrap();
+    let find = String::from("BMW");
+    let mut it = view.get(&find);
     assert_eq!(
         Some(&Car {
             id: 99,
-            name: "BMW 1",
+            name: "BMW".into(),
         }),
         it.next()
     );
     assert_eq!(
         Some(&Car {
-            id: 99,
-            name: "BMW 2",
+            id: 6,
+            name: "BMW".into(),
         }),
         it.next()
     );
     assert_eq!(None, it.next());
 
     // check with many
-    let mut it = view.get_many([99, 7]);
+    let mut it = view.get_many([String::from("Porsche"), String::from("Ferrari")]);
     assert_eq!(
         Some(&Car {
-            id: 99,
-            name: "BMW 1",
-        }),
-        it.next()
-    );
-    assert_eq!(
-        Some(&Car {
-            id: 99,
-            name: "BMW 2",
+            id: 1,
+            name: "Porsche".into(),
         }),
         it.next()
     );
     assert_eq!(None, it.next());
-
-    // create new view with Range
-    assert!(!l.idx().create_view(10..100).contains(&7))
 }

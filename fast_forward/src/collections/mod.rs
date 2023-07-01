@@ -240,15 +240,11 @@ where
         self.view.contains(key)
     }
 
-    pub fn get(
-        &'a self,
-        key: &'a S::Key,
-    ) -> Option<impl Iterator<Item = &'a <I as Index<usize>>::Output>> {
-        if !self.view.contains(key) {
-            return None;
-        }
-
-        Some(self.store.get(key).iter().map(|i| &self.items[*i]))
+    pub fn get(&'a self, key: &'a S::Key) -> impl Iterator<Item = &'a <I as Index<usize>>::Output> {
+        self.store
+            .get_with_check(key, |k| self.view.contains(k))
+            .iter()
+            .map(|i| &self.items[*i])
     }
 
     #[inline]
@@ -274,4 +270,102 @@ where
     //         .enumerate()
     //         .filter(|(i, _)| self.view.contains(i))
     // }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::index::uint::UIntIndex;
+    use rstest::{fixture, rstest};
+
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct Car {
+        id: usize,
+        name: &'static str,
+    }
+
+    #[fixture]
+    fn list<'a>() -> ROIndexList<'a, Car, UIntIndex> {
+        ROIndexList::owned(
+            |c| c.id,
+            vec![
+                Car {
+                    id: 99,
+                    name: "BMW 1",
+                },
+                Car {
+                    id: 7,
+                    name: "Audi",
+                },
+                Car {
+                    id: 99,
+                    name: "BMW 2",
+                },
+                Car {
+                    id: 1,
+                    name: "Porsche",
+                },
+            ],
+        )
+    }
+
+    #[rstest]
+    fn view_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
+        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+
+        assert!(!view.contains(&7));
+        assert_eq!(None, view.get(&7).next());
+        assert!(view.get_many([7]).next().is_none());
+    }
+
+    #[rstest]
+    fn view_get_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
+        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+
+        assert_eq!(3, view.get_many([1, 99, 7]).collect::<Vec<_>>().len());
+
+        let mut it = view.get(&99);
+        assert_eq!(
+            Some(&Car {
+                id: 99,
+                name: "BMW 1",
+            }),
+            it.next()
+        );
+        assert_eq!(
+            Some(&Car {
+                id: 99,
+                name: "BMW 2",
+            }),
+            it.next()
+        );
+        assert_eq!(None, it.next());
+    }
+
+    #[rstest]
+    fn view_get_many_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
+        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+
+        let mut it = view.get_many([99, 7]);
+        assert_eq!(
+            Some(&Car {
+                id: 99,
+                name: "BMW 1",
+            }),
+            it.next()
+        );
+        assert_eq!(
+            Some(&Car {
+                id: 99,
+                name: "BMW 2",
+            }),
+            it.next()
+        );
+        assert_eq!(None, it.next());
+    }
+
+    #[rstest]
+    fn view_with_range(list: ROIndexList<'_, Car, UIntIndex>) {
+        assert!(!list.idx().create_view(10..100).contains(&7))
+    }
 }

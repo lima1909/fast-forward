@@ -113,6 +113,18 @@ pub trait Filterable {
     /// If the `Key` not exist, than this method returns [`crate::index::indices::EMPTY_INDICES`]
     fn get(&self, key: &Self::Key) -> &[usize];
 
+    /// Get all indices for a given `Key`, if the `check` functions returns `true`.
+    /// If the `Key` not exist, than this method returns [`crate::index::indices::EMPTY_INDICES`]
+    fn get_with_check<F>(&self, key: &Self::Key, check: F) -> &[usize]
+    where
+        F: Fn(&Self::Key) -> bool,
+    {
+        if check(key) {
+            return self.get(key);
+        }
+        EMPTY_INDICES
+    }
+
     /// Combined all given `keys` with an logical `OR`.
     ///
     /// ## Example:
