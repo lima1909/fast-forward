@@ -146,21 +146,18 @@ pub trait MetaData {
     fn meta(&self) -> Self::Meta<'_>;
 }
 
-#[derive(Debug)]
+/// Wrapper for an given [`Filterable`] implementation.
+/// The Index-slice (&[usize]), will also be wrapped in the [`Indices`] implementation.
 #[repr(transparent)]
-pub struct Filter<'f, F>(&'f F);
+pub struct Filter<'f, F>(pub &'f F);
 
 impl<'f, F> Filter<'f, F>
 where
     F: Filterable,
 {
-    pub const fn new(filter: &'f F) -> Self {
-        Self(filter)
-    }
-
     #[inline]
     pub fn eq(&self, key: &F::Key) -> Indices<'f> {
-        self.0.get(key).into()
+        Indices::from_sorted_slice(self.0.get(key))
     }
 
     #[inline]
@@ -168,18 +165,17 @@ where
         self.0.contains(key)
     }
 
-    // ???
-    // #[inline]
-    // pub fn items<M, B>(
-    //     &self,
-    //     key: &F::Key,
-    //     map: M,
-    // ) -> std::iter::Map<std::slice::Iter<'f, usize>, M>
-    // where
-    //     M: FnMut(&usize) -> B,
-    // {
-    //     self.0.get(key).iter().map(map)
-    // }
+    #[inline]
+    pub fn items<I>(
+        &'f self,
+        key: &F::Key,
+        items: &'f I,
+    ) -> impl Iterator<Item = &'f <I as Index<usize>>::Output>
+    where
+        I: Index<usize>,
+    {
+        self.0.get(key).iter().map(|i| &items[*i])
+    }
 }
 
 pub struct Many<'m, F, K> {
@@ -328,7 +324,7 @@ mod tests {
     #[test]
     fn filter() {
         let list = StrIndex::new();
-        let f = Filter::new(&list);
+        let f = Filter(&list);
 
         assert!(f.contains(&"a"));
         assert!(!f.contains(&"zz"));
@@ -342,7 +338,7 @@ mod tests {
     #[test]
     fn extend_filter() {
         let list = StrIndex::new();
-        let f = Filter::new(&list);
+        let f = Filter(&list);
 
         assert_eq!([0, 2, 3], f.or(&"c", &"a"));
         assert_eq!([0, 3], f.or(&"zz", &"a"));

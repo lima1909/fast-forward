@@ -58,6 +58,7 @@ fn list_index(c: &mut Criterion) {
 
     // group benchmark
     let mut group = c.benchmark_group("index");
+
     group.bench_function("ff: ro pk get (1)", |b| {
         b.iter(|| {
             let p = ro_idx.idx().get(&FIND_ID).next().unwrap();
@@ -110,8 +111,8 @@ fn list_index(c: &mut Criterion) {
 
     group.bench_function("ff: pk and name", |b| {
         b.iter(|| {
-            let f_pk = Filter::new(&idx.pk);
-            let f_name = Filter::new(&idx.name);
+            let f_pk = Filter(&idx.pk);
+            let f_name = Filter(&idx.name);
 
             let mut it = (f_pk.eq(&FIND_ID) & f_name.eq(&FIND_PERSON.1)).items(&v);
             assert_eq!(&FIND_PERSON, it.next().unwrap());

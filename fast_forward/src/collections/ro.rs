@@ -124,6 +124,8 @@ mod tests {
         assert!(l.idx().contains(&99));
 
         let mut it = l.idx().filter(|f| {
+            assert!(f.contains(&99));
+
             let idxs = f.eq(&99);
             assert_eq!([3], idxs);
 

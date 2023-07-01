@@ -9,11 +9,11 @@ use std::ops::Index;
 
 pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
 
-use crate::index::{indices, Filterable, Indices, MetaData};
+use crate::index::{store::Filter as StoreFilter, Filterable, Indices, MetaData};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'f, F, I> {
-    filter: &'f F,
+    filter: StoreFilter<'f, F>,
     _items: &'f I,
 }
 
@@ -23,22 +23,27 @@ where
 {
     const fn new(filter: &'f F, items: &'f I) -> Self {
         Self {
-            filter,
+            filter: StoreFilter(filter),
             _items: items,
         }
     }
 
     #[inline]
     pub fn eq(&self, key: &F::Key) -> Indices<'f> {
-        self.filter.get(key).into()
+        self.filter.eq(key)
     }
 
     #[inline]
-    pub fn items(&self, key: &F::Key) -> impl Iterator<Item = &'f <I as Index<usize>>::Output>
+    pub fn contains(&self, key: &F::Key) -> bool {
+        self.filter.contains(key)
+    }
+
+    #[inline]
+    pub fn items(&'f self, key: &F::Key) -> impl Iterator<Item = &'f <I as Index<usize>>::Output>
     where
         I: Index<usize>,
     {
-        self.filter.get(key).iter().map(|i| &self._items[*i])
+        self.filter.items(key, self._items)
     }
 }
 
@@ -109,7 +114,7 @@ where
     where
         I: Index<usize>,
     {
-        self.0.filter.get(key).iter().map(|i| &self.0._items[*i])
+        self.0.filter.0.get(key).iter().map(|i| &self.0._items[*i])
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -145,13 +150,6 @@ where
     ///     ],
     ///     result);
     /// ```
-    ///
-    /// ## Hint:
-    ///
-    /// The `OR` generated a extra allocation.
-    ///
-    /// For performance reason it is better to use [`Self::get_many_cb()`] or
-    /// to call [`Self::get()`] several times.
     #[inline]
     pub fn get_many<II>(&self, keys: II) -> impl Iterator<Item = &'r <I as Index<usize>>::Output>
     where
@@ -159,7 +157,7 @@ where
         I: Index<usize>,
         <I as Index<usize>>::Output: Sized,
     {
-        self.0.filter.get_many(keys).map(|i| &self.0._items[*i])
+        self.0.filter.0.get_many(keys).map(|i| &self.0._items[*i])
     }
 
     /// Return filter methods from the `Store`.
@@ -187,7 +185,7 @@ where
     ///
     /// The `OR` (`|`) generated a extra allocation.
     #[inline]
-    pub fn filter<P>(&self, predicate: P) -> indices::Iter<'r, I>
+    pub fn filter<P>(&self, predicate: P) -> impl Iterator<Item = &'r <I as Index<usize>>::Output>
     where
         P: Fn(&Filter<'r, F, I>) -> Indices<'r>,
         I: Index<usize>,
@@ -195,25 +193,12 @@ where
         predicate(&self.0).items(self.0._items)
     }
 
-    // ???
-    // #[inline]
-    // pub fn filter<P>(
-    //     &self,
-    //     predicate: P,
-    // ) -> impl Iterator<Item = &'r <I as Index<usize>>::Output> + '_
-    // where
-    //     P: Fn(&Filter<'r, F, I>) -> Indices<'r>,
-    //     I: Index<usize>,
-    // {
-    //     predicate(&self.0).items(|i| &self.0._items[i])
-    // }
-
     /// Returns Meta data, if the [`crate::index::Store`] supports any.
     #[inline]
     pub fn meta(&self) -> F::Meta<'_>
     where
         F: MetaData,
     {
-        self.0.filter.meta()
+        self.0.filter.0.meta()
     }
 }

@@ -1,4 +1,4 @@
-//! There are two kind of `Indices`
+//! There are two kinds of `Indices`
 //! - KeyIndices: is a collection of all `Indices`for a given `Key`
 //! - Indices: is a collection (read only) of selected `Indices`,
 //! which you can use for operations like [`std::ops::BitOr`] and [`std::ops::BitAnd`].
@@ -7,7 +7,7 @@ use std::{
     ops::{BitAnd, BitOr, Index},
 };
 
-/// An empty list of `Indices`.
+/// An empty list (array) of `Indices`.
 pub const EMPTY_INDICES: &[usize] = &[];
 
 /// `KeyIndices` contains all indices for a given `Key`.
@@ -52,63 +52,30 @@ impl KeyIndices {
 pub struct Indices<'i>(Cow<'i, [usize]>);
 
 impl<'i> Indices<'i> {
-    /// Create a new empty list.
+    /// Create a new empty Indices.
     #[inline]
     pub const fn empty() -> Self {
         Self(Cow::Borrowed(EMPTY_INDICES))
     }
 
+    /// Create an Incices from an given __sorted__ slice.
+    pub const fn from_sorted_slice(s: &'i [usize]) -> Self {
+        Self(Cow::Borrowed(s))
+    }
+
+    /// Return a slice of indices.
     #[inline]
     pub fn as_slice(&self) -> &[usize] {
         self.0.as_ref()
     }
 
-    // ???
-    // #[inline]
-    // pub fn items<F, B>(self, map: F) -> std::iter::Map<std::vec::IntoIter<usize>, F>
-    // where
-    //     F: FnMut(usize) -> B,
-    // {
-    //     #[allow(clippy::unnecessary_to_owned)]
-    //     self.0.into_owned().into_iter().map(map)
-    // }
-
-    #[inline]
-    pub fn items<I>(self, list: &'i I) -> Iter<'i, I>
+    /// Is a mapping from indices to Items from an given list.
+    pub fn items<I>(self, list: &'i I) -> impl Iterator<Item = &'i <I as Index<usize>>::Output>
     where
         I: Index<usize>,
     {
-        Iter {
-            pos: 0,
-            list,
-            indices: self,
-        }
-    }
-}
-
-pub struct Iter<'i, I> {
-    pos: usize,
-    list: &'i I,
-    indices: Indices<'i>,
-}
-
-impl<'i, I> Iterator for Iter<'i, I>
-where
-    I: Index<usize>,
-{
-    type Item = &'i I::Output;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let idx = self.indices.0.get(self.pos)?;
-        self.pos += 1;
-        Some(&self.list[*idx])
-    }
-}
-
-/// !!! The slice must be ordered !!!
-impl<'i> From<&'i [usize]> for Indices<'i> {
-    fn from(s: &'i [usize]) -> Self {
-        Self(Cow::Borrowed(s))
+        #[allow(clippy::unnecessary_to_owned)]
+        self.0.into_owned().into_iter().map(|i| &list[i])
     }
 }
 
@@ -206,8 +173,8 @@ mod tests {
             rhs.add(2);
             rhs.add(9);
 
-            let l: Indices = lhs.as_slice().into();
-            let r: Indices = rhs.as_slice().into();
+            let l: Indices = Indices::from_sorted_slice(lhs.as_slice());
+            let r: Indices = Indices::from_sorted_slice(rhs.as_slice());
             assert_eq!([2, 3, 4, 5, 9], l | r);
         }
 
@@ -216,22 +183,22 @@ mod tests {
             let mut lhs = KeyIndices::new(5);
             let rhs = KeyIndices::new(5);
 
-            let r: Indices = rhs.as_slice().into();
+            let r: Indices = Indices::from_sorted_slice(rhs.as_slice());
             {
-                let l: Indices = lhs.as_slice().into();
+                let l: Indices = Indices::from_sorted_slice(lhs.as_slice());
                 assert_eq!([5], l | r);
             }
 
             lhs.add(0);
-            let l: Indices = lhs.as_slice().into();
-            let r: Indices = rhs.as_slice().into();
+            let l: Indices = Indices::from_sorted_slice(lhs.as_slice());
+            let r: Indices = Indices::from_sorted_slice(rhs.as_slice());
             assert_eq!([0, 5], l | r);
         }
 
         #[test]
         fn remove() {
             let mut pos = KeyIndices::new(5);
-            let p: Indices = pos.as_slice().into();
+            let p: Indices = Indices::from_sorted_slice(pos.as_slice());
             assert_eq!([5], p);
 
             assert!(pos.remove(5).is_empty());

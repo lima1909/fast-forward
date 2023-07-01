@@ -263,8 +263,8 @@ mod tests {
         fast_cars.insert(Car(1, "Mercedes".into()));
         fast_cars.insert(Car(4, "Porsche".into()));
 
-        let fid = Filter::new(&fast_cars.id);
-        let fname = Filter::new(&fast_cars.name);
+        let fid = Filter(&fast_cars.id);
+        let fname = Filter(&fast_cars.name);
 
         assert_eq!([0], fast_cars.id_map.get(&1));
         assert_eq!([1], fid.eq(&4) | fname.eq(&"Porsche".into()));
@@ -330,12 +330,12 @@ mod tests {
 
         assert_eq!([0, 1], persons.multi.get(&7));
 
-        let f = Filter::new(&persons.multi);
+        let f = Filter(&persons.multi);
         assert_eq!([0, 1], f.eq(&3) | f.eq(&7));
 
         assert_eq!([0], persons.name.get(&"Jasmin".into()));
 
-        let f = Filter::new(&persons.name);
+        let f = Filter(&persons.name);
         assert_eq!([0, 1], f.eq(&"Jasmin".into()) | f.eq(&"Mario".into()));
 
         assert_eq!([1, 2], persons.gender.get(&Male));
@@ -359,8 +359,8 @@ mod tests {
         name.insert("b", 2);
         name.insert("z", 0);
 
-        let fname = Filter::new(&name);
-        let fgender = Filter::new(&gender);
+        let fname = Filter(&name);
+        let fgender = Filter(&gender);
 
         assert_eq!([1], fgender.eq(&Female) & fname.eq(&"Julia"));
 

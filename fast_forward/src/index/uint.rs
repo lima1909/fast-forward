@@ -202,7 +202,7 @@ mod tests {
         assert_eq!(i.get(&2), [4]);
 
         i.insert(1, 3);
-        let f = Filter::new(&i);
+        let f = Filter(&i);
         assert_eq!([3, 4], (f.eq(&2) | f.eq(&1)));
     }
 
@@ -263,7 +263,7 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            let f = Filter::new(&idx);
+            let f = Filter(&idx);
 
             assert_eq!([6, 8], f.eq(&3) | f.eq(&4));
             assert_eq!([6], f.eq(&3) & f.eq(&3));
@@ -282,7 +282,7 @@ mod tests {
             idx.insert(4, 8);
             idx.insert(3, 6);
 
-            let f = Filter::new(&idx);
+            let f = Filter(&idx);
 
             assert_eq!([], f.eq(&3) & f.eq(&2));
 

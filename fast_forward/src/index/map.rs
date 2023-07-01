@@ -143,7 +143,7 @@ mod tests {
             idx.insert("Mario", 8);
             idx.insert("Paul", 6);
 
-            let f = Filter::new(&idx);
+            let f = Filter(&idx);
 
             let r = f.eq(&"Mario") | f.eq(&"Paul");
             assert_eq!([6, 8], r);
