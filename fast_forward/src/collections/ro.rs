@@ -5,10 +5,7 @@ use std::{
     ops::{Deref, Index},
 };
 
-use crate::{
-    collections::Retriever,
-    index::{Filterable, Store},
-};
+use crate::{collections::Retriever, index::Store};
 
 // [`ROIndexList`] is a read only list with one index.
 //
@@ -48,7 +45,7 @@ where
 
     pub fn idx(&self) -> Retriever<'_, S, Slice<'_, I>>
     where
-        S: Filterable,
+        S: Store,
         [I]: ToOwned,
     {
         Retriever::new(&self.store, &self.items)

@@ -8,20 +8,19 @@ pub mod rw;
 use std::ops::Index;
 
 pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
-
-use crate::index::{store::Filter as StoreFilter, Filterable, Indices, MetaData};
+use crate::index::{store::Filter as StoreFilter, Filterable, Indices, MetaData, Store};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
-pub struct Filter<'f, F, I> {
-    filter: StoreFilter<'f, F>,
-    _items: &'f I,
+pub struct Filter<'a, F, I> {
+    filter: StoreFilter<'a, F>,
+    _items: &'a I,
 }
 
-impl<'f, F, I> Filter<'f, F, I>
+impl<'a, F, I> Filter<'a, F, I>
 where
     F: Filterable,
 {
-    const fn new(filter: &'f F, items: &'f I) -> Self {
+    const fn new(filter: &'a F, items: &'a I) -> Self {
         Self {
             filter: StoreFilter(filter),
             _items: items,
@@ -29,7 +28,7 @@ where
     }
 
     #[inline]
-    pub fn eq(&self, key: &F::Key) -> Indices<'f> {
+    pub fn eq(&self, key: &F::Key) -> Indices<'a> {
         self.filter.eq(key)
     }
 
@@ -39,7 +38,7 @@ where
     }
 
     #[inline]
-    pub fn items(&'f self, key: &F::Key) -> impl Iterator<Item = &'f <I as Index<usize>>::Output>
+    pub fn items(&'a self, key: &F::Key) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
     where
         I: Index<usize>,
     {
@@ -49,19 +48,19 @@ where
 
 /// A `Retriever` is the interface for get Items by an given filter|query.
 #[repr(transparent)]
-pub struct Retriever<'r, F, I>(Filter<'r, F, I>);
+pub struct Retriever<'a, S, I>(Filter<'a, S, I>);
 
-impl<'r, F, I> Retriever<'r, F, I>
+impl<'a, S, I> Retriever<'a, S, I>
 where
-    F: Filterable,
+    S: Store,
 {
     /// Create a new instance of an [`Retriever`].
-    pub const fn new(filter: &'r F, items: &'r I) -> Self {
+    pub const fn new(filter: &'a S, items: &'a I) -> Self {
         Self(Filter::new(filter, items))
     }
 
     #[inline]
-    pub fn eq(&self, key: &F::Key) -> Indices<'r> {
+    pub fn eq(&self, key: &S::Key) -> Indices<'a> {
         self.0.eq(key)
     }
 
@@ -84,7 +83,7 @@ where
     /// assert!(!l.idx().contains(&99));
     /// ```
     #[inline]
-    pub fn contains(&self, key: &F::Key) -> bool {
+    pub fn contains(&self, key: &S::Key) -> bool {
         self.0.filter.contains(key)
     }
 
@@ -110,7 +109,7 @@ where
     /// assert_eq!(Some(&Car(2, "BMW".into())), l.idx().get(&2).next());
     /// ```
     #[inline]
-    pub fn get(&self, key: &F::Key) -> impl Iterator<Item = &'r <I as Index<usize>>::Output>
+    pub fn get(&self, key: &S::Key) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
     where
         I: Index<usize>,
     {
@@ -151,9 +150,9 @@ where
     ///     result);
     /// ```
     #[inline]
-    pub fn get_many<II>(&self, keys: II) -> impl Iterator<Item = &'r <I as Index<usize>>::Output>
+    pub fn get_many<II>(&self, keys: II) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
     where
-        II: IntoIterator<Item = F::Key> + 'r,
+        II: IntoIterator<Item = S::Key> + 'a,
         I: Index<usize>,
         <I as Index<usize>>::Output: Sized,
     {
@@ -185,20 +184,94 @@ where
     ///
     /// The `OR` (`|`) generated a extra allocation.
     #[inline]
-    pub fn filter<P>(&self, predicate: P) -> impl Iterator<Item = &'r <I as Index<usize>>::Output>
+    pub fn filter<P>(&self, predicate: P) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
     where
-        P: Fn(&Filter<'r, F, I>) -> Indices<'r>,
+        P: Fn(&Filter<'a, S, I>) -> Indices<'a>,
         I: Index<usize>,
     {
         predicate(&self.0).items(self.0._items)
     }
 
+    ///
+    #[inline]
+    pub fn create_view<II>(&self, keys: II) -> View<'a, S, I>
+    where
+        II: IntoIterator<Item = S::Key> + ExactSizeIterator + 'a,
+        I: Index<usize>,
+    {
+        View::new(keys, self.0.filter.0, self.0._items)
+    }
+
     /// Returns Meta data, if the [`crate::index::Store`] supports any.
     #[inline]
-    pub fn meta(&self) -> F::Meta<'_>
+    pub fn meta(&self) -> S::Meta<'_>
     where
-        F: MetaData,
+        S: MetaData,
     {
         self.0.filter.0.meta()
     }
+}
+
+/// A `View` is a wrapper for an given [`Store`],
+/// that can be only use (read only) for [`Filterable`] operations.
+pub struct View<'a, S, I> {
+    view: S,
+    store: &'a S,
+    items: &'a I,
+}
+
+impl<'a, S, I> View<'a, S, I>
+where
+    S: Store,
+    I: Index<usize>,
+{
+    pub fn new<K>(keys: K, store: &'a S, items: &'a I) -> Self
+    where
+        K: IntoIterator<Item = S::Key> + ExactSizeIterator,
+    {
+        Self {
+            view: S::from_iter(keys),
+            store,
+            items,
+        }
+    }
+
+    pub fn contains(&self, key: &S::Key) -> bool {
+        self.view.contains(key)
+    }
+
+    pub fn get(
+        &'a self,
+        key: &'a S::Key,
+    ) -> Option<impl Iterator<Item = &'a <I as Index<usize>>::Output>> {
+        if !self.view.contains(key) {
+            return None;
+        }
+
+        Some(self.store.get(key).iter().map(|i| &self.items[*i]))
+    }
+
+    #[inline]
+    pub fn get_many<II>(&'a self, keys: II) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
+    where
+        II: IntoIterator<Item = S::Key> + 'a,
+        I: Index<usize>,
+        <I as Index<usize>>::Output: Sized,
+    {
+        let keys = keys
+            .into_iter()
+            .filter(|key| self.contains(key))
+            .collect::<Vec<_>>();
+        self.store.get_many(keys).map(|i| &self.items[*i])
+    }
+
+    // pub fn items(&self) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
+    // where
+    //     I: IntoIterator,
+    // {
+    //     self.items
+    //         .into_iter()
+    //         .enumerate()
+    //         .filter(|(i, _)| self.view.contains(i))
+    // }
 }
