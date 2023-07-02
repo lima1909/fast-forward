@@ -34,7 +34,7 @@ where
 
     #[inline]
     pub fn contains(&self, key: &F::Key) -> bool {
-        self.filter.contains(key)
+        self.filter.0.contains(key)
     }
 
     #[inline]
@@ -254,10 +254,7 @@ where
         I: Index<usize>,
         <I as Index<usize>>::Output: Sized,
     {
-        let keys = keys
-            .into_iter()
-            .filter(|key| self.contains(key))
-            .collect::<Vec<_>>();
+        let keys = keys.into_iter().filter(|key| self.contains(key));
         self.store.get_many(keys).map(|i| &self.items[*i])
     }
 
