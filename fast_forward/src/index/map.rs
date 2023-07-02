@@ -174,7 +174,8 @@ mod tests {
             ];
             let idx = MapIndex::from_iter(l.clone().into_iter());
 
-            assert_eq!(0, idx.get_many([]).items_vec(&l).len());
+            assert!(idx.get_many([]).items(&l).next().is_none());
+
             assert_eq!(0, idx.get_many(["NotFound".into()]).items_vec(&l).len());
             assert_eq!(
                 vec![&String::from("Mario")],

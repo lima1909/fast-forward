@@ -403,6 +403,9 @@ mod tests {
                 // 7 is not allowed
                 assert!(f.items(&7).next().is_none());
 
+                assert!(!f.contains(&7));
+                assert!(f.contains(&1));
+
                 f.eq(&99)
             })
             .collect::<Vec<_>>()
