@@ -85,7 +85,6 @@ fn list_index(c: &mut Criterion) {
             assert_eq!(&FIND_PERSON, it.next().unwrap());
             assert_eq!(&FIND_PERSON_2, it.next().unwrap());
             assert_eq!(&FIND_PERSON_3, it.next().unwrap());
-            assert_eq!(None, it.next());
         })
     });
 

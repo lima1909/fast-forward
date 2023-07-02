@@ -258,6 +258,19 @@ where
         self.store.get_many(keys).map(|i| &self.items[*i])
     }
 
+    #[inline]
+    pub fn filter<P>(
+        &'a self,
+        predicate: P,
+    ) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
+    where
+        P: Fn(Filter<'a, View<'a, F, I>, I>) -> Indices<'a>,
+        I: Index<usize>,
+    {
+        let filter = Filter::new(self, self.items);
+        predicate(filter).items(self.items)
+    }
+
     // pub fn items(&self) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
     // where
     //     I: IntoIterator,
@@ -267,6 +280,21 @@ where
     //         .enumerate()
     //         .filter(|(i, _)| self.view.contains(i))
     // }
+}
+
+impl<'a, F, I> Filterable for View<'a, F, I>
+where
+    F: Filterable,
+{
+    type Key = F::Key;
+
+    fn contains(&self, key: &Self::Key) -> bool {
+        self.view.contains(key)
+    }
+
+    fn get(&self, key: &Self::Key) -> &[usize] {
+        self.store.get_with_check(key, |k| self.view.contains(k))
+    }
 }
 
 #[cfg(test)]
@@ -307,15 +335,6 @@ mod tests {
     }
 
     #[rstest]
-    fn view_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
-        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
-
-        assert!(!view.contains(&7));
-        assert_eq!(None, view.get(&7).next());
-        assert!(view.get_many([7]).next().is_none());
-    }
-
-    #[rstest]
     fn view_eq(list: ROIndexList<'_, Car, UIntIndex>) {
         let view = list.idx().create_view(vec![1, 3, 99].into_iter());
 
@@ -324,6 +343,79 @@ mod tests {
 
         assert_eq!([3], view.eq(&1));
         assert_eq!([0, 2, 3], view.eq(&1) | view.eq(&99));
+    }
+
+    #[rstest]
+    fn view_filter(list: ROIndexList<'_, Car, UIntIndex>) {
+        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+
+        // 7 is not allowed
+        assert_eq!(None, view.filter(|f| f.eq(&7)).next());
+        // 2000 do not exist
+        assert_eq!(None, view.filter(|f| f.eq(&2000)).next());
+
+        assert_eq!(
+            vec![&Car {
+                id: 1,
+                name: "Porsche",
+            }],
+            view.filter(|f| f.eq(&1)).collect::<Vec<_>>()
+        );
+
+        assert_eq!(
+            vec![
+                &Car {
+                    id: 99,
+                    name: "BMW 1",
+                },
+                &Car {
+                    id: 99,
+                    name: "BMW 2",
+                },
+                &Car {
+                    id: 1,
+                    name: "Porsche",
+                },
+            ],
+            view.filter(|f| f.eq(&1) | f.eq(&99)).collect::<Vec<_>>()
+        );
+
+        assert_eq!(
+            vec![
+                &Car {
+                    id: 99,
+                    name: "BMW 1",
+                },
+                &Car {
+                    id: 99,
+                    name: "BMW 2",
+                },
+            ],
+            view.filter(|f| {
+                assert_eq!(
+                    Some(&Car {
+                        id: 1,
+                        name: "Porsche",
+                    }),
+                    f.items(&1).next()
+                );
+
+                // 7 is not allowed
+                assert!(f.items(&7).next().is_none());
+
+                f.eq(&99)
+            })
+            .collect::<Vec<_>>()
+        );
+    }
+
+    #[rstest]
+    fn view_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
+        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+
+        assert!(!view.contains(&7));
+        assert_eq!(None, view.get(&7).next());
+        assert!(view.get_many([7]).next().is_none());
     }
 
     #[rstest]
