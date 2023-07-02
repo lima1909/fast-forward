@@ -109,6 +109,9 @@ pub trait Store: Filterable {
 pub trait Filterable {
     type Key;
 
+    /// Checks whether the `Key` exists.
+    fn contains(&self, key: &Self::Key) -> bool;
+
     /// Get all indices for a given `Key`.
     /// If the `Key` not exist, than this method returns [`crate::index::indices::EMPTY_INDICES`]
     fn get(&self, key: &Self::Key) -> &[usize];
@@ -139,12 +142,6 @@ pub trait Filterable {
         Self: Sized,
     {
         Many::new(self, keys.into_iter())
-    }
-
-    /// Checks whether the `Key` exists.
-    #[inline]
-    fn contains(&self, key: &Self::Key) -> bool {
-        !self.get(key).is_empty()
     }
 }
 
@@ -284,6 +281,10 @@ mod tests {
                 Some(i) => i.as_slice(),
                 None => EMPTY_INDICES,
             }
+        }
+
+        fn contains(&self, key: &Self::Key) -> bool {
+            self.idx.contains_key(key)
         }
     }
 

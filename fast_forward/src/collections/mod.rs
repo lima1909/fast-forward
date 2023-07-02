@@ -55,8 +55,8 @@ where
     S: Store,
 {
     /// Create a new instance of an [`Retriever`].
-    pub const fn new(filter: &'a S, items: &'a I) -> Self {
-        Self(Filter::new(filter, items))
+    pub const fn new(store: &'a S, items: &'a I) -> Self {
+        Self(Filter::new(store, items))
     }
 
     #[inline]
@@ -199,7 +199,7 @@ where
         II: IntoIterator<Item = S::Key> + ExactSizeIterator + 'a,
         I: Index<usize>,
     {
-        View::new(keys, self.0.filter.0, self.0._items)
+        View::new(S::from_iter(keys), self.0.filter.0, self.0._items)
     }
 
     /// Returns Meta data, if the [`crate::index::Store`] supports any.
@@ -214,33 +214,33 @@ where
 
 /// A `View` is a wrapper for an given [`Store`],
 /// that can be only use (read only) for [`Filterable`] operations.
-pub struct View<'a, S, I> {
-    view: S,
-    store: &'a S,
+pub struct View<'a, F, I> {
+    view: F,
+    store: &'a F,
     items: &'a I,
 }
 
-impl<'a, S, I> View<'a, S, I>
+impl<'a, F, I> View<'a, F, I>
 where
-    S: Store,
+    F: Filterable,
     I: Index<usize>,
 {
-    pub fn new<K>(keys: K, store: &'a S, items: &'a I) -> Self
-    where
-        K: IntoIterator<Item = S::Key> + ExactSizeIterator,
-    {
-        Self {
-            view: S::from_iter(keys),
-            store,
-            items,
-        }
+    pub fn new(view: F, store: &'a F, items: &'a I) -> Self {
+        Self { view, store, items }
     }
 
-    pub fn contains(&self, key: &S::Key) -> bool {
+    #[inline]
+    pub fn eq(&self, key: &F::Key) -> Indices<'a> {
+        Indices::from_sorted_slice(self.store.get_with_check(key, |k| self.view.contains(k)))
+    }
+
+    #[inline]
+    pub fn contains(&self, key: &F::Key) -> bool {
         self.view.contains(key)
     }
 
-    pub fn get(&'a self, key: &'a S::Key) -> impl Iterator<Item = &'a <I as Index<usize>>::Output> {
+    #[inline]
+    pub fn get(&'a self, key: &'a F::Key) -> impl Iterator<Item = &'a <I as Index<usize>>::Output> {
         self.store
             .get_with_check(key, |k| self.view.contains(k))
             .iter()
@@ -250,11 +250,11 @@ where
     #[inline]
     pub fn get_many<II>(&'a self, keys: II) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
     where
-        II: IntoIterator<Item = S::Key> + 'a,
+        II: IntoIterator<Item = F::Key> + 'a,
         I: Index<usize>,
         <I as Index<usize>>::Output: Sized,
     {
-        let keys = keys.into_iter().filter(|key| self.contains(key));
+        let keys = keys.into_iter().filter(|key| self.view.contains(key));
         self.store.get_many(keys).map(|i| &self.items[*i])
     }
 
@@ -313,6 +313,17 @@ mod tests {
         assert!(!view.contains(&7));
         assert_eq!(None, view.get(&7).next());
         assert!(view.get_many([7]).next().is_none());
+    }
+
+    #[rstest]
+    fn view_eq(list: ROIndexList<'_, Car, UIntIndex>) {
+        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+
+        assert!(view.eq(&7).as_slice().iter().next().is_none());
+        assert!(view.eq(&2000).as_slice().iter().next().is_none());
+
+        assert_eq!([3], view.eq(&1));
+        assert_eq!([0, 2, 3], view.eq(&1) | view.eq(&99));
     }
 
     #[rstest]
