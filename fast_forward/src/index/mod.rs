@@ -39,7 +39,7 @@ pub use store::{Filterable, MetaData, Store};
 
 /// Union is using for OR
 #[inline]
-pub fn union<'c>(lhs: Cow<'c, [usize]>, rhs: Cow<'c, [usize]>) -> Cow<'c, [usize]> {
+pub fn union<'a, I: Ord + Clone>(lhs: Cow<'a, [I]>, rhs: Cow<'a, [I]>) -> Cow<'a, [I]> {
     if lhs.is_empty() {
         return rhs;
     }
@@ -53,7 +53,7 @@ pub fn union<'c>(lhs: Cow<'c, [usize]>, rhs: Cow<'c, [usize]>) -> Cow<'c, [usize
     let (mut li, mut ri) = (0, 0);
 
     loop {
-        let (l, r) = (lhs[li], rhs[ri]);
+        let (l, r) = (lhs[li].clone(), rhs[ri].clone());
 
         match l.cmp(&r) {
             Equal => {
@@ -72,10 +72,10 @@ pub fn union<'c>(lhs: Cow<'c, [usize]>, rhs: Cow<'c, [usize]>) -> Cow<'c, [usize
         }
 
         if ll == li {
-            v.extend(&rhs[ri..]);
+            v.extend(rhs.iter().skip(ri).cloned());
             return Cow::Owned(v);
         } else if lr == ri {
-            v.extend(&lhs[li..]);
+            v.extend(lhs.iter().skip(li).cloned());
             return Cow::Owned(v);
         }
     }
@@ -83,7 +83,7 @@ pub fn union<'c>(lhs: Cow<'c, [usize]>, rhs: Cow<'c, [usize]>) -> Cow<'c, [usize
 
 /// Intersection is using for AND
 #[inline]
-pub fn intersection<'c>(lhs: Cow<'c, [usize]>, rhs: Cow<'c, [usize]>) -> Cow<'c, [usize]> {
+pub fn intersection<'a, I: Ord + Clone>(lhs: Cow<'a, [I]>, rhs: Cow<'a, [I]>) -> Cow<'a, [I]> {
     if lhs.is_empty() {
         return lhs;
     }
@@ -97,7 +97,7 @@ pub fn intersection<'c>(lhs: Cow<'c, [usize]>, rhs: Cow<'c, [usize]>) -> Cow<'c,
     let (mut li, mut ri) = (0, 0);
 
     loop {
-        let l = lhs[li];
+        let l = lhs[li].clone();
 
         match l.cmp(&rhs[ri]) {
             Equal => {

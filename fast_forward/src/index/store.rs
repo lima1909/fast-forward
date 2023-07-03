@@ -1,9 +1,9 @@
 //! A `Store` is saving `Indices` for a given `Key`,
 //! with the goal, to get the `Indices` as fast as possible.
 
-use std::ops::Index;
+use std::{fmt::Debug, ops::Index};
 
-use super::{indices::EMPTY_INDICES, Indices};
+use super::Indices;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Filterable {
@@ -108,24 +108,25 @@ pub trait Store: Filterable {
 /// Returns a list to the indices [`Indices`] corresponding to the key.
 pub trait Filterable {
     type Key;
+    type Index;
 
     /// Checks whether the `Key` exists.
     fn contains(&self, key: &Self::Key) -> bool;
 
     /// Get all indices for a given `Key`.
     /// If the `Key` not exist, than this method returns [`crate::index::indices::EMPTY_INDICES`]
-    fn get(&self, key: &Self::Key) -> &[usize];
+    fn get(&self, key: &Self::Key) -> &[Self::Index];
 
     /// Get all indices for a given `Key`, if the `check` functions returns `true`.
     /// If the `Key` not exist, than this method returns [`crate::index::indices::EMPTY_INDICES`]
-    fn get_with_check<F>(&self, key: &Self::Key, check: F) -> &[usize]
+    fn get_with_check<F>(&self, key: &Self::Key, check: F) -> &[Self::Index]
     where
         F: Fn(&Self::Key) -> bool,
     {
         if check(key) {
             return self.get(key);
         }
-        EMPTY_INDICES
+        &[]
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -165,7 +166,10 @@ where
     F: Filterable,
 {
     #[inline]
-    pub fn eq(&self, key: &F::Key) -> Indices<'f> {
+    pub fn eq(&self, key: &F::Key) -> Indices<'f, F::Index>
+    where
+        F::Index: Clone + Debug,
+    {
         Indices::from_sorted_slice(self.0.get(key))
     }
 
@@ -179,19 +183,23 @@ where
         &'f self,
         key: &F::Key,
         items: &'f I,
-    ) -> impl Iterator<Item = &'f <I as Index<usize>>::Output>
+    ) -> impl Iterator<Item = &'f <I as Index<F::Index>>::Output>
     where
-        I: Index<usize>,
+        I: Index<F::Index>,
+        F::Index: Clone + Debug,
     {
-        self.0.get(key).iter().map(|i| &items[*i])
+        self.0.get(key).iter().map(|i| &items[i.clone()])
     }
 }
 
 /// `Many` is an `Iterator` for the result from [`Filterable::get_many()`].
-pub struct Many<'m, F, K> {
+pub struct Many<'m, F, K>
+where
+    F: Filterable,
+{
     filter: &'m F,
     keys: K,
-    iter: std::slice::Iter<'m, usize>,
+    iter: std::slice::Iter<'m, F::Index>,
 }
 
 impl<'m, F, K> Many<'m, F, K>
@@ -202,26 +210,28 @@ where
     pub fn new(filter: &'m F, mut keys: K) -> Self {
         let iter = match keys.next() {
             Some(k) => filter.get(&k).iter(),
-            None => EMPTY_INDICES.iter(),
+            None => [].iter(),
         };
 
         Self { filter, keys, iter }
     }
 
-    pub fn items<I>(self, items: &'m I) -> impl Iterator<Item = &'m <I as Index<usize>>::Output>
+    pub fn items<I>(self, items: &'m I) -> impl Iterator<Item = &'m <I as Index<F::Index>>::Output>
     where
-        I: Index<usize>,
-        <I as Index<usize>>::Output: Sized,
+        I: Index<F::Index>,
+        <I as Index<F::Index>>::Output: Sized,
+        F::Index: Clone,
     {
-        self.map(|i| &items[*i])
+        self.map(|i| &items[i.clone()])
     }
 
-    pub fn items_vec<I>(self, items: &'m I) -> Vec<&'m <I as Index<usize>>::Output>
+    pub fn items_vec<I>(self, items: &'m I) -> Vec<&'m <I as Index<F::Index>>::Output>
     where
-        I: Index<usize>,
-        <I as Index<usize>>::Output: Sized,
+        I: Index<F::Index>,
+        <I as Index<F::Index>>::Output: Sized,
+        F::Index: Clone,
     {
-        self.map(|i| &items[*i]).collect()
+        self.map(|i| &items[i.clone()]).collect()
     }
 }
 
@@ -231,7 +241,7 @@ where
     K: Iterator<Item = F::Key> + 'm,
     Self: 'm,
 {
-    type Item = &'m usize;
+    type Item = &'m F::Index;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(i) = self.iter.next() {
@@ -275,11 +285,12 @@ mod tests {
 
     impl Filterable for StrIndex {
         type Key = &'static str;
+        type Index = usize;
 
         fn get(&self, key: &Self::Key) -> &[usize] {
             match self.idx.get(key) {
                 Some(i) => i.as_slice(),
-                None => EMPTY_INDICES,
+                None => &[],
             }
         }
 
@@ -291,13 +302,13 @@ mod tests {
     trait Or<'f> {
         type Key;
 
-        fn or(&'f self, key1: &Self::Key, key2: &Self::Key) -> Indices<'f>;
+        fn or(&'f self, key1: &Self::Key, key2: &Self::Key) -> Indices<'f, usize>;
     }
 
-    impl<'f, F: Filterable> Or<'f> for Filter<'f, F> {
+    impl<'f, F: Filterable<Index = usize>> Or<'f> for Filter<'f, F> {
         type Key = F::Key;
 
-        fn or(&'f self, key1: &Self::Key, key2: &Self::Key) -> Indices<'f> {
+        fn or(&'f self, key1: &Self::Key, key2: &Self::Key) -> Indices<'f, usize> {
             self.eq(key1) | self.eq(key2)
         }
     }

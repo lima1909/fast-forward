@@ -39,6 +39,7 @@ where
     K: Default + Hash + Eq,
 {
     type Key = K;
+    type Index = usize;
 
     #[inline]
     fn get(&self, key: &Self::Key) -> &[usize] {

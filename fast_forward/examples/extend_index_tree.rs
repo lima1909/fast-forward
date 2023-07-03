@@ -12,7 +12,7 @@ trait Parents<'a> {
 
 impl<'a, F, L> Parents<'a> for Filter<'a, F, L>
 where
-    F: Filterable<Key = usize>,
+    F: Filterable<Key = usize, Index = usize>,
     L: Index<usize, Output = Node>,
 {
     fn parents(&self, key: usize, stop: usize) -> Indices<'a> {

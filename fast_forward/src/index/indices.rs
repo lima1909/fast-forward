@@ -4,6 +4,7 @@
 //! which you can use for operations like [`std::ops::BitOr`] and [`std::ops::BitAnd`].
 use std::{
     borrow::Cow,
+    fmt::Debug,
     ops::{BitAnd, BitOr, Index},
 };
 
@@ -14,19 +15,22 @@ pub const EMPTY_INDICES: &[usize] = &[];
 /// Important: the collection must be sorted!
 #[derive(Debug, Clone, PartialEq)]
 #[repr(transparent)]
-pub struct KeyIndices(Vec<usize>);
+pub struct KeyIndices<I = usize>(Vec<I>);
 
-impl KeyIndices {
+impl<I> KeyIndices<I>
+where
+    I: Ord + PartialEq,
+{
     /// Create a new Indices collection with the initial Index.
     #[inline]
-    pub fn new(idx: usize) -> Self {
+    pub fn new(idx: I) -> Self {
         Self(vec![idx])
     }
 
     /// Add new Index to a sorted collection.
     /// The collection is unique.
     #[inline]
-    pub fn add(&mut self, idx: usize) {
+    pub fn add(&mut self, idx: I) {
         if let Err(pos) = self.0.binary_search(&idx) {
             self.0.insert(pos, idx);
         }
@@ -34,13 +38,13 @@ impl KeyIndices {
 
     /// Remove one Index and return left free Indices.
     #[inline]
-    pub fn remove(&mut self, idx: usize) -> &[usize] {
+    pub fn remove(&mut self, idx: I) -> &[I] {
         self.0.retain(|v| v != &idx);
         self.0.as_ref()
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[usize] {
+    pub fn as_slice(&self) -> &[I] {
         self.0.as_ref()
     }
 }
@@ -49,50 +53,53 @@ impl KeyIndices {
 /// The `Indices` can be created as result from quering (filtering) a list.
 #[derive(Debug, PartialEq)]
 #[repr(transparent)]
-pub struct Indices<'i>(Cow<'i, [usize]>);
+pub struct Indices<'i, I: Clone + Debug = usize>(Cow<'i, [I]>);
 
-impl<'i> Indices<'i> {
+impl<'i, I> Indices<'i, I>
+where
+    I: Clone + Debug,
+{
     /// Create a new empty Indices.
     #[inline]
     pub const fn empty() -> Self {
-        Self(Cow::Borrowed(EMPTY_INDICES))
+        Self(Cow::Owned(vec![]))
     }
 
     /// Create an Incices from an given __sorted__ slice.
-    pub const fn from_sorted_slice(s: &'i [usize]) -> Self {
+    pub const fn from_sorted_slice(s: &'i [I]) -> Self {
         Self(Cow::Borrowed(s))
     }
 
     /// Return a slice of indices.
     #[inline]
-    pub fn as_slice(&self) -> &[usize] {
+    pub fn as_slice(&self) -> &[I] {
         self.0.as_ref()
     }
 
     /// Is a mapping from indices to Items from an given list.
-    pub fn items<I>(self, list: &'i I) -> impl Iterator<Item = &'i <I as Index<usize>>::Output>
+    pub fn items<Idx>(self, list: &'i Idx) -> impl Iterator<Item = &'i <Idx as Index<I>>::Output>
     where
-        I: Index<usize>,
+        Idx: Index<I>,
     {
         #[allow(clippy::unnecessary_to_owned)]
         self.0.into_owned().into_iter().map(|i| &list[i])
     }
 }
 
-impl<const N: usize> From<[usize; N]> for Indices<'_> {
-    fn from(mut s: [usize; N]) -> Self {
+impl<I: Ord + Clone + Debug, const N: usize> From<[I; N]> for Indices<'_, I> {
+    fn from(mut s: [I; N]) -> Self {
         s.sort();
         Self(Cow::Owned(Vec::from(s)))
     }
 }
 
-impl<const N: usize> PartialEq<Indices<'_>> for [usize; N] {
-    fn eq(&self, other: &Indices) -> bool {
+impl<I: PartialEq + Clone + Debug, const N: usize> PartialEq<Indices<'_, I>> for [I; N] {
+    fn eq(&self, other: &Indices<'_, I>) -> bool {
         (self).eq(&*other.0)
     }
 }
 
-impl BitOr for Indices<'_> {
+impl<I: Ord + Clone + Debug> BitOr for Indices<'_, I> {
     type Output = Self;
 
     fn bitor(self, other: Self) -> Self::Output {
@@ -113,12 +120,12 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
-    impl<'i> Indices<'i> {
-        const fn owned(v: Vec<usize>) -> Self {
+    impl<'i, I: Clone + Debug> Indices<'i, I> {
+        const fn owned(v: Vec<I>) -> Self {
             Self(Cow::Owned(v))
         }
 
-        const fn borrowed(s: &'i [usize]) -> Self {
+        const fn borrowed(s: &'i [I]) -> Self {
             Self(Cow::Borrowed(s))
         }
     }

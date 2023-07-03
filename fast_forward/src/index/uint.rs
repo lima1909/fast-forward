@@ -60,6 +60,7 @@ where
     K: Default + Into<usize> + Copy,
 {
     type Key = K;
+    type Index = usize;
 
     #[inline]
     fn get(&self, key: &Self::Key) -> &[usize] {
