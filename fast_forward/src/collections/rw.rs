@@ -1,6 +1,6 @@
 //! `Read-Write-List` with one index.
 //!
-use std::{fmt::Debug, ops::Index};
+use std::ops::Index;
 
 use crate::{
     collections::{
@@ -20,7 +20,7 @@ impl<S, K, I, F> RWIndexList<S, K, I, F>
 where
     F: Fn(&I) -> K,
     S: Store<Key = K>,
-    S::Index: Clone + Debug,
+    S::Index: Clone,
 {
     pub fn from_vec<It>(store: S, f: F, iter: It) -> Self
     where

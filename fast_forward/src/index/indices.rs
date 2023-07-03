@@ -14,10 +14,7 @@ use std::{
 #[repr(transparent)]
 pub struct KeyIndices<I = usize>(Vec<I>);
 
-impl<I> KeyIndices<I>
-where
-    I: Ord + PartialEq,
-{
+impl<I> KeyIndices<I> {
     /// Create a new Indices collection with the initial Index.
     #[inline]
     pub fn new(idx: I) -> Self {
@@ -27,7 +24,10 @@ where
     /// Add new Index to a sorted collection.
     /// The collection is unique.
     #[inline]
-    pub fn add(&mut self, idx: I) {
+    pub fn add(&mut self, idx: I)
+    where
+        I: Ord,
+    {
         if let Err(pos) = self.0.binary_search(&idx) {
             self.0.insert(pos, idx);
         }
@@ -35,7 +35,10 @@ where
 
     /// Remove one Index and return left free Indices.
     #[inline]
-    pub fn remove(&mut self, idx: I) -> &[I] {
+    pub fn remove(&mut self, idx: I) -> &[I]
+    where
+        I: PartialEq,
+    {
         self.0.retain(|v| v != &idx);
         self.0.as_ref()
     }
@@ -50,11 +53,11 @@ where
 /// The `Indices` can be created as result from quering (filtering) a list.
 #[derive(Debug, PartialEq)]
 #[repr(transparent)]
-pub struct Indices<'i, I: Clone + Debug = usize>(Cow<'i, [I]>);
+pub struct Indices<'i, I: Clone = usize>(Cow<'i, [I]>);
 
 impl<'i, I> Indices<'i, I>
 where
-    I: Clone + Debug,
+    I: Clone,
 {
     /// Create a new empty Indices.
     #[inline]
@@ -83,20 +86,20 @@ where
     }
 }
 
-impl<I: Ord + Clone + Debug, const N: usize> From<[I; N]> for Indices<'_, I> {
+impl<I: Ord + Clone, const N: usize> From<[I; N]> for Indices<'_, I> {
     fn from(mut s: [I; N]) -> Self {
         s.sort();
         Self(Cow::Owned(Vec::from(s)))
     }
 }
 
-impl<I: PartialEq + Clone + Debug, const N: usize> PartialEq<Indices<'_, I>> for [I; N] {
+impl<I: PartialEq + Clone, const N: usize> PartialEq<Indices<'_, I>> for [I; N] {
     fn eq(&self, other: &Indices<'_, I>) -> bool {
         (self).eq(&*other.0)
     }
 }
 
-impl<I: Ord + Clone + Debug> BitOr for Indices<'_, I> {
+impl<I: Ord + Clone> BitOr for Indices<'_, I> {
     type Output = Self;
 
     fn bitor(self, other: Self) -> Self::Output {
@@ -104,7 +107,7 @@ impl<I: Ord + Clone + Debug> BitOr for Indices<'_, I> {
     }
 }
 
-impl BitAnd for Indices<'_> {
+impl<I: Ord + Clone> BitAnd for Indices<'_, I> {
     type Output = Self;
 
     fn bitand(self, other: Self) -> Self::Output {
@@ -117,7 +120,7 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
-    impl<'i, I: Clone + Debug> Indices<'i, I> {
+    impl<'i, I: Clone> Indices<'i, I> {
         const fn owned(v: Vec<I>) -> Self {
             Self(Cow::Owned(v))
         }

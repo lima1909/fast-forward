@@ -5,7 +5,7 @@ pub(crate) mod list;
 pub mod ro;
 pub mod rw;
 
-use std::{fmt::Debug, ops::Index};
+use std::ops::Index;
 
 pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
 use crate::index::{store::Filter as StoreFilter, Filterable, Indices, MetaData, Store};
@@ -19,7 +19,7 @@ pub struct Filter<'a, F, I> {
 impl<'a, F, I> Filter<'a, F, I>
 where
     F: Filterable,
-    F::Index: Clone + Debug,
+    F::Index: Clone,
 {
     const fn new(filter: &'a F, items: &'a I) -> Self {
         Self {
@@ -54,7 +54,7 @@ pub struct Retriever<'a, S, I>(Filter<'a, S, I>);
 impl<'a, S, I> Retriever<'a, S, I>
 where
     S: Store,
-    S::Index: Clone + Debug,
+    S::Index: Clone,
 {
     /// Create a new instance of an [`Retriever`].
     pub const fn new(store: &'a S, items: &'a I) -> Self {
@@ -238,7 +238,7 @@ impl<'a, F, I> View<'a, F, I>
 where
     F: Filterable,
     I: Index<F::Index>,
-    F::Index: Clone + Debug,
+    F::Index: Clone,
 {
     pub fn new(view: F, store: &'a F, items: &'a I) -> Self {
         Self { view, store, items }

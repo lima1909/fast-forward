@@ -2,7 +2,6 @@
 //!
 use std::{
     borrow::Cow,
-    fmt::Debug,
     ops::{Deref, Index},
 };
 
@@ -22,7 +21,7 @@ impl<'i, I, S> ROIndexList<'i, I, S>
 where
     [I]: ToOwned,
     S: Store,
-    S::Index: Clone + Debug,
+    S::Index: Clone,
 {
     pub fn borrowed<K, F>(field: F, items: &'i [I]) -> Self
     where

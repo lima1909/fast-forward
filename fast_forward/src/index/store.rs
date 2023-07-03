@@ -1,7 +1,7 @@
 //! A `Store` is saving `Indices` for a given `Key`,
 //! with the goal, to get the `Indices` as fast as possible.
 
-use std::{fmt::Debug, ops::Index};
+use std::ops::Index;
 
 use super::Indices;
 
@@ -168,7 +168,7 @@ where
     #[inline]
     pub fn eq(&self, key: &F::Key) -> Indices<'f, F::Index>
     where
-        F::Index: Clone + Debug,
+        F::Index: Clone,
     {
         Indices::from_sorted_slice(self.0.get(key))
     }
@@ -186,7 +186,7 @@ where
     ) -> impl Iterator<Item = &'f <I as Index<F::Index>>::Output>
     where
         I: Index<F::Index>,
-        F::Index: Clone + Debug,
+        F::Index: Clone,
     {
         self.0.get(key).iter().map(|i| &items[i.clone()])
     }
