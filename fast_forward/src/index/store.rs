@@ -114,11 +114,11 @@ pub trait Filterable {
     fn contains(&self, key: &Self::Key) -> bool;
 
     /// Get all indices for a given `Key`.
-    /// If the `Key` not exist, than this method returns [`crate::index::indices::EMPTY_INDICES`]
+    /// If the `Key` not exist, than this method returns `empty array`.
     fn get(&self, key: &Self::Key) -> &[Self::Index];
 
     /// Get all indices for a given `Key`, if the `check` functions returns `true`.
-    /// If the `Key` not exist, than this method returns [`crate::index::indices::EMPTY_INDICES`]
+    /// If the `Key` not exist, than this method returns `empty array`.
     fn get_with_check<F>(&self, key: &Self::Key, check: F) -> &[Self::Index]
     where
         F: Fn(&Self::Key) -> bool,

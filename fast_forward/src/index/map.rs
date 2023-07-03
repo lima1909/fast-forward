@@ -26,7 +26,7 @@
 //!   ...     | ...
 //!
 //! ```
-use crate::index::{indices::EMPTY_INDICES, store::Filterable, KeyIndices, Store};
+use crate::index::{store::Filterable, KeyIndices, Store};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
@@ -45,7 +45,7 @@ where
     fn get(&self, key: &Self::Key) -> &[usize] {
         match self.0.get(key) {
             Some(i) => i.as_slice(),
-            None => EMPTY_INDICES,
+            None => &[],
         }
     }
 

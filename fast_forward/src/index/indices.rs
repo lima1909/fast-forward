@@ -8,9 +8,6 @@ use std::{
     ops::{BitAnd, BitOr, Index},
 };
 
-/// An empty list (array) of `Indices`.
-pub const EMPTY_INDICES: &[usize] = &[];
-
 /// `KeyIndices` contains all indices for a given `Key`.
 /// Important: the collection must be sorted!
 #[derive(Debug, Clone, PartialEq)]

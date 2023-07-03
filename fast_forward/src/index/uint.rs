@@ -31,7 +31,6 @@
 //! ...  | ...
 //! ```
 use crate::index::{
-    indices::EMPTY_INDICES,
     store::{Filterable, MetaData},
     KeyIndices, MinMax, Store,
 };
@@ -67,7 +66,7 @@ where
         let i: usize = (*key).into();
         match self.data.get(i) {
             Some(Some(idx)) => idx.as_slice(),
-            _ => EMPTY_INDICES,
+            _ => &[],
         }
     }
 
