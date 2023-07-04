@@ -2,52 +2,66 @@
 //!
 use std::{
     borrow::Cow,
+    marker::PhantomData,
     ops::{Deref, Index},
 };
 
 use crate::{collections::Retriever, index::Store};
 
-pub struct IVec<S, T> {
+// [`IList`] is a read only `List` with one index.
+pub struct IList<S, T, L = Vec<T>, X = usize>
+where
+    L: Index<X>,
+{
     store: S,
-    items: Vec<T>,
+    items: L,
+    _type: PhantomData<T>,
+    _idx: PhantomData<X>,
 }
 
-// [`IVec`] is a read only [`std::vec::Vec`] with one index.
-impl<S, T> IVec<S, T>
+impl<S, T, L, X> IList<S, T, L, X>
 where
+    L: Index<X>,
     S: Store,
-    S::Index: Clone,
 {
-    pub fn new<K, F>(field: F, items: Vec<T>) -> Self
-    where
-        F: Fn(&T) -> K,
-        S: Store<Key = K>,
-    {
-        Self {
-            store: S::from_iter(items.iter().map(field)),
-            items,
-        }
-    }
-
-    pub fn from_iter<K, F, I>(field: F, items: I) -> Self
+    pub fn new<F, K, I>(field: F, items: I) -> Self
     where
         F: Fn(&T) -> K,
         S: Store<Key = K>,
         I: IntoIterator<Item = T>,
+        L: FromIterator<T>,
     {
-        Self::new(field, Vec::from_iter(items))
+        let v = Vec::from_iter(items);
+        Self {
+            store: S::from_iter(v.iter().map(field)),
+            items: L::from_iter(v),
+            _type: PhantomData,
+            _idx: PhantomData,
+        }
     }
 
-    pub fn idx(&self) -> Retriever<'_, S, Vec<T>> {
+    pub fn idx(&self) -> Retriever<'_, S, L> {
         Retriever::new(&self.store, &self.items)
     }
 }
 
-impl<S, T> Deref for IVec<S, T> {
+impl<S, T, L> Deref for IList<S, T, L>
+where
+    L: Deref<Target = [T]> + Index<usize>,
+{
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
         &self.items
+    }
+}
+
+impl<S, T, L> AsRef<[T]> for IList<S, T, L>
+where
+    L: AsRef<[T]> + Index<usize>,
+{
+    fn as_ref(&self) -> &[T] {
+        self.items.as_ref()
     }
 }
 
@@ -150,6 +164,59 @@ mod tests {
         ]
     }
 
+    #[rstest]
+    fn ilist_vec(cars: Vec<Car>) {
+        let l: IList<UIntIndex, _> = IList::new(Car::id, cars);
+
+        // deref
+        assert_eq!(4, l.len());
+        assert_eq!(Car(2, "BMW".into()), l[0]);
+
+        // store
+        assert!(l.idx().contains(&2));
+        assert!(!l.idx().contains(&2000));
+
+        let mut it = l.idx().get(&2);
+        assert_eq!(Some(&Car(2, "BMW".into())), it.next());
+        assert_eq!(Some(&Car(2, "VW".into())), it.next());
+        assert_eq!(None, it.next());
+
+        let mut it = l.idx().get_many([99, 5]);
+        assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+        assert_eq!(Some(&Car(5, "Audi".into())), it.next());
+        assert_eq!(None, it.next());
+
+        let mut it = l.idx().filter(|f| {
+            assert!(f.contains(&99));
+
+            let idxs = f.eq(&99);
+            assert_eq!([3], idxs);
+
+            let mut it = f.items(&99);
+            assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+            assert_eq!(None, it.next());
+
+            idxs
+        });
+        assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+        assert_eq!(None, it.next());
+
+        assert_eq!(2, l.idx().meta().min());
+        assert_eq!(99, l.idx().meta().max());
+    }
+
+    // #[test]
+    // fn ilist_hashmap() {
+    // use std::collections::HashMap;
+    //     let mut m = HashMap::new();
+    //     m.insert("BMW", Car(2, "BMW".into()));
+    //     m.insert("Audi", Car(5, "Audi".into()));
+
+    //     let l: IList<UIntIndex, _, HashMap<&'static str, Car>, &'static str> =
+    //         IList::new(Car::id, m);
+    // }
+
+    // -----------------------------------------------------
     #[rstest]
     fn read_only_index_list_from_vec(cars: Vec<Car>) {
         let l: ROIndexList<'_, _, UIntIndex> = ROIndexList::borrowed(Car::id, &cars);

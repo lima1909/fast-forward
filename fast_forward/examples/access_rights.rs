@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-use fast_forward::{collections::ro::IVec, index::map::MapIndex};
+use fast_forward::{collections::ro, index::map::MapIndex};
 
 #[derive(Debug, PartialEq)]
 pub struct Car {
@@ -9,7 +9,7 @@ pub struct Car {
 }
 
 fn main() {
-    let l: IVec<MapIndex, _> = IVec::from_iter(
+    let l: ro::IList<MapIndex, _> = ro::IList::new(
         |c| c.name.clone(),
         [
             Car {

@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use fast_forward::collections::ro::ROIndexList;
+use fast_forward::collections::ro::IList;
 use fast_forward::index::map::MapIndex;
 use fast_forward::index::store::Filter;
 use fast_forward::index::uint::UIntIndex;
@@ -44,7 +44,7 @@ fn list_index(c: &mut Criterion) {
     let FIND_PERSON_3: Person = Person(FIND_ID_3, format!("Jasmin {FIND_ID_3}"));
 
     // read only index list
-    let ro_idx = ROIndexList::<'_, _, UIntIndex>::borrowed(Person::id, &v);
+    let ro_idx = IList::<UIntIndex, _>::new(Person::id, v.clone());
 
     // create search index
     let mut idx = Indices {
