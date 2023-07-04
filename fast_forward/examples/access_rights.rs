@@ -1,17 +1,17 @@
 #![allow(dead_code, unused_variables)]
 
-use fast_forward::{collections::ROIndexList, index::map::MapIndex};
+use fast_forward::{collections::ro::IVec, index::map::MapIndex};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Car {
     id: usize,
     name: String,
 }
 
 fn main() {
-    let l: ROIndexList<'_, _, MapIndex> = ROIndexList::owned(
+    let l: IVec<MapIndex, _> = IVec::from_iter(
         |c| c.name.clone(),
-        vec![
+        [
             Car {
                 id: 99,
                 name: "BMW".into(),

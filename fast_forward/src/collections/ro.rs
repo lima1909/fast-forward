@@ -7,6 +7,50 @@ use std::{
 
 use crate::{collections::Retriever, index::Store};
 
+pub struct IVec<S, T> {
+    store: S,
+    items: Vec<T>,
+}
+
+// [`IVec`] is a read only [`std::vec::Vec`] with one index.
+impl<S, T> IVec<S, T>
+where
+    S: Store,
+    S::Index: Clone,
+{
+    pub fn new<K, F>(field: F, items: Vec<T>) -> Self
+    where
+        F: Fn(&T) -> K,
+        S: Store<Key = K>,
+    {
+        Self {
+            store: S::from_iter(items.iter().map(field)),
+            items,
+        }
+    }
+
+    pub fn from_iter<K, F, I>(field: F, items: I) -> Self
+    where
+        F: Fn(&T) -> K,
+        S: Store<Key = K>,
+        I: IntoIterator<Item = T>,
+    {
+        Self::new(field, Vec::from_iter(items))
+    }
+
+    pub fn idx(&self) -> Retriever<'_, S, Vec<T>> {
+        Retriever::new(&self.store, &self.items)
+    }
+}
+
+impl<S, T> Deref for IVec<S, T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        &self.items
+    }
+}
+
 // [`ROIndexList`] is a read only list with one index.
 //
 pub struct ROIndexList<'i, I, S>

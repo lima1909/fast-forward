@@ -19,7 +19,6 @@ pub struct Filter<'a, F, I> {
 impl<'a, F, I> Filter<'a, F, I>
 where
     F: Filterable,
-    F::Index: Clone,
 {
     const fn new(filter: &'a F, items: &'a I) -> Self {
         Self {
@@ -29,7 +28,10 @@ where
     }
 
     #[inline]
-    pub fn eq(&self, key: &F::Key) -> Indices<'a, F::Index> {
+    pub fn eq(&self, key: &F::Key) -> Indices<'a, F::Index>
+    where
+        F::Index: Clone,
+    {
         self.filter.eq(key)
     }
 
@@ -42,6 +44,7 @@ where
     pub fn items(&'a self, key: &F::Key) -> impl Iterator<Item = &'a <I as Index<F::Index>>::Output>
     where
         I: Index<F::Index>,
+        F::Index: Clone,
     {
         self.filter.items(key, self._items)
     }
@@ -54,7 +57,6 @@ pub struct Retriever<'a, S, I>(Filter<'a, S, I>);
 impl<'a, S, I> Retriever<'a, S, I>
 where
     S: Store,
-    S::Index: Clone,
 {
     /// Create a new instance of an [`Retriever`].
     pub const fn new(store: &'a S, items: &'a I) -> Self {
@@ -62,7 +64,10 @@ where
     }
 
     #[inline]
-    pub fn eq(&self, key: &S::Key) -> Indices<'a, S::Index> {
+    pub fn eq(&self, key: &S::Key) -> Indices<'a, S::Index>
+    where
+        S::Index: Clone,
+    {
         self.0.eq(key)
     }
 
@@ -114,6 +119,7 @@ where
     pub fn get(&self, key: &S::Key) -> impl Iterator<Item = &'a <I as Index<S::Index>>::Output>
     where
         I: Index<S::Index>,
+        S::Index: Clone,
     {
         self.0
             .filter
@@ -162,6 +168,7 @@ where
         II: IntoIterator<Item = S::Key> + 'a,
         I: Index<S::Index>,
         <I as Index<S::Index>>::Output: Sized,
+        S::Index: Clone,
     {
         self.0
             .filter
@@ -202,6 +209,7 @@ where
     where
         P: Fn(&Filter<'a, S, I>) -> Indices<'a, S::Index>,
         I: Index<S::Index>,
+        S::Index: Clone,
     {
         predicate(&self.0).items(self.0._items)
     }
@@ -212,6 +220,7 @@ where
     where
         II: IntoIterator<Item = S::Key> + ExactSizeIterator + 'a,
         I: Index<S::Index>,
+        S::Index: Clone,
     {
         View::new(S::from_iter(keys), self.0.filter.0, self.0._items)
     }
@@ -238,14 +247,16 @@ impl<'a, F, I> View<'a, F, I>
 where
     F: Filterable,
     I: Index<F::Index>,
-    F::Index: Clone,
 {
     pub fn new(view: F, store: &'a F, items: &'a I) -> Self {
         Self { view, store, items }
     }
 
     #[inline]
-    pub fn eq(&self, key: &F::Key) -> Indices<'a, F::Index> {
+    pub fn eq(&self, key: &F::Key) -> Indices<'a, F::Index>
+    where
+        F::Index: Clone,
+    {
         Indices::from_sorted_slice(self.store.get_with_check(key, |k| self.view.contains(k)))
     }
 
@@ -258,7 +269,10 @@ where
     pub fn get(
         &'a self,
         key: &'a F::Key,
-    ) -> impl Iterator<Item = &'a <I as Index<F::Index>>::Output> {
+    ) -> impl Iterator<Item = &'a <I as Index<F::Index>>::Output>
+    where
+        F::Index: Clone,
+    {
         self.store
             .get_with_check(key, |k| self.view.contains(k))
             .iter()
@@ -274,6 +288,7 @@ where
         II: IntoIterator<Item = F::Key> + 'a,
         I: Index<F::Index>,
         <I as Index<F::Index>>::Output: Sized,
+        F::Index: Clone,
     {
         let keys = keys.into_iter().filter(|key| self.view.contains(key));
         self.store.get_many(keys).map(|i| &self.items[i.clone()])
@@ -287,6 +302,7 @@ where
     where
         P: Fn(Filter<'a, View<'a, F, I>, I>) -> Indices<'a>,
         I: Index<usize>,
+        F::Index: Clone,
     {
         let filter = Filter::new(self, self.items);
         predicate(filter).items(self.items)
@@ -306,7 +322,6 @@ where
 impl<'a, F, I> Filterable for View<'a, F, I>
 where
     F: Filterable,
-    F::Index: Clone,
 {
     type Key = F::Key;
     type Index = F::Index;
