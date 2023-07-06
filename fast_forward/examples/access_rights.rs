@@ -34,12 +34,12 @@ fn main() {
     // let mut it = l.idx().create_view([1, 3, 99]).filter(|c| c.id < 10_000);
     let view = l
         .idx()
-        .create_view(vec![String::from("Porsche"), String::from("BMW")].into_iter());
+        .create_view([String::from("Porsche"), String::from("BMW")]);
 
     // no ACL, can not see car Ferrari
-    assert!(!view.contains(&String::from("Ferrari")));
-    assert_eq!(None, view.get(&String::from("Ferrari")).next());
-    assert!(view.get_many([String::from("Ferrari")]).next().is_none());
+    assert!(!view.contains(&String::from("Audi")));
+    assert_eq!(None, view.get(&String::from("Audi")).next());
+    assert!(view.get_many([String::from("Audi")]).next().is_none());
 
     assert_eq!(
         3,

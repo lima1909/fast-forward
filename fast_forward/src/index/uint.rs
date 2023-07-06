@@ -31,7 +31,7 @@
 //! ...  | ...
 //! ```
 use crate::index::{
-    store::{Filterable, MetaData},
+    store::{Filterable, Keys, MetaData},
     KeyIndices, MinMax, Store,
 };
 use std::marker::PhantomData;
@@ -119,6 +119,37 @@ where
             min_max_cache: MinMax::default(),
             _key: PhantomData,
         }
+    }
+}
+
+impl<K> Keys for UIntIndex<K>
+where
+    K: Default + Into<usize> + Copy + Ord,
+{
+    type Key = K;
+
+    fn exist(&self, key: &K) -> bool {
+        matches!(self.data.get((*key).into()), Some(Some(_)))
+    }
+
+    fn add_key(&mut self, key: K) {
+        let k = key.into();
+
+        if self.data.len() <= k {
+            self.data.resize(k + 1, None);
+        }
+
+        self.data[k] = Some(KeyIndices::empty());
+    }
+
+    fn from_iter<I>(it: I) -> Self
+    where
+        I: IntoIterator<Item = K>,
+    {
+        let v = Vec::from_iter(it);
+        let mut view = Self::with_capacity(v.iter().max().map(|k| (*k).into()).unwrap_or_default());
+        v.into_iter().for_each(|key| view.add_key(key));
+        view
     }
 }
 
@@ -494,6 +525,34 @@ mod tests {
 
             assert!(i.contains(&2));
             assert!(!i.contains(&55));
+        }
+    }
+
+    mod keys {
+        use super::*;
+
+        #[test]
+        fn empty() {
+            let keys = UIntIndex::from_iter(Vec::<usize>::new());
+            assert!(!keys.exist(&1));
+        }
+
+        #[test]
+        fn one() {
+            let keys = UIntIndex::from_iter([2usize]);
+            assert!(!keys.exist(&1));
+            assert!(keys.exist(&2));
+        }
+
+        #[test]
+        fn add_key() {
+            let mut keys = UIntIndex::from_iter([2usize]);
+            assert!(!keys.exist(&1));
+            assert!(keys.exist(&2));
+
+            keys.add_key(1);
+            assert!(keys.exist(&1));
+            assert!(keys.exist(&2));
         }
     }
 }

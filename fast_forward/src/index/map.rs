@@ -26,7 +26,10 @@
 //!   ...     | ...
 //!
 //! ```
-use crate::index::{store::Filterable, KeyIndices, Store};
+use crate::index::{
+    store::{Filterable, Keys},
+    KeyIndices, Store,
+};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
@@ -77,6 +80,31 @@ where
 
     fn with_capacity(capacity: usize) -> Self {
         MapIndex(HashMap::with_capacity(capacity))
+    }
+}
+
+impl<K> Keys for MapIndex<K>
+where
+    K: Default + Eq + Hash,
+{
+    type Key = K;
+
+    fn exist(&self, key: &K) -> bool {
+        self.0.contains_key(key)
+    }
+
+    fn add_key(&mut self, key: K) {
+        self.0.insert(key, KeyIndices::empty());
+    }
+
+    fn from_iter<I>(it: I) -> Self
+    where
+        I: IntoIterator<Item = K>,
+    {
+        let v = Vec::from_iter(it);
+        let mut view = Self::with_capacity(v.len());
+        v.into_iter().for_each(|key| view.add_key(key));
+        view
     }
 }
 
@@ -293,6 +321,34 @@ mod tests {
 
             assert!(idx.contains(&"Jasmin"));
             assert!(!idx.contains(&"Paul"));
+        }
+    }
+
+    mod keys {
+        use super::*;
+
+        #[test]
+        fn empty() {
+            let keys = MapIndex::from_iter(Vec::<String>::new());
+            assert!(!keys.exist(&"Foo".into()));
+        }
+
+        #[test]
+        fn one() {
+            let keys = MapIndex::from_iter([String::from("Foo")]);
+            assert!(!keys.exist(&"Bar".into()));
+            assert!(keys.exist(&"Foo".into()));
+        }
+
+        #[test]
+        fn add_key() {
+            let mut keys = MapIndex::from_iter([String::from("Foo")]);
+            assert!(!keys.exist(&"Bar".into()));
+            assert!(keys.exist(&"Foo".into()));
+
+            keys.add_key(String::from("Bar"));
+            assert!(keys.exist(&"Bar".into()));
+            assert!(keys.exist(&"Foo".into()));
         }
     }
 }

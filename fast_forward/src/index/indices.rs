@@ -15,6 +15,12 @@ use std::{
 pub struct KeyIndices<I = usize>(Vec<I>);
 
 impl<I> KeyIndices<I> {
+    /// Create a new empty KeyIndices.
+    #[inline]
+    pub const fn empty() -> Self {
+        Self(vec![])
+    }
+
     /// Create a new Indices collection with the initial Index.
     #[inline]
     pub fn new(idx: I) -> Self {
@@ -132,6 +138,12 @@ mod tests {
 
     mod key_indices {
         use super::*;
+
+        #[test]
+        fn empty() {
+            let empty: [usize; 0] = [];
+            assert_eq!(empty, KeyIndices::<usize>::empty().as_slice());
+        }
 
         #[test]
         fn unique() {

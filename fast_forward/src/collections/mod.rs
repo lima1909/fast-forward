@@ -8,7 +8,10 @@ pub mod rw;
 use std::ops::Index;
 
 pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
-use crate::index::{store::Filter as StoreFilter, Filterable, Indices, MetaData, Store};
+use crate::index::{
+    store::{Filter as StoreFilter, Keys},
+    Filterable, Indices, MetaData, Store,
+};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'a, F, I> {
@@ -216,14 +219,14 @@ where
 
     ///
     #[inline]
-    pub fn create_view<II>(&self, keys: II) -> View<'a, S, I>
+    pub fn create_view<It>(&self, keys: It) -> View<'a, S, S, I>
     where
-        II: IntoIterator<Item = S::Key> + ExactSizeIterator + 'a,
-        <II as IntoIterator>::IntoIter: ExactSizeIterator,
-        S: Store<Index = usize>,
+        It: IntoIterator<Item = <S as Keys>::Key>,
         I: Index<S::Index>,
+        S: Filterable,
+        S: Keys<Key = <S as Filterable>::Key>,
     {
-        View::new(S::from_slice(keys), self.0.filter.0, self.0._items)
+        View::new(S::from_iter(keys), self.0.filter.0, self.0._items)
     }
 
     /// Returns Meta data, if the [`crate::index::Store`] supports any.
@@ -238,32 +241,33 @@ where
 
 /// A `View` is a wrapper for an given [`Store`],
 /// that can be only use (read only) for [`Filterable`] operations.
-pub struct View<'a, F, I> {
-    view: F,
+pub struct View<'a, K, F, I> {
+    keys: K,
     store: &'a F,
     items: &'a I,
 }
 
-impl<'a, F, I> View<'a, F, I>
+impl<'a, K, F, I> View<'a, K, F, I>
 where
     F: Filterable,
+    K: Keys<Key = F::Key>,
     I: Index<F::Index>,
 {
-    pub fn new(view: F, store: &'a F, items: &'a I) -> Self {
-        Self { view, store, items }
+    pub fn new(keys: K, store: &'a F, items: &'a I) -> Self {
+        Self { keys, store, items }
     }
 
     #[inline]
-    pub fn eq(&self, key: &F::Key) -> Indices<'a, F::Index>
+    pub fn eq(&self, key: &K::Key) -> Indices<'a, F::Index>
     where
         F::Index: Clone,
     {
-        Indices::from_sorted_slice(self.store.get_with_check(key, |k| self.view.contains(k)))
+        Indices::from_sorted_slice(self.store.get_with_check(key, |k| self.keys.exist(k)))
     }
 
     #[inline]
-    pub fn contains(&self, key: &F::Key) -> bool {
-        self.view.contains(key)
+    pub fn contains(&self, key: &K::Key) -> bool {
+        self.keys.exist(key)
     }
 
     #[inline]
@@ -275,7 +279,7 @@ where
         F::Index: Clone,
     {
         self.store
-            .get_with_check(key, |k| self.view.contains(k))
+            .get_with_check(key, |k| self.keys.exist(k))
             .iter()
             .map(|i| &self.items[i.clone()])
     }
@@ -291,7 +295,7 @@ where
         <I as Index<F::Index>>::Output: Sized,
         F::Index: Clone,
     {
-        let keys = keys.into_iter().filter(|key| self.view.contains(key));
+        let keys = keys.into_iter().filter(|key| self.keys.exist(key));
         self.store.get_many(keys).map(|i| &self.items[i.clone()])
     }
 
@@ -301,7 +305,7 @@ where
         predicate: P,
     ) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
     where
-        P: Fn(Filter<'a, View<'a, F, I>, I>) -> Indices<'a>,
+        P: Fn(Filter<'a, View<'a, K, F, I>, I>) -> Indices<'a>,
         I: Index<usize>,
         F::Index: Clone,
     {
@@ -320,19 +324,20 @@ where
     // }
 }
 
-impl<'a, F, I> Filterable for View<'a, F, I>
+impl<'a, K, F, I> Filterable for View<'a, K, F, I>
 where
-    F: Filterable,
+    K: Keys,
+    F: Filterable<Key = K::Key>,
 {
     type Key = F::Key;
     type Index = F::Index;
 
     fn contains(&self, key: &Self::Key) -> bool {
-        self.view.contains(key)
+        self.keys.exist(key)
     }
 
     fn get(&self, key: &Self::Key) -> &[F::Index] {
-        self.store.get_with_check(key, |k| self.view.contains(k))
+        self.store.get_with_check(key, |k| self.keys.exist(k))
     }
 }
 
@@ -375,7 +380,7 @@ mod tests {
 
     #[rstest]
     fn view_eq(list: ROIndexList<'_, Car, UIntIndex>) {
-        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+        let view = list.idx().create_view([1, 3, 99]);
 
         assert!(view.eq(&7).as_slice().iter().next().is_none());
         assert!(view.eq(&2000).as_slice().iter().next().is_none());
@@ -386,7 +391,7 @@ mod tests {
 
     #[rstest]
     fn view_filter(list: ROIndexList<'_, Car, UIntIndex>) {
-        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+        let view = list.idx().create_view([1, 3, 99]);
 
         // 7 is not allowed
         assert_eq!(None, view.filter(|f| f.eq(&7)).next());
@@ -453,7 +458,7 @@ mod tests {
 
     #[rstest]
     fn view_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
-        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+        let view = list.idx().create_view([1, 3, 99]);
 
         assert!(!view.contains(&7));
         assert_eq!(None, view.get(&7).next());
@@ -462,7 +467,7 @@ mod tests {
 
     #[rstest]
     fn view_get_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
-        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+        let view = list.idx().create_view([1, 3, 99]);
 
         assert_eq!(3, view.get_many([1, 99, 7]).collect::<Vec<_>>().len());
 
@@ -486,7 +491,7 @@ mod tests {
 
     #[rstest]
     fn view_get_many_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
-        let view = list.idx().create_view(vec![1, 3, 99].into_iter());
+        let view = list.idx().create_view([1, 3, 99]);
 
         let mut it = view.get_many([99, 7]);
         assert_eq!(

@@ -154,6 +154,24 @@ pub trait Filterable {
     }
 }
 
+/// [`Keys`] is a special kind of a `Store`, which stores only `Key`s.
+/// This is useful, if you want to create a `View` of a [`Store`].
+///
+pub trait Keys {
+    type Key;
+
+    /// Checks if the `Key`exist.
+    fn exist(&self, key: &Self::Key) -> bool;
+
+    /// Insert a new `Key`. If the Key already exists, then will be ignored.
+    fn add_key(&mut self, key: Self::Key);
+
+    /// Create a new `Key-Store` from a given List of `Key`s.
+    fn from_iter<I>(it: I) -> Self
+    where
+        I: IntoIterator<Item = Self::Key>;
+}
+
 /// Meta data from the [`Store`], like min or max value of the `Key`.
 pub trait MetaData {
     type Meta<'m>
