@@ -217,7 +217,7 @@ mod tests {
 
     #[rstest]
     fn ilist_vec(cars: Vec<Car>) {
-        let l: IList<UIntIndex, _> = IList::new(Car::id, cars);
+        let l = IList::<UIntIndex, _>::new(Car::id, cars);
 
         // deref
         assert_eq!(4, l.len());
@@ -303,7 +303,6 @@ mod tests {
         assert_eq!(99, l.idx().meta().max());
     }
 
-    // -----------------------------------------------------
     #[rstest]
     fn read_only_index_list_from_vec(cars: Vec<Car>) {
         let l: ROIndexList<'_, _, UIntIndex> = ROIndexList::borrowed(Car::id, &cars);

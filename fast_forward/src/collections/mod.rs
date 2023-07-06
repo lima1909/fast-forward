@@ -7,7 +7,6 @@ pub mod rw;
 
 use std::ops::Index;
 
-pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
 use crate::index::{
     indices::Indices,
     store::{Filter as StoreFilter, Filterable, Keys, MetaData, Store},
@@ -80,14 +79,14 @@ where
     ///
     /// ```
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
-    /// use fast_forward::collections::ro::ROIndexList;
+    /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
     /// pub struct Car(usize, String);
     ///
     /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
     ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(|c: &Car| c.0, &cars);
+    /// let l = IList::<UIntIndex, _>::new(|c| c.0, cars);
     ///
     /// assert!(l.idx().contains(&2));
     /// assert!(!l.idx().contains(&99));
@@ -103,7 +102,7 @@ where
     ///
     /// ```
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
-    /// use fast_forward::collections::ro::ROIndexList;
+    /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
     /// pub struct Car(usize, String);
@@ -114,7 +113,7 @@ where
     ///
     /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
     ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(Car::id, &cars);
+    /// let l = IList::<UIntIndex, _>::new(Car::id, cars);
     ///
     /// assert_eq!(Some(&Car(2, "BMW".into())), l.idx().get(&2).next());
     /// ```
@@ -143,7 +142,7 @@ where
     ///
     /// ```
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
-    /// use fast_forward::collections::ro::ROIndexList;
+    /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
     /// pub struct Car(usize, String);
@@ -155,7 +154,7 @@ where
     ///     Car(99, "Porsche".into()),
     /// ];
     ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(|c: &Car| c.0, &cars);
+    /// let l = IList::<UIntIndex, _>::new(|c| c.0, cars);
     ///
     /// let result = l.idx().get_many([2, 5]).collect::<Vec<_>>();
     /// assert_eq!(vec![
@@ -186,14 +185,14 @@ where
     ///
     /// ```
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
-    /// use fast_forward::collections::ro::ROIndexList;
+    /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
     /// pub struct Car(usize, String);
     ///
     /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
     ///
-    /// let l = ROIndexList::<'_, _, UIntIndex>::borrowed(|c: &Car| c.0, &cars);
+    /// let l = IList::<UIntIndex, _>::new(|c| c.0, cars);
     ///
     /// assert_eq!(
     ///     vec![&Car(2, "BMW".into()), &Car(5, "Audi".into())],
@@ -343,7 +342,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::collections::ro::IList;
     use crate::index::uint::UIntIndex;
     use rstest::{fixture, rstest};
 
@@ -354,8 +353,8 @@ mod tests {
     }
 
     #[fixture]
-    fn list<'a>() -> ROIndexList<'a, Car, UIntIndex> {
-        ROIndexList::owned(
+    fn list<'a>() -> IList<UIntIndex, Car> {
+        IList::new(
             |c| c.id,
             vec![
                 Car {
@@ -379,7 +378,7 @@ mod tests {
     }
 
     #[rstest]
-    fn view_eq(list: ROIndexList<'_, Car, UIntIndex>) {
+    fn view_eq(list: IList<UIntIndex, Car>) {
         let view = list.idx().create_view([1, 3, 99]);
 
         assert!(view.eq(&7).as_slice().iter().next().is_none());
@@ -390,7 +389,7 @@ mod tests {
     }
 
     #[rstest]
-    fn view_filter(list: ROIndexList<'_, Car, UIntIndex>) {
+    fn view_filter(list: IList<UIntIndex, Car>) {
         let view = list.idx().create_view([1, 3, 99]);
 
         // 7 is not allowed
@@ -457,7 +456,7 @@ mod tests {
     }
 
     #[rstest]
-    fn view_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
+    fn view_without_7(list: IList<UIntIndex, Car>) {
         let view = list.idx().create_view([1, 3, 99]);
 
         assert!(!view.contains(&7));
@@ -466,7 +465,7 @@ mod tests {
     }
 
     #[rstest]
-    fn view_get_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
+    fn view_get_without_7(list: IList<UIntIndex, Car>) {
         let view = list.idx().create_view([1, 3, 99]);
 
         assert_eq!(3, view.get_many([1, 99, 7]).collect::<Vec<_>>().len());
@@ -490,7 +489,7 @@ mod tests {
     }
 
     #[rstest]
-    fn view_get_many_without_7(list: ROIndexList<'_, Car, UIntIndex>) {
+    fn view_get_many_without_7(list: IList<UIntIndex, Car>) {
         let view = list.idx().create_view([1, 3, 99]);
 
         let mut it = view.get_many([99, 7]);
@@ -512,7 +511,7 @@ mod tests {
     }
 
     #[rstest]
-    fn view_with_range(list: ROIndexList<'_, Car, UIntIndex>) {
+    fn view_with_range(list: IList<UIntIndex, Car>) {
         assert!(!list.idx().create_view(10..100).contains(&7))
     }
 }

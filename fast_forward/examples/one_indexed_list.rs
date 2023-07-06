@@ -1,5 +1,5 @@
 use fast_forward::{
-    collections::RWIndexList,
+    collections::rw::RWIndexList,
     index::{map::MapIndex, store::Store, uint::UIntIndex},
 };
 

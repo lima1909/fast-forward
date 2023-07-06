@@ -282,6 +282,9 @@ mod tests {
             // delete correct Key with last correct Index, Key now longer exist
             idx.delete("Jasmin", &4);
             assert!(idx.get(&"Jasmin").is_empty());
+
+            // delete not exist Key
+            idx.delete("NotExist", &1);
         }
     }
 

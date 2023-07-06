@@ -1,7 +1,7 @@
 use std::ops::Index;
 
 use fast_forward::{
-    collections::{Filter, RWIndexList},
+    collections::{rw::RWIndexList, Filter},
     index::uint::UIntIndex,
     index::{
         indices::Indices,
