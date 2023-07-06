@@ -3,6 +3,7 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
+    hash::Hash,
     marker::PhantomData,
     ops::{Deref, Index},
 };
@@ -10,22 +11,21 @@ use std::{
 use crate::{collections::Retriever, index::store::Store};
 
 // [`IList`] is a read only `List` with one index.
-pub struct IList<S, T, L = Vec<T>, X = usize>
+pub struct IList<S, T, L = Vec<T>>
 where
-    L: Index<X>,
+    L: Index<usize>,
 {
     store: S,
     items: L,
     _type: PhantomData<T>,
-    _idx: PhantomData<X>,
 }
 
-impl<S, T, L, X> IList<S, T, L, X>
+impl<S, T, L> IList<S, T, L>
 where
-    L: Index<X>,
-    S: Store,
+    L: Index<usize>,
+    S: Store<Index = usize>,
 {
-    pub fn from_list<F, K, I>(field: F, items: I) -> Self
+    pub fn new<F, K, I>(field: F, items: I) -> Self
     where
         F: Fn(&T) -> K,
         S: Store<Key = K, Index = usize>,
@@ -33,26 +33,11 @@ where
         L: FromIterator<T>,
     {
         let v = Vec::from_iter(items);
+
         Self {
             store: S::from_list(v.iter().map(field)),
             items: L::from_iter(v),
             _type: PhantomData,
-            _idx: PhantomData,
-        }
-    }
-
-    pub fn from_map<F, K>(field: F, items: HashMap<X, T>) -> Self
-    where
-        F: Fn(&T) -> K,
-        S: Store<Key = K, Index = X>,
-        L: FromIterator<(X, T)>,
-        X: Clone,
-    {
-        Self {
-            store: S::from_map(items.iter().map(|(x, v)| (field(v), x.clone()))),
-            items: L::from_iter(items.into_iter()),
-            _type: PhantomData,
-            _idx: PhantomData,
         }
     }
 
@@ -78,6 +63,56 @@ where
 {
     fn as_ref(&self) -> &[T] {
         self.items.as_ref()
+    }
+}
+
+// [`IMap`] is a read only `Key-Value-Map` with one index.
+pub struct IMap<S, X, T, M = HashMap<X, T>>
+where
+    M: Index<X>,
+{
+    store: S,
+    items: M,
+    _idx: PhantomData<X>,
+    _type: PhantomData<T>,
+}
+
+impl<S, X, T, M> IMap<S, X, T, M>
+where
+    M: Index<X>,
+    S: Store<Index = X>,
+{
+    pub fn new<F, K, I>(field: F, items: I) -> Self
+    where
+        F: Fn(&T) -> K,
+        S: Store<Key = K, Index = X>,
+        I: IntoIterator<Item = (X, T)>,
+        M: FromIterator<(X, T)>,
+        X: Eq + Hash + Clone,
+    {
+        let items: HashMap<X, T> = HashMap::from_iter(items.into_iter());
+        Self {
+            store: S::from_map(items.iter().map(|(x, v)| (field(v), x.clone()))),
+            items: M::from_iter(items.into_iter()),
+            _idx: PhantomData,
+            _type: PhantomData,
+        }
+    }
+
+    pub fn idx(&self) -> Retriever<'_, S, M> {
+        Retriever::new(&self.store, &self.items)
+    }
+}
+
+impl<S, X, T, M> Deref for IMap<S, X, T, M>
+where
+    M: Index<X>,
+    S: Store<Index = X>,
+{
+    type Target = M;
+
+    fn deref(&self) -> &Self::Target {
+        &self.items
     }
 }
 
@@ -182,7 +217,7 @@ mod tests {
 
     #[rstest]
     fn ilist_vec(cars: Vec<Car>) {
-        let l: IList<UIntIndex, _> = IList::from_list(Car::id, cars);
+        let l: IList<UIntIndex, _> = IList::new(Car::id, cars);
 
         // deref
         assert_eq!(4, l.len());
@@ -231,8 +266,10 @@ mod tests {
         m.insert("VW", Car(2, "VW".into()));
         m.insert("Porsche", Car(99, "Porsche".into()));
 
-        let l: IList<UIntIndex<usize, &str>, _, HashMap<&'static str, Car>, &'static str> =
-            IList::from_map(Car::id, m);
+        let l: IMap<UIntIndex<usize, &'static str>, _, Car> = IMap::new(Car::id, m);
+
+        assert_eq!(4, l.len());
+        assert_eq!(Car(2, "BMW".into()), l["BMW"]);
 
         assert!(l.idx().contains(&2));
         assert!(!l.idx().contains(&200));

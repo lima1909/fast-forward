@@ -44,7 +44,7 @@ fn list_index(c: &mut Criterion) {
     let FIND_PERSON_3: Person = Person(FIND_ID_3, format!("Jasmin {FIND_ID_3}"));
 
     // read only index list
-    let ro_idx = IList::<UIntIndex, _>::from_list(Person::id, v.clone());
+    let ro_idx = IList::<UIntIndex, _>::new(Person::id, v.clone());
 
     // create search index
     let mut idx = Indices {
