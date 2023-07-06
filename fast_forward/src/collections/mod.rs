@@ -9,8 +9,8 @@ use std::ops::Index;
 
 pub use crate::collections::{ro::ROIndexList, rw::RWIndexList};
 use crate::index::{
-    store::{Filter as StoreFilter, Keys},
-    Filterable, Indices, MetaData, Store,
+    indices::Indices,
+    store::{Filter as StoreFilter, Filterable, Keys, MetaData, Store},
 };
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
@@ -79,7 +79,7 @@ where
     /// ## Example
     ///
     /// ```
-    /// use fast_forward::index::{Store, uint::UIntIndex};
+    /// use fast_forward::index::{store::Store, uint::UIntIndex};
     /// use fast_forward::collections::ro::ROIndexList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
@@ -102,7 +102,7 @@ where
     /// ## Example
     ///
     /// ```
-    /// use fast_forward::index::{Store, uint::UIntIndex};
+    /// use fast_forward::index::{store::Store, uint::UIntIndex};
     /// use fast_forward::collections::ro::ROIndexList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
@@ -142,7 +142,7 @@ where
     /// ## Example:
     ///
     /// ```
-    /// use fast_forward::index::{Store, uint::UIntIndex};
+    /// use fast_forward::index::{store::Store, uint::UIntIndex};
     /// use fast_forward::collections::ro::ROIndexList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
@@ -185,7 +185,7 @@ where
     /// ## Example
     ///
     /// ```
-    /// use fast_forward::index::{Store, uint::UIntIndex};
+    /// use fast_forward::index::{store::Store, uint::UIntIndex};
     /// use fast_forward::collections::ro::ROIndexList;
     ///
     /// #[derive(Debug, Eq, PartialEq, Clone)]
@@ -229,7 +229,7 @@ where
         View::new(S::from_iter(keys), self.0.filter.0, self.0._items)
     }
 
-    /// Returns Meta data, if the [`crate::index::Store`] supports any.
+    /// Returns Meta data, if the [`crate::index::store::Store`] supports any.
     #[inline]
     pub fn meta(&self) -> S::Meta<'_>
     where

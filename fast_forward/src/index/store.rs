@@ -3,7 +3,7 @@
 
 use std::ops::Index;
 
-use super::Indices;
+use crate::index::indices::Indices;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Filterable {
@@ -89,9 +89,9 @@ pub trait Store: Filterable {
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
 
-    /// Create a new `Store` from a given slice (array, slice, Vec, ...) with a given `Key`.
+    /// Create a new `Store` from a given `List` (array, slice, Vec, ...) with a given `Key`.
     /// The `Index-Type` is `usize`.
-    fn from_slice<I>(it: I) -> Self
+    fn from_list<I>(it: I) -> Self
     where
         I: IntoIterator<Item = Self::Key>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
@@ -101,7 +101,7 @@ pub trait Store: Filterable {
         Self::from_map(it.into_iter().enumerate().map(|(x, k)| (k, x)))
     }
 
-    /// Create a new `Store` from a given `Map` (`Key-Index-Pair`.
+    /// Create a new `Store` from a given `Map` (`Key-Index-Pair`).
     fn from_map<I>(it: I) -> Self
     where
         I: IntoIterator<Item = (Self::Key, Self::Index)> + ExactSizeIterator,
@@ -287,7 +287,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::{map::MapIndex, KeyIndices, Store};
+    use crate::index::{indices::KeyIndices, map::MapIndex};
     use rstest::rstest;
     use std::collections::HashMap;
 
@@ -381,7 +381,7 @@ mod tests {
     #[case::a_double_x(vec!["a", "x"], vec![&"a", &"x", &"x"])]
     fn view_str(#[case] keys: Vec<&str>, #[case] expected: Vec<&&str>) {
         let items = vec!["x", "a", "b", "c", "x", "y", "z"];
-        let map = MapIndex::from_slice(items.clone());
+        let map = MapIndex::from_list(items.clone());
         assert_eq!(expected, map.get_many(keys).items_vec(&items));
     }
 }

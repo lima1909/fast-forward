@@ -27,12 +27,12 @@
 //!
 //! ```
 use crate::index::{
-    store::{Filterable, Keys},
-    KeyIndices, Store,
+    indices::KeyIndices,
+    store::{Filterable, Keys, Store},
 };
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
-/// `Key` is from type [`str`] and use [`std::collections::BTreeMap`] for the searching.
+/// `Key` is from type [`str`] and use [`std::collections::HashMap`] for the searching.
 #[derive(Debug, Default)]
 #[repr(transparent)]
 pub struct MapIndex<K: Default = String>(HashMap<K, KeyIndices>);
@@ -201,7 +201,7 @@ mod tests {
                 String::from("Mario"),
                 String::from("Paul"),
             ];
-            let idx = MapIndex::from_slice(l.clone());
+            let idx = MapIndex::from_list(l.clone());
 
             assert!(idx.get_many([]).items(&l).next().is_none());
 

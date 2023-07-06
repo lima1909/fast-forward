@@ -31,15 +31,16 @@
 //! ...  | ...
 //! ```
 use crate::index::{
-    store::{Filterable, Keys, MetaData},
-    KeyIndices, MinMax, Store,
+    indices::KeyIndices,
+    store::{Filterable, Keys, MetaData, Store},
+    MinMax,
 };
 use std::marker::PhantomData;
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
-pub struct UIntIndex<K: Default = usize> {
-    data: Vec<Option<KeyIndices>>,
+pub struct UIntIndex<K: Default = usize, X = usize> {
+    data: Vec<Option<KeyIndices<X>>>,
     min_max_cache: MinMax<usize>,
     _key: PhantomData<K>,
 }
@@ -54,15 +55,15 @@ impl UIntIndex<usize> {
     }
 }
 
-impl<K> Filterable for UIntIndex<K>
+impl<K, X> Filterable for UIntIndex<K, X>
 where
     K: Default + Into<usize> + Copy,
 {
     type Key = K;
-    type Index = usize;
+    type Index = X;
 
     #[inline]
-    fn get(&self, key: &Self::Key) -> &[usize] {
+    fn get(&self, key: &Self::Key) -> &[X] {
         let i: usize = (*key).into();
         match self.data.get(i) {
             Some(Some(idx)) => idx.as_slice(),
@@ -76,11 +77,12 @@ where
     }
 }
 
-impl<K> Store for UIntIndex<K>
+impl<K, X> Store for UIntIndex<K, X>
 where
     K: Default + Into<usize> + Copy,
+    X: Ord + Clone,
 {
-    fn insert(&mut self, k: K, i: usize) {
+    fn insert(&mut self, k: K, i: X) {
         let k = k.into();
 
         if self.data.len() <= k {
@@ -96,7 +98,7 @@ where
         self.min_max_cache.new_max_value(k);
     }
 
-    fn delete(&mut self, key: K, idx: &usize) {
+    fn delete(&mut self, key: K, idx: &X) {
         let k = key.into();
         if let Some(Some(rm_idx)) = self.data.get_mut(k) {
             // if the Index is the last, then remove complete Index
@@ -154,17 +156,17 @@ where
 }
 
 // type Meta<'m> = UIntMeta<'m, K> where K:'m;
-impl<K: Default> MetaData for UIntIndex<K> {
-    type Meta<'m> = UIntMeta<'m, K> where K: 'm;
+impl<K: Default, X> MetaData for UIntIndex<K, X> {
+    type Meta<'m> = UIntMeta<'m, K,X> where K: 'm, X:'m;
 
     fn meta(&self) -> Self::Meta<'_> {
         UIntMeta(self)
     }
 }
 
-pub struct UIntMeta<'s, K: Default + 's>(&'s UIntIndex<K>);
+pub struct UIntMeta<'s, K: Default + 's, X>(&'s UIntIndex<K, X>);
 
-impl<'s, K> UIntMeta<'s, K>
+impl<'s, K, X> UIntMeta<'s, K, X>
 where
     K: Default + 's,
 {
@@ -179,7 +181,7 @@ where
     }
 }
 
-impl<K: Default> UIntIndex<K> {
+impl<K: Default, X> UIntIndex<K, X> {
     /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
     pub const fn min(&self) -> usize {
         self.min_max_cache.min
@@ -348,7 +350,7 @@ mod tests {
         #[test]
         fn find_eq_many_unique() {
             let l = [0, 1, 2, 3, 4, 5, 6];
-            let i = UIntIndex::<u8>::from_slice(l);
+            let i = UIntIndex::<u8>::from_list(l);
 
             assert_eq!(0, i.get_many([]).items_vec(&l).len());
             assert_eq!(0, i.get_many([9]).items_vec(&l).len());
@@ -506,7 +508,7 @@ mod tests {
         #[test]
         fn find_eq_many_unique() {
             let l = [0, 2, 2, 3, 4, 5, 6];
-            let i = UIntIndex::<u8>::from_slice(l);
+            let i = UIntIndex::<u8>::from_list(l);
 
             assert_eq!(0, i.get_many([]).items_vec(&l).len());
             assert_eq!(0, i.get_many([9]).items_vec(&l).len());

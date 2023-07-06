@@ -2,8 +2,11 @@ use std::ops::Index;
 
 use fast_forward::{
     collections::{Filter, RWIndexList},
-    index::{uint::UIntIndex, Filterable},
-    index::{Indices, Store},
+    index::uint::UIntIndex,
+    index::{
+        indices::Indices,
+        store::{Filterable, Store},
+    },
 };
 
 trait Parents<'a> {

@@ -2,11 +2,12 @@
 //!
 use std::{
     borrow::Cow,
+    collections::HashMap,
     marker::PhantomData,
     ops::{Deref, Index},
 };
 
-use crate::{collections::Retriever, index::Store};
+use crate::{collections::Retriever, index::store::Store};
 
 // [`IList`] is a read only `List` with one index.
 pub struct IList<S, T, L = Vec<T>, X = usize>
@@ -24,7 +25,7 @@ where
     L: Index<X>,
     S: Store,
 {
-    pub fn new<F, K, I>(field: F, items: I) -> Self
+    pub fn from_list<F, K, I>(field: F, items: I) -> Self
     where
         F: Fn(&T) -> K,
         S: Store<Key = K, Index = usize>,
@@ -33,8 +34,23 @@ where
     {
         let v = Vec::from_iter(items);
         Self {
-            store: S::from_slice(v.iter().map(field)),
+            store: S::from_list(v.iter().map(field)),
             items: L::from_iter(v),
+            _type: PhantomData,
+            _idx: PhantomData,
+        }
+    }
+
+    pub fn from_map<F, K>(field: F, items: HashMap<X, T>) -> Self
+    where
+        F: Fn(&T) -> K,
+        S: Store<Key = K, Index = X>,
+        L: FromIterator<(X, T)>,
+        X: Clone,
+    {
+        Self {
+            store: S::from_map(items.iter().map(|(x, v)| (field(v), x.clone()))),
+            items: L::from_iter(items.into_iter()),
             _type: PhantomData,
             _idx: PhantomData,
         }
@@ -87,7 +103,7 @@ where
         S: Store<Key = K, Index = usize>,
     {
         Self {
-            store: S::from_slice(items.iter().map(field)),
+            store: S::from_list(items.iter().map(field)),
             items: Slice(Cow::Borrowed(items)),
         }
     }
@@ -98,7 +114,7 @@ where
         S: Store<Key = K, Index = usize>,
     {
         Self {
-            store: S::from_slice(items.iter().map(field)),
+            store: S::from_list(items.iter().map(field)),
             items: Slice(Cow::Owned(items.to_owned())),
         }
     }
@@ -166,7 +182,7 @@ mod tests {
 
     #[rstest]
     fn ilist_vec(cars: Vec<Car>) {
-        let l: IList<UIntIndex, _> = IList::new(Car::id, cars);
+        let l: IList<UIntIndex, _> = IList::from_list(Car::id, cars);
 
         // deref
         assert_eq!(4, l.len());
@@ -205,16 +221,50 @@ mod tests {
         assert_eq!(99, l.idx().meta().max());
     }
 
-    // #[test]
-    // fn ilist_hashmap() {
-    // use std::collections::HashMap;
-    //     let mut m = HashMap::new();
-    //     m.insert("BMW", Car(2, "BMW".into()));
-    //     m.insert("Audi", Car(5, "Audi".into()));
+    #[test]
+    fn ilist_hashmap() {
+        use std::collections::HashMap;
 
-    //     let l: IList<UIntIndex, _, HashMap<&'static str, Car>, &'static str> =
-    //         IList::new(Car::id, m);
-    // }
+        let mut m = HashMap::new();
+        m.insert("BMW", Car(2, "BMW".into()));
+        m.insert("Audi", Car(5, "Audi".into()));
+        m.insert("VW", Car(2, "VW".into()));
+        m.insert("Porsche", Car(99, "Porsche".into()));
+
+        let l: IList<UIntIndex<usize, &str>, _, HashMap<&'static str, Car>, &'static str> =
+            IList::from_map(Car::id, m);
+
+        assert!(l.idx().contains(&2));
+        assert!(!l.idx().contains(&200));
+
+        let mut it = l.idx().get(&2);
+        assert_eq!(Some(&Car(2, "BMW".into())), it.next());
+        assert_eq!(Some(&Car(2, "VW".into())), it.next());
+        assert_eq!(None, it.next());
+
+        let mut it = l.idx().get_many([99, 5]);
+        assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+        assert_eq!(Some(&Car(5, "Audi".into())), it.next());
+        assert_eq!(None, it.next());
+
+        let mut it = l.idx().filter(|f| {
+            assert!(f.contains(&99));
+
+            let idxs = f.eq(&99);
+            assert_eq!(["Porsche"], idxs.as_slice());
+
+            let mut it = f.items(&99);
+            assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+            assert_eq!(None, it.next());
+
+            idxs
+        });
+        assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+        assert_eq!(None, it.next());
+
+        assert_eq!(2, l.idx().meta().min());
+        assert_eq!(99, l.idx().meta().max());
+    }
 
     // -----------------------------------------------------
     #[rstest]

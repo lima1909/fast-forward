@@ -104,7 +104,7 @@ impl IndexedList {
         quote! (
             impl<'a> #list_name<'a> {
                 pub fn borrowed(slice: &'a [#on]) -> Self {
-                    use fast_forward::index::Store;
+                    use fast_forward::index::store::Store;
 
                     Self {
                         #(#init_fields)*
@@ -113,7 +113,7 @@ impl IndexedList {
                 }
 
                 pub fn owned(slice: Vec<#on>) -> Self {
-                    use fast_forward::index::Store;
+                    use fast_forward::index::store::Store;
 
                     Self {
                         #(#init_fields)*

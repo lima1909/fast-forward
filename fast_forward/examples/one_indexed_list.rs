@@ -1,6 +1,6 @@
 use fast_forward::{
     collections::RWIndexList,
-    index::{map::MapIndex, uint::UIntIndex, Store},
+    index::{map::MapIndex, store::Store, uint::UIntIndex},
 };
 
 #[derive(Debug, Eq, PartialEq, Clone)]

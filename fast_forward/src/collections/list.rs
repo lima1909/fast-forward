@@ -161,7 +161,7 @@ impl<'i, T> Iterator for Iter<'i, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::Indices;
+    use crate::index::indices::Indices;
 
     impl<T> From<Vec<T>> for List<T> {
         fn from(v: Vec<T>) -> Self {

@@ -34,9 +34,6 @@ use std::{
     cmp::{min, Ordering::*},
 };
 
-pub use indices::{Indices, KeyIndices};
-pub use store::{Filterable, MetaData, Store};
-
 /// Union is using for OR
 #[inline]
 pub fn union<'a, I: Ord + Clone>(lhs: Cow<'a, [I]>, rhs: Cow<'a, [I]>) -> Cow<'a, [I]> {

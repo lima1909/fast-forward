@@ -7,7 +7,7 @@ use crate::{
         list::{Iter, List},
         Retriever,
     },
-    index::Store,
+    index::store::Store,
 };
 
 pub struct RWIndexList<S, K, I, F: Fn(&I) -> K> {
@@ -100,7 +100,7 @@ impl<S, K, I, F: Fn(&I) -> K> Index<usize> for RWIndexList<S, K, I, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::{map::MapIndex, uint::UIntIndex, Store};
+    use crate::index::{map::MapIndex, store::Store, uint::UIntIndex};
     use rstest::{fixture, rstest};
 
     #[derive(Debug, Eq, PartialEq, Clone)]

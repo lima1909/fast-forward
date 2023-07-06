@@ -61,7 +61,7 @@ macro_rules! fast {
             ///
             #[allow(dead_code)]
             fn insert(&mut self, item: $item) -> usize {
-                use $crate::index::Store;
+                use $crate::index::store::Store;
 
                 self._items_.insert(item, |it: &$item, pos: usize| {
                     $(
@@ -82,7 +82,7 @@ macro_rules! fast {
             ///
             #[allow(dead_code)]
             fn update<F>(&mut self, pos: usize, update_fn: F) -> bool where F: Fn(&$item)-> $item {
-                use $crate::index::Store;
+                use $crate::index::store::Store;
 
                 self._items_.update(pos, update_fn, |old: &$item, pos: usize, new: &$item| {
                     $(
@@ -103,7 +103,7 @@ macro_rules! fast {
             ///
             #[allow(dead_code)]
             fn delete(&mut self, pos: usize) -> Option<&$item> {
-                use $crate::index::Store;
+                use $crate::index::store::Store;
 
                 self._items_.delete(pos, |it: &$item, pos: &usize| {
                     $(
@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn different_idxs() {
-        use crate::index::Store;
+        use crate::index::store::Store;
         use Gender::*;
 
         let p = Person::new(0, 0, "Julia", Female);
