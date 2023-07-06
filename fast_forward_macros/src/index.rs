@@ -111,11 +111,11 @@ impl Index {
         // ids: S::from_iter(&cars.iter().map(Car::id))
         if let Some(method) = method {
             quote! {
-                #name: #store::from_iter(slice.iter().map(|o: &#on| o.#field.#method())),
+                #name: #store::from_slice(slice.iter().map(|o: &#on| o.#field.#method())),
             }
         } else {
             quote! {
-                #name: #store::from_iter(slice.iter().map(|o: &#on| o.#field)),
+                #name: #store::from_slice(slice.iter().map(|o: &#on| o.#field)),
             }
         }
     }
@@ -154,7 +154,7 @@ mod tests {
 
         let ts = idx.to_init_struct_field_tokens(&on);
         let ts2: TokenStream =
-            parse_quote!(id: UIntIndex::from_iter(slice.iter().map(|o: &Car| o.0)),);
+            parse_quote!(id: UIntIndex::from_slice(slice.iter().map(|o: &Car| o.0)),);
 
         assert_eq!(ts.to_string(), ts2.to_string());
     }

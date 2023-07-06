@@ -105,7 +105,7 @@ macro_rules! fast {
             fn delete(&mut self, pos: usize) -> Option<&$item> {
                 use $crate::index::Store;
 
-                self._items_.delete(pos, |it: &$item, pos: usize| {
+                self._items_.delete(pos, |it: &$item, pos: &usize| {
                     $(
                         self.$store.delete(
                                     it.$item_field$(.$item_field_func())?,

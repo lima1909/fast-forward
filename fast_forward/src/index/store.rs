@@ -24,7 +24,7 @@ pub trait Store: Filterable {
     /// After:
     ///     Female | 2,3,4
     ///
-    fn insert(&mut self, key: Self::Key, idx: usize);
+    fn insert(&mut self, key: Self::Key, idx: Self::Index);
 
     /// Update means: `Key` changed, but `Index` stays the same
     ///
@@ -52,8 +52,8 @@ pub trait Store: Filterable {
     /// `Update: (Male, 2, Female)`
     /// After:
     ///     Female | 2,3,4
-    fn update(&mut self, old_key: Self::Key, idx: usize, new_key: Self::Key) {
-        self.delete(old_key, idx);
+    fn update(&mut self, old_key: Self::Key, idx: Self::Index, new_key: Self::Key) {
+        self.delete(old_key, &idx);
         self.insert(new_key, idx);
     }
 
@@ -84,23 +84,31 @@ pub trait Store: Filterable {
     /// After:
     ///     Female | 3,4
     ///
-    fn delete(&mut self, key: Self::Key, idx: usize);
+    fn delete(&mut self, key: Self::Key, idx: &Self::Index);
 
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
 
-    /// Create a new `Store` with `Key`-values by given `Iterator`.
-    fn from_iter<I>(it: I) -> Self
+    /// Create a new `Store` from a given slice (array, slice, Vec, ...) with a given `Key`.
+    /// The `Index-Type` is `usize`.
+    fn from_slice<I>(it: I) -> Self
     where
-        I: IntoIterator<Item = Self::Key> + ExactSizeIterator,
+        I: IntoIterator<Item = Self::Key>,
+        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        Self: Store<Index = usize>,
+        Self: Sized,
+    {
+        Self::from_map(it.into_iter().enumerate().map(|(x, k)| (k, x)))
+    }
+
+    /// Create a new `Store` from a given `Map` (`Key-Index-Pair`.
+    fn from_map<I>(it: I) -> Self
+    where
+        I: IntoIterator<Item = (Self::Key, Self::Index)> + ExactSizeIterator,
         Self: Sized,
     {
         let mut store = Self::with_capacity(it.len());
-
-        for (idx, k) in it.into_iter().enumerate() {
-            store.insert(k, idx)
-        }
-
+        it.into_iter().for_each(|(k, idx)| store.insert(k, idx));
         store
     }
 }
@@ -355,7 +363,7 @@ mod tests {
     #[case::a_double_x(vec!["a", "x"], vec![&"a", &"x", &"x"])]
     fn view_str(#[case] keys: Vec<&str>, #[case] expected: Vec<&&str>) {
         let items = vec!["x", "a", "b", "c", "x", "y", "z"];
-        let map = MapIndex::from_iter(items.clone().into_iter());
+        let map = MapIndex::from_slice(items.clone());
         assert_eq!(expected, map.get_many(keys).items_vec(&items));
     }
 }

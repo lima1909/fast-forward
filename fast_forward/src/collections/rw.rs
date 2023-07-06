@@ -19,7 +19,7 @@ pub struct RWIndexList<S, K, I, F: Fn(&I) -> K> {
 impl<S, K, I, F> RWIndexList<S, K, I, F>
 where
     F: Fn(&I) -> K,
-    S: Store<Key = K>,
+    S: Store<Key = K, Index = usize>,
     S::Index: Clone,
 {
     pub fn from_vec<It>(store: S, f: F, iter: It) -> Self

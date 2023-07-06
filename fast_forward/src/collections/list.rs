@@ -51,10 +51,10 @@ impl<T> List<T> {
     ///
     pub fn delete<F>(&mut self, pos: usize, mut trigger: F) -> Option<&T>
     where
-        F: FnMut(&T, usize), // param are: &Item, current position in the list
+        F: FnMut(&T, &usize), // param are: &Item, current position in the list
     {
         let del_item = self.items.get(pos)?;
-        trigger(del_item, pos);
+        trigger(del_item, &pos);
 
         self.deleted_pos.push(pos);
         Some(del_item)

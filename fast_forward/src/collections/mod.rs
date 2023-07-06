@@ -219,10 +219,11 @@ where
     pub fn create_view<II>(&self, keys: II) -> View<'a, S, I>
     where
         II: IntoIterator<Item = S::Key> + ExactSizeIterator + 'a,
+        <II as IntoIterator>::IntoIter: ExactSizeIterator,
+        S: Store<Index = usize>,
         I: Index<S::Index>,
-        S::Index: Clone,
     {
-        View::new(S::from_iter(keys), self.0.filter.0, self.0._items)
+        View::new(S::from_slice(keys), self.0.filter.0, self.0._items)
     }
 
     /// Returns Meta data, if the [`crate::index::Store`] supports any.

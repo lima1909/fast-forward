@@ -35,11 +35,11 @@ impl<I> KeyIndices<I> {
 
     /// Remove one Index and return left free Indices.
     #[inline]
-    pub fn remove(&mut self, idx: I) -> &[I]
+    pub fn remove(&mut self, idx: &I) -> &[I]
     where
         I: PartialEq,
     {
-        self.0.retain(|v| v != &idx);
+        self.0.retain(|v| v != idx);
         self.0.as_ref()
     }
 
@@ -208,17 +208,17 @@ mod tests {
             let p: Indices = Indices::from_sorted_slice(pos.as_slice());
             assert_eq!([5], p);
 
-            assert!(pos.remove(5).is_empty());
+            assert!(pos.remove(&5).is_empty());
             // double remove
-            assert!(pos.remove(5).is_empty());
+            assert!(pos.remove(&5).is_empty());
 
             let mut pos = KeyIndices::new(5);
             pos.add(2);
-            assert_eq!([2], pos.remove(5));
+            assert_eq!([2], pos.remove(&5));
 
             let mut pos = KeyIndices::new(5);
             pos.add(2);
-            assert_eq!([5], pos.remove(2));
+            assert_eq!([5], pos.remove(&2));
         }
     }
 

@@ -27,13 +27,13 @@ where
     pub fn new<F, K, I>(field: F, items: I) -> Self
     where
         F: Fn(&T) -> K,
-        S: Store<Key = K>,
+        S: Store<Key = K, Index = usize>,
         I: IntoIterator<Item = T>,
         L: FromIterator<T>,
     {
         let v = Vec::from_iter(items);
         Self {
-            store: S::from_iter(v.iter().map(field)),
+            store: S::from_slice(v.iter().map(field)),
             items: L::from_iter(v),
             _type: PhantomData,
             _idx: PhantomData,
@@ -84,10 +84,10 @@ where
     pub fn borrowed<K, F>(field: F, items: &'i [I]) -> Self
     where
         F: Fn(&I) -> K,
-        S: Store<Key = K>,
+        S: Store<Key = K, Index = usize>,
     {
         Self {
-            store: S::from_iter(items.iter().map(field)),
+            store: S::from_slice(items.iter().map(field)),
             items: Slice(Cow::Borrowed(items)),
         }
     }
@@ -95,10 +95,10 @@ where
     pub fn owned<K, F>(field: F, items: Vec<I>) -> Self
     where
         F: Fn(&I) -> K,
-        S: Store<Key = K>,
+        S: Store<Key = K, Index = usize>,
     {
         Self {
-            store: S::from_iter(items.iter().map(field)),
+            store: S::from_slice(items.iter().map(field)),
             items: Slice(Cow::Owned(items.to_owned())),
         }
     }

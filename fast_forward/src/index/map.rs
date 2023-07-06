@@ -67,7 +67,7 @@ where
         }
     }
 
-    fn delete(&mut self, key: K, idx: usize) {
+    fn delete(&mut self, key: K, idx: &usize) {
         if let Some(rm_idx) = self.0.get_mut(&key) {
             if rm_idx.remove(idx).is_empty() {
                 self.0.remove(&key);
@@ -173,7 +173,7 @@ mod tests {
                 String::from("Mario"),
                 String::from("Paul"),
             ];
-            let idx = MapIndex::from_iter(l.clone().into_iter());
+            let idx = MapIndex::from_slice(l.clone());
 
             assert!(idx.get_many([]).items(&l).next().is_none());
 
@@ -244,15 +244,15 @@ mod tests {
             idx.insert("Mario", 1);
 
             // delete correct Key with wrong Index, nothing happens
-            idx.delete("Jasmin", 100);
+            idx.delete("Jasmin", &100);
             assert_eq!([3, 4], idx.get(&"Jasmin"));
 
             // delete correct Key with correct Index
-            idx.delete("Jasmin", 3);
+            idx.delete("Jasmin", &3);
             assert_eq!([4], idx.get(&"Jasmin"));
 
             // delete correct Key with last correct Index, Key now longer exist
-            idx.delete("Jasmin", 4);
+            idx.delete("Jasmin", &4);
             assert!(idx.get(&"Jasmin").is_empty());
         }
     }

@@ -96,7 +96,7 @@ where
         self.min_max_cache.new_max_value(k);
     }
 
-    fn delete(&mut self, key: K, idx: usize) {
+    fn delete(&mut self, key: K, idx: &usize) {
         let k = key.into();
         if let Some(Some(rm_idx)) = self.data.get_mut(k) {
             // if the Index is the last, then remove complete Index
@@ -317,7 +317,7 @@ mod tests {
         #[test]
         fn find_eq_many_unique() {
             let l = [0, 1, 2, 3, 4, 5, 6];
-            let i = UIntIndex::<u8>::from_iter(l.into_iter());
+            let i = UIntIndex::<u8>::from_slice(l);
 
             assert_eq!(0, i.get_many([]).items_vec(&l).len());
             assert_eq!(0, i.get_many([9]).items_vec(&l).len());
@@ -428,15 +428,15 @@ mod tests {
             assert_eq!(3, idx.max());
 
             // delete correct Key with wrong Index, nothing happens
-            idx.delete(2, 100);
+            idx.delete(2, &100);
             assert_eq!([3, 4], idx.get(&2));
 
             // delete correct Key with correct Index
-            idx.delete(2, 3);
+            idx.delete(2, &3);
             assert_eq!([4], idx.get(&2));
 
             // delete correct Key with last correct Index, Key now longer exist
-            idx.delete(2, 4);
+            idx.delete(2, &4);
             assert!(idx.get(&2).is_empty());
 
             assert_eq!(3, idx.min());
@@ -475,7 +475,7 @@ mod tests {
         #[test]
         fn find_eq_many_unique() {
             let l = [0, 2, 2, 3, 4, 5, 6];
-            let i = UIntIndex::<u8>::from_iter(l.into_iter());
+            let i = UIntIndex::<u8>::from_slice(l);
 
             assert_eq!(0, i.get_many([]).items_vec(&l).len());
             assert_eq!(0, i.get_many([9]).items_vec(&l).len());
