@@ -20,17 +20,38 @@ pub struct IList<S, T, L = Vec<T>> {
 
 impl<S, T, L> IList<S, T, L>
 where
-    L: AsRef<[T]> + Index<usize, Output = T>,
+    L: Index<usize, Output = T>,
     S: Store<Index = usize>,
 {
     pub fn new<F, K>(field: F, items: L) -> Self
     where
         F: Fn(&T) -> K,
         S: Store<Key = K, Index = usize>,
+        L: AsRef<[T]>,
     {
         Self {
             store: S::from_list(items.as_ref().iter().map(field)),
             items,
+            _type: PhantomData,
+        }
+    }
+
+    /// If it is possible, then use the `new` method.
+    /// The `from_iter` method is slower and allocate memory.
+    /// This method is useful, if the list not implement the `AsRef<[T]>` trait
+    /// (like [`std::collections::VecDeque`]).
+    pub fn from_iter<F, K, I>(field: F, items: I) -> Self
+    where
+        F: Fn(&T) -> K,
+        S: Store<Key = K, Index = usize>,
+        I: IntoIterator<Item = T>,
+        L: FromIterator<T>,
+    {
+        let v = Vec::from_iter(items.into_iter());
+
+        Self {
+            store: S::from_list(v.iter().map(field)),
+            items: L::from_iter(v.into_iter()),
             _type: PhantomData,
         }
     }
@@ -40,11 +61,8 @@ where
     }
 }
 
-impl<S, T, L> Deref for IList<S, T, L>
-where
-    L: Deref<Target = [T]> + Index<usize>,
-{
-    type Target = [T];
+impl<S, T, L> Deref for IList<S, T, L> {
+    type Target = L;
 
     fn deref(&self) -> &Self::Target {
         &self.items
@@ -175,6 +193,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+
     use super::*;
     use crate::index::{map::MapIndex, uint::UIntIndex};
     use rstest::{fixture, rstest};
@@ -237,6 +257,26 @@ mod tests {
 
         assert_eq!(2, l.idx().meta().min());
         assert_eq!(99, l.idx().meta().max());
+    }
+
+    #[rstest]
+    fn ilist_vecdeque(cars: Vec<Car>) {
+        let cars = VecDeque::from_iter(cars.into_iter());
+        let l = IList::<UIntIndex, _, VecDeque<_>>::from_iter(Car::id, cars);
+
+        // deref
+        assert_eq!(4, l.len());
+        assert_eq!(Car(2, "BMW".into()), l[0]);
+        assert_eq!(&Car(99, "Porsche".into()), l.back().unwrap());
+
+        // store
+        assert!(l.idx().contains(&2));
+        assert!(!l.idx().contains(&2000));
+
+        let mut it = l.idx().get(&2);
+        assert_eq!(Some(&Car(2, "BMW".into())), it.next());
+        assert_eq!(Some(&Car(2, "VW".into())), it.next());
+        assert_eq!(None, it.next());
     }
 
     #[test]
