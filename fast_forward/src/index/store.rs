@@ -111,7 +111,7 @@ pub trait Store: Filterable {
     }
 }
 
-/// Returns a list to the indices [`Indices`] corresponding to the key.
+/// Returns a list to the indices [`crate::index::indices::Indices`] corresponding to the key.
 pub trait Filterable {
     type Key;
     type Index;

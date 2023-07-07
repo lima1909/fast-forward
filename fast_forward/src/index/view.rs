@@ -3,7 +3,7 @@
 
 use std::ops::Index;
 
-use super::{indices::Indices, store::Filterable};
+use crate::index::{indices::Indices, store::Filterable};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'a, F, I> {
@@ -43,7 +43,7 @@ where
 }
 
 /// [`Keys`] is a special kind of a `Store`, which stores only `Key`s.
-/// This is useful, if you want to create a `View` of a [`Store`].
+/// This is useful, if you want to create a `View` of a [`crate::index::store::Store`].
 pub trait Keys {
     type Key;
 
@@ -59,8 +59,8 @@ pub trait Keys {
         I: IntoIterator<Item = Self::Key>;
 }
 
-/// A `View` is a wrapper for an given [`Store`],
-/// that can be only use (read only) for [`Filterable`] operations.
+/// A `View` is a wrapper for an given [`crate::index::store::Store`],
+/// that can be only use (read only) for [`crate::index::store::Filterable`] operations.
 pub struct View<'a, K, F, I> {
     keys: K,
     store: &'a F,

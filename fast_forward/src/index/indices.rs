@@ -8,6 +8,8 @@ use std::{
     ops::{BitAnd, BitOr, Index},
 };
 
+use crate::index::ops::{intersection, union};
+
 /// `KeyIndices` contains all indices for a given `Key`.
 /// Important: the collection must be sorted!
 #[derive(Debug, Clone, PartialEq)]
@@ -109,7 +111,7 @@ impl<I: Ord + Clone> BitOr for Indices<'_, I> {
     type Output = Self;
 
     fn bitor(self, other: Self) -> Self::Output {
-        Indices(super::union(self.0, other.0))
+        Indices(union(self.0, other.0))
     }
 }
 
@@ -117,7 +119,7 @@ impl<I: Ord + Clone> BitAnd for Indices<'_, I> {
     type Output = Self;
 
     fn bitand(self, other: Self) -> Self::Output {
-        Indices(super::intersection(self.0, other.0))
+        Indices(intersection(self.0, other.0))
     }
 }
 

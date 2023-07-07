@@ -32,9 +32,9 @@
 //! ```
 use crate::index::{
     indices::KeyIndices,
+    ops::MinMax,
     store::{Filterable, MetaData, Store},
     view::Keys,
-    MinMax,
 };
 use std::marker::PhantomData;
 
