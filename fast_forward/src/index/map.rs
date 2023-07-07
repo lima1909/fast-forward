@@ -28,7 +28,8 @@
 //! ```
 use crate::index::{
     indices::KeyIndices,
-    store::{Filterable, Keys, Store},
+    store::{Filterable, Store},
+    view::Keys,
 };
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
@@ -132,8 +133,7 @@ mod tests {
     }
 
     mod unique {
-        use super::*;
-        use crate::index::store::Filter;
+        use super::{super::super::filter::Filter, *};
 
         #[test]
         fn empty() {

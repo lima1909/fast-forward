@@ -1,11 +1,12 @@
 use std::ops::Index;
 
 use fast_forward::{
-    collections::{rw::RWIndexList, Filter},
+    collections::rw::RWIndexList,
     index::uint::UIntIndex,
     index::{
         indices::Indices,
         store::{Filterable, Store},
+        view::Filter,
     },
 };
 

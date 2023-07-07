@@ -2,9 +2,9 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 use fast_forward::collections::ro::IList;
 use fast_forward::index::map::MapIndex;
-use fast_forward::index::store::Filter;
 use fast_forward::index::store::Store;
 use fast_forward::index::uint::UIntIndex;
+use fast_forward::index::view::Filter;
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
@@ -110,8 +110,8 @@ fn list_index(c: &mut Criterion) {
 
     group.bench_function("ff: pk and name", |b| {
         b.iter(|| {
-            let f_pk = Filter(&idx.pk);
-            let f_name = Filter(&idx.name);
+            let f_pk = Filter::new(&idx.pk, &v);
+            let f_name = Filter::new(&idx.name, &v);
 
             let mut it = (f_pk.eq(&FIND_ID) & f_name.eq(&FIND_PERSON.1)).items(&v);
             assert_eq!(&FIND_PERSON, it.next().unwrap());

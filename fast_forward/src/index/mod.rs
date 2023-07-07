@@ -28,6 +28,7 @@ pub mod indices;
 pub mod map;
 pub mod store;
 pub mod uint;
+pub mod view;
 
 use std::{
     borrow::Cow,
@@ -131,6 +132,34 @@ impl<K: Default + Ord> MinMax<K> {
             self.max = key
         }
         &self.max
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod filter {
+    use super::{indices::Indices, store::Filterable};
+
+    /// Wrapper for an given [`Filterable`] implementation.
+    /// The Index-slice (&[usize]), will also be wrapped in the [`Indices`] implementation.
+    #[repr(transparent)]
+    pub struct Filter<'f, F>(pub &'f F);
+
+    impl<'f, F> Filter<'f, F>
+    where
+        F: Filterable,
+    {
+        #[inline]
+        pub fn eq(&self, key: &F::Key) -> Indices<'f, F::Index>
+        where
+            F::Index: Clone,
+        {
+            Indices::from_sorted_slice(self.0.get(key))
+        }
+
+        #[inline]
+        pub fn contains(&self, key: &F::Key) -> bool {
+            self.0.contains(key)
+        }
     }
 }
 

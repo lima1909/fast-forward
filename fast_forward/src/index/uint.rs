@@ -32,7 +32,8 @@
 //! ```
 use crate::index::{
     indices::KeyIndices,
-    store::{Filterable, Keys, MetaData, Store},
+    store::{Filterable, MetaData, Store},
+    view::Keys,
     MinMax,
 };
 use std::marker::PhantomData;
@@ -214,8 +215,7 @@ impl<K: Default, X> UIntIndex<K, X> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::index::store::Filter;
+    use super::{super::filter::Filter, *};
 
     #[test]
     fn retrieve() {

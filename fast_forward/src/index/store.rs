@@ -3,8 +3,6 @@
 
 use std::ops::Index;
 
-use crate::index::indices::Indices;
-
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Filterable {
     /// Insert an `Key` for a given `Index`.
@@ -154,24 +152,6 @@ pub trait Filterable {
     }
 }
 
-/// [`Keys`] is a special kind of a `Store`, which stores only `Key`s.
-/// This is useful, if you want to create a `View` of a [`Store`].
-///
-pub trait Keys {
-    type Key;
-
-    /// Checks if the `Key`exist.
-    fn exist(&self, key: &Self::Key) -> bool;
-
-    /// Insert a new `Key`. If the Key already exists, then will be ignored.
-    fn add_key(&mut self, key: Self::Key);
-
-    /// Create a new `Key-Store` from a given List of `Key`s.
-    fn from_iter<I>(it: I) -> Self
-    where
-        I: IntoIterator<Item = Self::Key>;
-}
-
 /// Meta data from the [`Store`], like min or max value of the `Key`.
 pub trait MetaData {
     type Meta<'m>
@@ -180,42 +160,6 @@ pub trait MetaData {
 
     /// Return meta data from the `Store`.
     fn meta(&self) -> Self::Meta<'_>;
-}
-
-/// Wrapper for an given [`Filterable`] implementation.
-/// The Index-slice (&[usize]), will also be wrapped in the [`Indices`] implementation.
-#[repr(transparent)]
-pub struct Filter<'f, F>(pub &'f F);
-
-impl<'f, F> Filter<'f, F>
-where
-    F: Filterable,
-{
-    #[inline]
-    pub fn eq(&self, key: &F::Key) -> Indices<'f, F::Index>
-    where
-        F::Index: Clone,
-    {
-        Indices::from_sorted_slice(self.0.get(key))
-    }
-
-    #[inline]
-    pub fn contains(&self, key: &F::Key) -> bool {
-        self.0.contains(key)
-    }
-
-    #[inline]
-    pub fn items<I>(
-        &'f self,
-        key: &F::Key,
-        items: &'f I,
-    ) -> impl Iterator<Item = &'f <I as Index<F::Index>>::Output>
-    where
-        I: Index<F::Index>,
-        F::Index: Clone,
-    {
-        self.0.get(key).iter().map(|i| &items[i.clone()])
-    }
 }
 
 /// `Many` is an `Iterator` for the result from [`Filterable::get_many()`].
@@ -286,8 +230,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::index::{indices::KeyIndices, map::MapIndex};
+    use super::{super::filter::Filter, *};
+    use crate::index::{
+        indices::{Indices, KeyIndices},
+        map::MapIndex,
+    };
     use rstest::rstest;
     use std::collections::HashMap;
 
