@@ -9,7 +9,7 @@ pub struct Car {
 }
 
 fn main() {
-    let l: ro::IList<MapIndex, _> = ro::IList::new(
+    let l: ro::IList<MapIndex, _, [Car; 4]> = ro::IList::new(
         |c| c.name.clone(),
         [
             Car {

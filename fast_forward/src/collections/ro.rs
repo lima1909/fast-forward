@@ -10,12 +10,9 @@ use std::{
 
 use crate::{collections::Retriever, index::store::Store};
 
-// [`IList`] is a read only `List` with owned the given items.
-// The list supported one `Index`.
-pub struct IList<S, T, L = Vec<T>>
-where
-    L: Index<usize>,
-{
+/// [`IList`] is a read only `List` (Vec, Array, ..., default is a Vec) which owned the given items.
+/// The list supported one `Index`.
+pub struct IList<S, T, L = Vec<T>> {
     store: S,
     items: L,
     _type: PhantomData<T>,
@@ -23,21 +20,17 @@ where
 
 impl<S, T, L> IList<S, T, L>
 where
-    L: Index<usize>,
+    L: AsRef<[T]> + Index<usize, Output = T>,
     S: Store<Index = usize>,
 {
-    pub fn new<F, K, I>(field: F, items: I) -> Self
+    pub fn new<F, K>(field: F, items: L) -> Self
     where
         F: Fn(&T) -> K,
         S: Store<Key = K, Index = usize>,
-        I: IntoIterator<Item = T>,
-        L: FromIterator<T>,
     {
-        let v = Vec::from_iter(items);
-
         Self {
-            store: S::from_list(v.iter().map(field)),
-            items: L::from_iter(v),
+            store: S::from_list(items.as_ref().iter().map(field)),
+            items,
             _type: PhantomData,
         }
     }
@@ -58,8 +51,8 @@ where
     }
 }
 
-// [`IRefList`] is a read only `List` with a reference (borrowed) to the given items.
-// The list supported one `Index`.
+/// [`IRefList`] is a read only `List` with a reference (borrowed) to the given items.
+/// The list supported one `Index`.
 pub struct IRefList<'l, S, T> {
     store: S,
     items: SliceX<'l, T>,
@@ -116,11 +109,8 @@ impl<'s, T> Index<usize> for SliceX<'s, T> {
     }
 }
 
-// [`IMap`] is a read only `Key-Value-Map` with one index.
-pub struct IMap<S, X, T, M = HashMap<X, T>>
-where
-    M: Index<X>,
-{
+/// [`IMap`] is a read only `Key-Value-Map` with one index.
+pub struct IMap<S, X, T, M = HashMap<X, T>> {
     store: S,
     items: M,
     _idx: PhantomData<X>,
@@ -166,64 +156,6 @@ where
     }
 }
 
-// [`ROIndexList`] is a read only list with one index.
-//
-pub struct ROIndexList<'i, I, S>
-where
-    [I]: ToOwned,
-{
-    items: Slice<'i, I>,
-    store: S,
-}
-
-impl<'i, I, S> ROIndexList<'i, I, S>
-where
-    [I]: ToOwned,
-    S: Store,
-    S::Index: Clone,
-{
-    pub fn borrowed<K, F>(field: F, items: &'i [I]) -> Self
-    where
-        F: Fn(&I) -> K,
-        S: Store<Key = K, Index = usize>,
-    {
-        Self {
-            store: S::from_list(items.iter().map(field)),
-            items: Slice(Cow::Borrowed(items)),
-        }
-    }
-
-    pub fn owned<K, F>(field: F, items: Vec<I>) -> Self
-    where
-        F: Fn(&I) -> K,
-        S: Store<Key = K, Index = usize>,
-    {
-        Self {
-            store: S::from_list(items.iter().map(field)),
-            items: Slice(Cow::Owned(items.to_owned())),
-        }
-    }
-
-    pub fn idx(&self) -> Retriever<'_, S, Slice<'_, I>>
-    where
-        S: Store,
-        [I]: ToOwned,
-    {
-        Retriever::new(&self.store, &self.items)
-    }
-}
-
-impl<'i, I, S> Deref for ROIndexList<'i, I, S>
-where
-    [I]: ToOwned,
-{
-    type Target = [I];
-
-    fn deref(&self) -> &Self::Target {
-        &self.items.0
-    }
-}
-
 /// Wrapper for `slices`.
 #[repr(transparent)]
 pub struct Slice<'s, I>(pub Cow<'s, [I]>)
@@ -247,7 +179,7 @@ mod tests {
     use crate::index::{map::MapIndex, uint::UIntIndex};
     use rstest::{fixture, rstest};
 
-    #[derive(Debug, Eq, PartialEq, Clone)]
+    #[derive(Debug, PartialEq)]
     pub struct Car(usize, String);
 
     impl Car {
@@ -355,14 +287,37 @@ mod tests {
     }
 
     #[test]
-    fn read_only_index_list_from_vec() {
-        let cars = [
-            Car(2, "BMW".into()),
-            Car(5, "Audi".into()),
-            Car(2, "VW".into()),
-            Car(99, "Porsche".into()),
-        ];
+    fn ilist_btreemap() {
+        use std::collections::BTreeMap;
 
+        let mut m = BTreeMap::new();
+        m.insert("BMW", Car(2, "BMW".into()));
+        m.insert("Audi", Car(5, "Audi".into()));
+        m.insert("VW", Car(2, "VW".into()));
+        m.insert("Porsche", Car(99, "Porsche".into()));
+
+        let l: IMap<UIntIndex<usize, &'static str>, _, Car, BTreeMap<_, _>> = IMap::new(Car::id, m);
+
+        // deref
+        assert_eq!(4, l.len());
+        assert_eq!(Car(2, "BMW".into()), l["BMW"]);
+        // deref with BTreeMap method (not by HashMap)
+        assert_eq!(
+            (&"Audi", &Car(5, "Audi".into())),
+            l.first_key_value().unwrap()
+        );
+
+        assert!(l.idx().contains(&2));
+        assert!(!l.idx().contains(&200));
+
+        let mut it = l.idx().get(&2);
+        assert_eq!(Some(&Car(2, "BMW".into())), it.next());
+        assert_eq!(Some(&Car(2, "VW".into())), it.next());
+        assert_eq!(None, it.next());
+    }
+
+    #[rstest]
+    fn read_only_index_list_from_array(cars: Vec<Car>) {
         let l: IRefList<'_, UIntIndex, _> = IRefList::<'_, UIntIndex, _>::new(Car::id, &cars);
 
         // deref

@@ -248,8 +248,8 @@ pub struct View<'a, K, F, I> {
 
 impl<'a, K, F, I> View<'a, K, F, I>
 where
-    F: Filterable,
     K: Keys<Key = F::Key>,
+    F: Filterable,
     I: Index<F::Index>,
 {
     pub fn new(keys: K, store: &'a F, items: &'a I) -> Self {
@@ -290,8 +290,6 @@ where
     ) -> impl Iterator<Item = &'a <I as Index<F::Index>>::Output>
     where
         II: IntoIterator<Item = F::Key> + 'a,
-        I: Index<F::Index>,
-        <I as Index<F::Index>>::Output: Sized,
         F::Index: Clone,
     {
         let keys = keys.into_iter().filter(|key| self.keys.exist(key));
@@ -306,7 +304,6 @@ where
     where
         P: Fn(Filter<'a, View<'a, K, F, I>, I>) -> Indices<'a>,
         I: Index<usize>,
-        F::Index: Clone,
     {
         let filter = Filter::new(self, self.items);
         predicate(filter).items(self.items)
@@ -346,7 +343,7 @@ mod tests {
     use crate::index::uint::UIntIndex;
     use rstest::{fixture, rstest};
 
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, PartialEq)]
     pub struct Car {
         id: usize,
         name: &'static str,
