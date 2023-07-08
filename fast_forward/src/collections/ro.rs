@@ -8,7 +8,10 @@ use std::{
     ops::{Deref, Index},
 };
 
-use crate::{collections::Retriever, index::store::Store};
+use crate::{
+    collections::Retriever,
+    index::store::{Store, ToStore},
+};
 
 /// [`IList`] is a read only `List` (Vec, Array, ..., default is a Vec) which owned the given items.
 /// The list supported one `Index`.
@@ -20,38 +23,18 @@ pub struct IList<S, T, L = Vec<T>> {
 
 impl<S, T, L> IList<S, T, L>
 where
-    L: Index<usize, Output = T>,
     S: Store<Index = usize>,
+    L: Index<usize, Output = T>,
 {
     pub fn new<F, K>(field: F, items: L) -> Self
     where
         F: Fn(&T) -> K,
         S: Store<Key = K, Index = usize>,
-        L: AsRef<[T]>,
+        L: ToStore<S, T>,
     {
         Self {
-            store: S::from_list(items.as_ref().iter().map(field)),
+            store: items.to_store(field),
             items,
-            _type: PhantomData,
-        }
-    }
-
-    /// If it is possible, then use the `new` method.
-    /// The `from_iter` method is slower and allocate memory.
-    /// This method is useful, if the list not implement the `AsRef<[T]>` trait
-    /// (like [`std::collections::VecDeque`]).
-    pub fn from_iter<F, K, I>(field: F, items: I) -> Self
-    where
-        F: Fn(&T) -> K,
-        S: Store<Key = K, Index = usize>,
-        I: IntoIterator<Item = T>,
-        L: FromIterator<T>,
-    {
-        let v = Vec::from_iter(items.into_iter());
-
-        Self {
-            store: S::from_list(v.iter().map(field)),
-            items: L::from_iter(v.into_iter()),
             _type: PhantomData,
         }
     }
@@ -86,7 +69,7 @@ where
         S: Store<Key = K, Index = usize>,
     {
         Self {
-            store: S::from_list(items.iter().map(field)),
+            store: items.to_store(field),
             items: SliceX(items),
         }
     }
@@ -137,21 +120,19 @@ pub struct IMap<S, X, T, M = HashMap<X, T>> {
 
 impl<S, X, T, M> IMap<S, X, T, M>
 where
-    M: Index<X>,
     S: Store<Index = X>,
+    M: Index<X>,
 {
-    pub fn new<F, K, I>(field: F, items: I) -> Self
+    pub fn new<F, K>(field: F, items: M) -> Self
     where
         F: Fn(&T) -> K,
         S: Store<Key = K, Index = X>,
-        I: IntoIterator<Item = (X, T)>,
-        M: FromIterator<(X, T)>,
         X: Eq + Hash + Clone,
+        M: ToStore<S, T>,
     {
-        let items: HashMap<X, T> = HashMap::from_iter(items.into_iter());
         Self {
-            store: S::from_map(items.iter().map(|(x, v)| (field(v), x.clone()))),
-            items: M::from_iter(items.into_iter()),
+            store: items.to_store(field),
+            items,
             _idx: PhantomData,
             _type: PhantomData,
         }
@@ -164,8 +145,8 @@ where
 
 impl<S, X, T, M> Deref for IMap<S, X, T, M>
 where
-    M: Index<X>,
     S: Store<Index = X>,
+    M: Index<X>,
 {
     type Target = M;
 
@@ -262,7 +243,7 @@ mod tests {
     #[rstest]
     fn ilist_vecdeque(cars: Vec<Car>) {
         let cars = VecDeque::from_iter(cars.into_iter());
-        let l = IList::<UIntIndex, _, VecDeque<_>>::from_iter(Car::id, cars);
+        let l = IList::<UIntIndex, _, VecDeque<_>>::new(Car::id, cars);
 
         // deref
         assert_eq!(4, l.len());
