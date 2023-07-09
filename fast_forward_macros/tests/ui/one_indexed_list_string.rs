@@ -10,7 +10,7 @@ indexed_list!(
 );
 
 fn main() {
-    let cars = Cars::owned(vec![
+    let cars = Cars::new(vec![
         Car(2, "BMW".into()),
         Car(5, "Audi".into()),
         Car(2, "VW".into()),

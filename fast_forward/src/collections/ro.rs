@@ -1,7 +1,6 @@
 //! `Read-Only-List` with one index.
 //!
 use std::{
-    borrow::Cow,
     collections::HashMap,
     hash::Hash,
     marker::PhantomData,
@@ -30,7 +29,7 @@ where
     where
         F: Fn(&T) -> K,
         S: Store<Key = K, Index = usize>,
-        L: ToStore<S, T>,
+        L: ToStore<usize, T>,
     {
         Self {
             store: items.to_store(field),
@@ -56,7 +55,7 @@ impl<S, T, L> Deref for IList<S, T, L> {
 /// The list supported one `Index`.
 pub struct IRefList<'l, S, T> {
     store: S,
-    items: SliceX<'l, T>,
+    items: Slice<'l, T>,
 }
 
 impl<'l, S, T> IRefList<'l, S, T>
@@ -70,11 +69,11 @@ where
     {
         Self {
             store: items.to_store(field),
-            items: SliceX(items),
+            items: Slice(items),
         }
     }
 
-    pub fn idx(&self) -> Retriever<'_, S, SliceX<'l, T>> {
+    pub fn idx(&self) -> Retriever<'_, S, Slice<'l, T>> {
         Retriever::new(&self.store, &self.items)
     }
 }
@@ -89,12 +88,9 @@ impl<S, T> Deref for IRefList<'_, S, T> {
 
 /// Wrapper for `slices`.
 #[repr(transparent)]
-pub struct SliceX<'s, T>(&'s [T]);
+pub struct Slice<'s, T>(pub &'s [T]);
 
-impl<'s, T> Deref for SliceX<'s, T>
-where
-    T: Deref<Target = [T]> + Index<usize>,
-{
+impl<'s, T> Deref for Slice<'s, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -102,7 +98,7 @@ where
     }
 }
 
-impl<'s, T> Index<usize> for SliceX<'s, T> {
+impl<'s, T> Index<usize> for Slice<'s, T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -128,7 +124,7 @@ where
         F: Fn(&T) -> K,
         S: Store<Key = K, Index = X>,
         X: Eq + Hash + Clone,
-        M: ToStore<S, T>,
+        M: ToStore<X, T>,
     {
         Self {
             store: items.to_store(field),
@@ -143,32 +139,11 @@ where
     }
 }
 
-impl<S, X, T, M> Deref for IMap<S, X, T, M>
-where
-    S: Store<Index = X>,
-    M: Index<X>,
-{
+impl<S, X, T, M> Deref for IMap<S, X, T, M> {
     type Target = M;
 
     fn deref(&self) -> &Self::Target {
         &self.items
-    }
-}
-
-/// Wrapper for `slices`.
-#[repr(transparent)]
-pub struct Slice<'s, I>(pub Cow<'s, [I]>)
-where
-    [I]: ToOwned;
-
-impl<'s, I> Index<usize> for Slice<'s, I>
-where
-    [I]: ToOwned,
-{
-    type Output = I;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
     }
 }
 

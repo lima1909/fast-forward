@@ -234,83 +234,73 @@ where
 
 /// Create a [`Store`] from a given List or Map and
 /// a function for mapping a Struct-Field to an Index.
-pub trait ToStore<S, T>
-where
-    S: Store,
-{
-    fn to_store<F>(&self, field: F) -> S
+pub trait ToStore<X, T> {
+    fn to_store<S, F>(&self, field: F) -> S
     where
+        S: Store<Index = X>,
         F: FnMut(&T) -> S::Key;
 }
 
-impl<S, T, const N: usize> ToStore<S, T> for [T; N]
-where
-    S: Store<Index = usize>,
-{
-    fn to_store<F>(&self, field: F) -> S
+impl<T, const N: usize> ToStore<usize, T> for [T; N] {
+    fn to_store<S, F>(&self, field: F) -> S
     where
+        S: Store<Index = usize>,
         F: FnMut(&T) -> <S>::Key,
     {
         S::from_list(self.iter().map(field))
     }
 }
 
-impl<'a, S, T> ToStore<S, T> for &'a [T]
-where
-    S: Store<Index = usize>,
-{
-    fn to_store<F>(&self, field: F) -> S
+impl<'a, T> ToStore<usize, T> for &'a [T] {
+    fn to_store<S, F>(&self, field: F) -> S
     where
+        S: Store<Index = usize>,
         F: FnMut(&T) -> <S>::Key,
     {
         S::from_list(self.iter().map(field))
     }
 }
 
-impl<S, T> ToStore<S, T> for Vec<T>
-where
-    S: Store<Index = usize>,
-{
-    fn to_store<F>(&self, field: F) -> S
+impl<T> ToStore<usize, T> for Vec<T> {
+    fn to_store<S, F>(&self, field: F) -> S
     where
+        S: Store<Index = usize>,
         F: FnMut(&T) -> <S>::Key,
     {
         S::from_list(self.iter().map(field))
     }
 }
 
-impl<S, T> ToStore<S, T> for std::collections::VecDeque<T>
-where
-    S: Store<Index = usize>,
-{
-    fn to_store<F>(&self, field: F) -> S
+impl<T> ToStore<usize, T> for std::collections::VecDeque<T> {
+    fn to_store<S, F>(&self, field: F) -> S
     where
+        S: Store<Index = usize>,
         F: FnMut(&T) -> <S>::Key,
     {
         S::from_list(self.iter().map(field))
     }
 }
 
-impl<X, S, T> ToStore<S, T> for std::collections::HashMap<X, T>
+impl<X, T> ToStore<X, T> for std::collections::HashMap<X, T>
 where
-    S: Store<Index = X>,
     X: Clone,
 {
-    fn to_store<F>(&self, mut field: F) -> S
+    fn to_store<S, F>(&self, mut field: F) -> S
     where
+        S: Store<Index = X>,
         F: FnMut(&T) -> <S>::Key,
     {
         S::from_map(self.iter().map(|(idx, item)| (field(item), idx.clone())))
     }
 }
 
-impl<X, S, T> ToStore<S, T> for std::collections::BTreeMap<X, T>
+impl<X, T> ToStore<X, T> for std::collections::BTreeMap<X, T>
 where
-    S: Store<Index = X>,
     X: Clone,
 {
-    fn to_store<F>(&self, mut field: F) -> S
+    fn to_store<S, F>(&self, mut field: F) -> S
     where
+        S: Store<Index = X>,
         F: FnMut(&T) -> <S>::Key,
     {
         S::from_map(self.iter().map(|(idx, item)| (field(item), idx.clone())))

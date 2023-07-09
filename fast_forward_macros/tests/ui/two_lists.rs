@@ -4,14 +4,14 @@ use fast_forward_macros::indexed_list;
 pub struct Car(usize, String);
 
 indexed_list!(
-    create CarsBorrow on Car using {
+    create ref_list CarsRef on Car using {
         id: fast_forward::index::uint::UIntIndex => 0,
         name: fast_forward::index::map::MapIndex => 1.clone,
     }
 );
 
 indexed_list!(
-    create CarsOwned on Car using {
+    create Cars on Car using {
         id: fast_forward::index::uint::UIntIndex => 0,
         name: fast_forward::index::map::MapIndex => 1.clone,
     }
@@ -21,22 +21,24 @@ fn main() {
     let v = vec![Car(1, "BMW".into()), Car(2, "VW".into())];
 
     // Borrowed
-    let cars = CarsBorrow::borrowed(&v);
+    let cars = CarsRef::new(&v);
 
     assert!(cars.id().contains(&2));
     assert!(cars.name().contains(&"BMW".into()));
     // deref
     assert_eq!(2, cars.len());
     assert!(cars.contains(&Car(2, "VW".into())));
+    assert_eq!(&Car(2, "VW".into()), &cars[1]);
 
     // ----------------------------
     // Owned
-    let cars = CarsOwned::owned(v);
+    let cars = Cars::new(v);
     assert!(cars.id().contains(&2));
     assert!(cars.name().contains(&"BMW".into()));
     // deref
     assert_eq!(2, cars.len());
     assert!(cars.contains(&Car(2, "VW".into())));
+    assert_eq!(&Car(2, "VW".into()), &cars[1]);
 
     // ----------------------------
     // combine two indices: id and name

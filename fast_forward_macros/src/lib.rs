@@ -35,7 +35,17 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::parse_macro_input;
 
-/// Macro, which create the struct for an `Indexed List`.
+/// Macro, which create the struct for an `Indexed Collections`.
+///
+/// ## Collections has the following kinds:
+/// - ro: read only (default)
+/// - rw: read write
+/// - rwd: read write delete
+///
+/// ## Collections of the Items has one of the following types:
+/// - list -> IList (Vec, Array, VecDeque, ...)
+/// - ref_list -> IRefList (&Vec, &[T], ...)
+/// - map -> IMap (HashMap, BTreeMap, ...)
 ///
 /// ## Example
 ///
@@ -46,7 +56,7 @@ use syn::parse_macro_input;
 /// pub struct Car(usize, String);
 ///
 /// indexed_list!(
-///     create ro Cars on Car using {
+///     create ro ref_list Cars on Car using {
 ///         id:   fast_forward::index::uint::UIntIndex => 0,
 ///         name: fast_forward::index::map::MapIndex   => 1.clone,
 ///     }

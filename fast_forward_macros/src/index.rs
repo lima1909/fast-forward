@@ -17,6 +17,8 @@ use syn::{
     Ident, Member, Result, Token, TypePath,
 };
 
+use crate::list::Type;
+
 ///
 /// List of indices
 ///
@@ -46,9 +48,10 @@ impl Indices {
 
     pub(crate) fn to_retrieve_tokens<'a>(
         &'a self,
+        typ: &'a Type,
         on: &'a TypePath,
     ) -> impl Iterator<Item = TokenStream> + 'a {
-        self.0.iter().map(|i| i.to_retrieve_tokens(on))
+        self.0.iter().map(|i| i.to_retrieve_tokens(typ, on))
     }
 }
 
@@ -104,29 +107,45 @@ impl Index {
 
     pub(crate) fn to_init_struct_field_tokens(&self, on: &TypePath) -> TokenStream {
         let name = self.name.clone();
-        let store = self.store.clone();
         let field = self.field.clone();
         let method = self.method.clone();
 
-        // ids: S::from_iter(&cars.iter().map(Car::id))
         if let Some(method) = method {
             quote! {
-                #name: #store::from_list(slice.iter().map(|o: &#on| o.#field.#method())),
+                #name: items.to_store(|o: &#on| o.#field.#method()),
             }
         } else {
             quote! {
-                #name: #store::from_list(slice.iter().map(|o: &#on| o.#field)),
+                #name: items.to_store(|o: &#on| o.#field),
             }
         }
     }
 
-    pub(crate) fn to_retrieve_tokens(&self, on: &TypePath) -> TokenStream {
+    pub(crate) fn to_retrieve_tokens(&self, typ: &Type, on: &TypePath) -> TokenStream {
         let name = self.name.clone();
         let store = self.store.clone();
 
-        quote! {
-            pub fn #name(&self) -> fast_forward::collections::Retriever<'_, #store, fast_forward::collections::ro::Slice<'_, #on>> {
-                fast_forward::collections::Retriever::new(&self.#name, &self._items)
+        match typ {
+            Type::List => {
+                quote! {
+                    pub fn #name(&self) -> fast_forward::collections::Retriever<'_, #store, L> {
+                        fast_forward::collections::Retriever::new(&self.#name, &self.items)
+                    }
+                }
+            }
+            Type::RefList => {
+                quote! {
+                    pub fn #name(&self) -> fast_forward::collections::Retriever<'_, #store, fast_forward::collections::ro::Slice<'a, #on>> {
+                        fast_forward::collections::Retriever::new(&self.#name, &self.items)
+                    }
+                }
+            }
+            Type::Map => {
+                quote! {
+                    pub fn #name(&self) -> fast_forward::collections::Retriever<'_, #store, M> {
+                        fast_forward::collections::Retriever::new(&self.#name, &self.items)
+                    }
+                }
             }
         }
     }
@@ -153,8 +172,7 @@ mod tests {
         let on = syn::parse_str::<TypePath>("Car").unwrap();
 
         let ts = idx.to_init_struct_field_tokens(&on);
-        let ts2: TokenStream =
-            parse_quote!(id: UIntIndex::from_list(slice.iter().map(|o: &Car| o.0)),);
+        let ts2: TokenStream = parse_quote!(id: items.to_store(|o: &Car| o.0),);
 
         assert_eq!(ts.to_string(), ts2.to_string());
     }

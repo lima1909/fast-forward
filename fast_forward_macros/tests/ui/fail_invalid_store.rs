@@ -10,6 +10,6 @@ indexed_list!(
 );
 
 fn main() {
-    let cars = Cars::owned(vec![Car(1, "BMW".into())]);
+    let cars = Cars::new(vec![Car(1, "BMW".into())]);
     assert_eq!(Some(&Car(1, "BMW".into())), cars.get(0));
 }
