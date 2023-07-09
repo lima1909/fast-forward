@@ -12,12 +12,12 @@
 //! ## Example:
 //!
 //! ```text
-//! use fast_forward_macros::indexed_list;
+//! use fast_forward_macros::fast;
 //!
 //! #[derive(Clone)]
 //! pub struct Car(usize, String);
 //!
-//! indexed_list!(
+//! fast!(
 //!     create ro Cars on Car using {
 //!         id:   fast_forward::index::uint::UIntIndex => 0,
 //!         name: fast_forward::index::map::MapIndex   => 1.clone,
@@ -50,12 +50,12 @@ use syn::parse_macro_input;
 /// ## Example
 ///
 /// ```
-/// use fast_forward_macros::indexed_list;
+/// use fast_forward_macros::fast;
 ///
 /// #[derive(Clone)]
 /// pub struct Car(usize, String);
 ///
-/// indexed_list!(
+/// fast!(
 ///     create ro ref_list Cars on Car using {
 ///         id:   fast_forward::index::uint::UIntIndex => 0,
 ///         name: fast_forward::index::map::MapIndex   => 1.clone,
@@ -63,7 +63,7 @@ use syn::parse_macro_input;
 /// );
 /// ```
 #[proc_macro]
-pub fn indexed_list(input: TokenStream) -> TokenStream {
+pub fn fast(input: TokenStream) -> TokenStream {
     let list = parse_macro_input!(input as IndexedList);
     TokenStream::from(list.into_token_stream())
 }

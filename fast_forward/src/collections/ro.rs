@@ -236,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn ilist_hashmap() {
+    fn ilist_hashmap_str() {
         use std::collections::HashMap;
 
         let mut m = HashMap::new();
@@ -281,6 +281,53 @@ mod tests {
         assert_eq!(2, l.idx().meta().min());
         assert_eq!(99, l.idx().meta().max());
     }
+
+    // #[test]
+    // fn ilist_hashmap_usize() {
+    //     use std::collections::HashMap;
+
+    //     let mut m = HashMap::<usize, Car>::new();
+    //     m.insert(2, Car(2, "BMW".into()));
+    //     m.insert(5, Car(5, "Audi".into()));
+    //     m.insert(3, Car(3, "VW".into()));
+    //     m.insert(99, Car(99, "Porsche".into()));
+
+    //     let l: IMap<UIntIndex<usize>, _, Car> = IMap::new(Car::id, m);
+
+    //     assert_eq!(4, l.len());
+    //     assert_eq!(Car(2, "BMW".into()), l[&2]);
+
+    //     assert!(l.idx().contains(&2));
+    //     assert!(!l.idx().contains(&200));
+
+    //     let mut it = l.idx().get(&&2);
+    //     assert_eq!(Some(&Car(2, "BMW".into())), it.next());
+    //     assert_eq!(Some(&Car(2, "VW".into())), it.next());
+    //     assert_eq!(None, it.next());
+
+    // let mut it = l.idx().get_many([99, 5]);
+    // assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+    // assert_eq!(Some(&Car(5, "Audi".into())), it.next());
+    // assert_eq!(None, it.next());
+
+    // let mut it = l.idx().filter(|f| {
+    //     assert!(f.contains(&99));
+
+    //     let idxs = f.eq(&99);
+    //     assert_eq!(["Porsche"], idxs.as_slice());
+
+    //     let mut it = f.items(&99);
+    //     assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+    //     assert_eq!(None, it.next());
+
+    //     idxs
+    // });
+    // assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+    // assert_eq!(None, it.next());
+
+    // assert_eq!(2, l.idx().meta().min());
+    // assert_eq!(99, l.idx().meta().max());
+    // }
 
     #[test]
     fn ilist_btreemap() {

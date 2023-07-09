@@ -168,20 +168,18 @@ impl IndexedList {
                 quote! (
                     impl<X, M> #list_name<X, M>
                     where
-                        S: Store<Index = X>,
-                        M: Index<X>,
-                                    {
-                        pub fn new(items: L) -> Self
+                        M: std::ops::Index<X>,
+                    {
+                        pub fn new(items: M) -> Self
                         where
-                            S: Store<Key = K, Index = X>,
-                            X: Eq + Hash + Clone,
+                            X: Eq + Clone + std::hash::Hash,
                             M: fast_forward::index::store::ToStore<X, #on>,
 
                         {
                             Self {
                                 #(#init_fields)*
                                 items,
-                                _idx:  std::marker::PhantomData<X>,
+                                _idx:  std::marker::PhantomData,
                             }
                         }
                     }

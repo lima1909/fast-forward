@@ -1,21 +1,27 @@
-use fast_forward_macros::indexed_list;
+use fast_forward_macros::fast;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Car(usize, String);
 
-indexed_list!(
+fast!(
     create ref_list CarsRef on Car using {
         id: fast_forward::index::uint::UIntIndex => 0,
         name: fast_forward::index::map::MapIndex => 1.clone,
     }
 );
 
-indexed_list!(
+fast!(
     create Cars on Car using {
         id: fast_forward::index::uint::UIntIndex => 0,
         name: fast_forward::index::map::MapIndex => 1.clone,
     }
 );
+
+// fast!(
+//     create ro map CarsMap on Car using {
+//         id: fast_forward::index::uint::UIntIndex => 0,
+//     }
+// );
 
 fn main() {
     let v = vec![Car(1, "BMW".into()), Car(2, "VW".into())];
@@ -46,4 +52,12 @@ fn main() {
     let mut it = idxs.as_slice().iter().map(|i| &cars[*i]);
     assert_eq!(Some(&Car(2, "VW".into())), it.next());
     assert_eq!(None, it.next());
+
+    // ----------------------------
+    // Map
+    // let mut m = HashMap::<usize, Car>::new();
+    // m.insert(1, Car(1, "BMW".into()));
+    // m.insert(2, Car(2, "VW".into()));
+
+    // let cars = CarsMap::new(m);
 }
