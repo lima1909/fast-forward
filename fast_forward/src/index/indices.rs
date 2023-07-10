@@ -4,11 +4,13 @@
 //! which you can use for operations like [`std::ops::BitOr`] and [`std::ops::BitAnd`].
 use std::{
     borrow::Cow,
-    fmt::Debug,
     ops::{BitAnd, BitOr, Index},
 };
 
-use crate::index::ops::{intersection, union};
+use crate::index::{
+    ops::{intersection, union},
+    to_itmes, Indexable,
+};
 
 /// `KeyIndices` contains all indices for a given `Key`.
 /// Important: the collection must be sorted!
@@ -91,6 +93,14 @@ where
     {
         #[allow(clippy::unnecessary_to_owned)]
         self.0.into_owned().into_iter().map(|i| &list[i])
+    }
+
+    // TODO
+    pub fn items_x<Idx>(self, items: &'i Idx) -> impl Iterator<Item = &'i Idx::Output>
+    where
+        Idx: Indexable<I>,
+    {
+        to_itmes(self.0.into_owned(), items)
     }
 }
 
