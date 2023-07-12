@@ -32,114 +32,47 @@ pub mod store;
 pub mod uint;
 pub mod view;
 
-use std::{borrow::Borrow, collections::HashMap, hash::Hash};
-
-use self::store::Store;
-
-/// Convert an Iterator of Indices to an Iterator of Items.
-pub fn to_itmes<'a, It, I>(indices: It, items: &'a I) -> impl Iterator<Item = &'a I::Output> + 'a
-where
-    It: IntoIterator,
-    I: Indexable<It::Item>,
-    <It as IntoIterator>::IntoIter: 'a,
-{
-    indices.into_iter().map(|idx| items.item(&idx))
-}
-
-/// [`Indexable`] means a collection (Map, Vec, Array, ...) which can indexed.
-/// The collection
-/// - must be insertable in the [`crate::index::store::Store`] and
-/// - the access of an Item is possible via an Index.
+/// [`Indexable`] means a collection (Map, Vec, Array, ...)
+/// where Items are accessable via an Index.
+/// It is a replacement of [`std::ops::Index`].
 pub trait Indexable<Idx> {
     type Output;
-
-    /// Insert the Items from the collection into the Store.
-    fn to_store<S, F>(&self, field: F) -> S
-    where
-        S: Store<Index = Idx>,
-        F: FnMut(&Self::Output) -> S::Key;
 
     /// Get the Item based on the given Index.
     fn item(&self, idx: &Idx) -> &Self::Output;
 }
 
-impl<T> Indexable<usize> for &[T] {
-    type Output = T;
+macro_rules! list_indexable {
+    ( $( $t:ty )* ) => {
+        $(
+        impl<T> Indexable<usize> for $t {
+            type Output = T;
 
-    fn to_store<S, F>(&self, field: F) -> S
-    where
-        S: Store<Index = usize>,
-        F: FnMut(&Self::Output) -> S::Key,
-    {
-        S::from_list(self.iter().map(field))
-    }
-
-    fn item(&self, idx: &usize) -> &Self::Output {
-        &self[*idx]
-    }
+            fn item(&self, idx: &usize) -> &Self::Output {
+                &self[*idx]
+            }
+        }
+        )*
+    };
 }
+
+list_indexable!(Vec<T> std::collections::VecDeque<T> &[T]);
 
 impl<T, const N: usize> Indexable<usize> for [T; N] {
     type Output = T;
 
-    fn to_store<S, F>(&self, field: F) -> S
-    where
-        S: Store<Index = usize>,
-        F: FnMut(&Self::Output) -> S::Key,
-    {
-        S::from_list(self.iter().map(field))
-    }
-
     fn item(&self, idx: &usize) -> &Self::Output {
         &self[*idx]
     }
 }
 
-impl<T> Indexable<usize> for Vec<T> {
-    type Output = T;
+use std::{borrow::Borrow, hash::Hash};
 
-    fn to_store<S, F>(&self, field: F) -> S
-    where
-        S: Store<Index = usize>,
-        F: FnMut(&Self::Output) -> S::Key,
-    {
-        S::from_list(self.iter().map(field))
-    }
-
-    fn item(&self, idx: &usize) -> &Self::Output {
-        &self[*idx]
-    }
-}
-
-impl<T> Indexable<usize> for std::collections::VecDeque<T> {
-    type Output = T;
-
-    fn to_store<S, F>(&self, field: F) -> S
-    where
-        S: Store<Index = usize>,
-        F: FnMut(&Self::Output) -> S::Key,
-    {
-        S::from_list(self.iter().map(field))
-    }
-
-    fn item(&self, idx: &usize) -> &Self::Output {
-        &self[*idx]
-    }
-}
-
-impl<X, T> Indexable<X> for HashMap<X, T>
+impl<X, T> Indexable<X> for std::collections::HashMap<X, T>
 where
     X: Eq + Hash + Clone + Borrow<X>,
 {
     type Output = T;
-
-    fn to_store<S, F>(&self, mut field: F) -> S
-    where
-        S: Store<Index = X>,
-        F: FnMut(&Self::Output) -> S::Key,
-    {
-        S::from_map(self.iter().map(|(idx, item)| (field(item), idx.clone())))
-    }
 
     fn item(&self, idx: &X) -> &Self::Output {
         self.get(idx).expect("no entry found for key")
@@ -151,14 +84,6 @@ where
     X: Ord + Eq + Hash + Clone + Borrow<X>,
 {
     type Output = T;
-
-    fn to_store<S, F>(&self, mut field: F) -> S
-    where
-        S: Store<Index = X>,
-        F: FnMut(&Self::Output) -> S::Key,
-    {
-        S::from_map(self.iter().map(|(idx, item)| (field(item), idx.clone())))
-    }
 
     fn item(&self, idx: &X) -> &Self::Output {
         self.get(idx).expect("no entry found for key")

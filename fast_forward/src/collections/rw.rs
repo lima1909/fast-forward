@@ -1,13 +1,11 @@
 //! `Read-Write-List` with one index.
 //!
-use std::ops::Index;
-
 use crate::{
     collections::{
         list::{Iter, List},
         Retriever,
     },
-    index::store::Store,
+    index::{store::Store, Indexable},
 };
 
 pub struct RWIndexList<S, K, I, F: Fn(&I) -> K> {
@@ -20,7 +18,6 @@ impl<S, K, I, F> RWIndexList<S, K, I, F>
 where
     F: Fn(&I) -> K,
     S: Store<Key = K, Index = usize>,
-    S::Index: Clone,
 {
     pub fn from_vec<It>(store: S, f: F, iter: It) -> Self
     where
@@ -89,11 +86,11 @@ where
     }
 }
 
-impl<S, K, I, F: Fn(&I) -> K> Index<usize> for RWIndexList<S, K, I, F> {
+impl<S, K, I, F: Fn(&I) -> K> Indexable<usize> for RWIndexList<S, K, I, F> {
     type Output = I;
 
-    fn index(&self, pos: usize) -> &Self::Output {
-        &self.items[pos]
+    fn item(&self, idx: &usize) -> &Self::Output {
+        self.items.item(idx)
     }
 }
 

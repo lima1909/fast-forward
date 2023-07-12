@@ -1,9 +1,7 @@
 //! The Idea of a `View` is like by databases.
 //! Show a section of an [`crate::index::store::Store`].
 
-use std::ops::Index;
-
-use crate::index::{indices::Indices, store::Filterable};
+use crate::index::{indices::Indices, store::Filterable, Indexable};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'a, F, I> {
@@ -33,12 +31,14 @@ where
     }
 
     #[inline]
-    pub fn items(&'a self, key: &F::Key) -> impl Iterator<Item = &'a <I as Index<F::Index>>::Output>
+    pub fn items(
+        &'a self,
+        key: &F::Key,
+    ) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output>
     where
-        I: Index<F::Index>,
-        F::Index: Clone,
+        I: Indexable<F::Index>,
     {
-        self.filter.get(key).iter().map(|i| &self.items[i.clone()])
+        self.filter.get(key).iter().map(|i| self.items.item(i))
     }
 }
 
@@ -71,7 +71,7 @@ impl<'a, K, F, I> View<'a, K, F, I>
 where
     K: Keys<Key = F::Key>,
     F: Filterable,
-    I: Index<F::Index>,
+    I: Indexable<F::Index>,
 {
     pub fn new(keys: K, store: &'a F, items: &'a I) -> Self {
         Self { keys, store, items }
@@ -94,37 +94,33 @@ where
     pub fn get(
         &'a self,
         key: &'a F::Key,
-    ) -> impl Iterator<Item = &'a <I as Index<F::Index>>::Output>
-    where
-        F::Index: Clone,
-    {
+    ) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output> {
         self.store
             .get_with_check(key, |k| self.keys.exist(k))
             .iter()
-            .map(|i| &self.items[i.clone()])
+            .map(|i| self.items.item(i))
     }
 
     #[inline]
     pub fn get_many<II>(
         &'a self,
         keys: II,
-    ) -> impl Iterator<Item = &'a <I as Index<F::Index>>::Output>
+    ) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output>
     where
         II: IntoIterator<Item = F::Key> + 'a,
-        F::Index: Clone,
     {
         let keys = keys.into_iter().filter(|key| self.keys.exist(key));
-        self.store.get_many(keys).map(|i| &self.items[i.clone()])
+        self.store.get_many(keys).items(self.items)
     }
 
     #[inline]
     pub fn filter<P>(
         &'a self,
         predicate: P,
-    ) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
+    ) -> impl Iterator<Item = &'a <I as Indexable<usize>>::Output>
     where
         P: Fn(Filter<'a, View<'a, K, F, I>, I>) -> Indices<'a>,
-        I: Index<usize>,
+        I: Indexable<usize>,
     {
         let filter = Filter::new(self, self.items);
         predicate(filter).items(self.items)

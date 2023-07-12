@@ -1,5 +1,3 @@
-use std::ops::Index;
-
 use fast_forward::{
     collections::rw::RWIndexList,
     index::uint::UIntIndex,
@@ -7,6 +5,7 @@ use fast_forward::{
         indices::Indices,
         store::{Filterable, Store},
         view::Filter,
+        Indexable,
     },
 };
 
@@ -17,7 +16,7 @@ trait Parents<'a> {
 impl<'a, F, L> Parents<'a> for Filter<'a, F, L>
 where
     F: Filterable<Key = usize, Index = usize>,
-    L: Index<usize, Output = Node>,
+    L: Indexable<usize, Output = Node>,
 {
     fn parents(&self, key: usize, stop: usize) -> Indices<'a> {
         let mut result = Indices::empty();
@@ -34,7 +33,7 @@ where
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq)]
 struct Node {
     id: usize,
     parent: usize,

@@ -1,7 +1,7 @@
 //! A `Store` is saving `Indices` for a given `Key`,
 //! with the goal, to get the `Indices` as fast as possible.
 
-use std::ops::Index;
+use crate::index::Indexable;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
 pub trait Store: Filterable {
@@ -186,22 +186,24 @@ where
         Self { filter, keys, iter }
     }
 
-    pub fn items<I>(self, items: &'m I) -> impl Iterator<Item = &'m <I as Index<F::Index>>::Output>
+    #[inline]
+    pub fn items<I>(
+        self,
+        items: &'m I,
+    ) -> impl Iterator<Item = &'m <I as Indexable<F::Index>>::Output>
     where
-        I: Index<F::Index>,
-        <I as Index<F::Index>>::Output: Sized,
-        F::Index: Clone,
+        I: Indexable<F::Index>,
+        <I as Indexable<F::Index>>::Output: Sized,
     {
-        self.map(|i| &items[i.clone()])
+        self.map(|i| items.item(i))
     }
 
-    pub fn items_vec<I>(self, items: &'m I) -> Vec<&'m <I as Index<F::Index>>::Output>
+    pub fn items_vec<I>(self, items: &'m I) -> Vec<&'m <I as Indexable<F::Index>>::Output>
     where
-        I: Index<F::Index>,
-        <I as Index<F::Index>>::Output: Sized,
-        F::Index: Clone,
+        I: Indexable<F::Index>,
+        <I as Indexable<F::Index>>::Output: Sized,
     {
-        self.map(|i| &items[i.clone()]).collect()
+        self.items(items).collect()
     }
 }
 
@@ -235,6 +237,7 @@ where
 /// Create a [`Store`] from a given List or Map and
 /// a function for mapping a Struct-Field to an Index.
 pub trait ToStore<X, T> {
+    /// Insert the Items from the collection into the Store.
     fn to_store<S, F>(&self, field: F) -> S
     where
         S: Store<Index = X>,

@@ -5,12 +5,11 @@ pub(crate) mod list;
 pub mod ro;
 pub mod rw;
 
-use std::ops::Index;
-
 use crate::index::{
     indices::Indices,
     store::{Filterable, MetaData, Store},
     view::{Filter, Keys, View},
+    Indexable,
 };
 
 /// A `Retriever` is the interface for get Items by an given filter|query.
@@ -42,7 +41,7 @@ where
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
-    /// #[derive(Debug, Eq, PartialEq, Clone)]
+    /// #[derive(Debug, PartialEq)]
     /// pub struct Car(usize, String);
     ///
     /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
@@ -65,7 +64,7 @@ where
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
-    /// #[derive(Debug, Eq, PartialEq, Clone)]
+    /// #[derive(Debug, PartialEq)]
     /// pub struct Car(usize, String);
     ///
     /// impl Car {
@@ -79,16 +78,11 @@ where
     /// assert_eq!(Some(&Car(2, "BMW".into())), l.idx().get(&2).next());
     /// ```
     #[inline]
-    pub fn get(&self, key: &S::Key) -> impl Iterator<Item = &'a <I as Index<S::Index>>::Output>
+    pub fn get(&self, key: &S::Key) -> impl Iterator<Item = &'a <I as Indexable<S::Index>>::Output>
     where
-        I: Index<S::Index>,
-        S::Index: Clone,
+        I: Indexable<S::Index>,
     {
-        self.0
-            .filter
-            .get(key)
-            .iter()
-            .map(|i| &self.0.items[i.clone()])
+        self.0.filter.get(key).iter().map(|i| self.0.items.item(i))
     }
 
     /// Combined all given `keys` with an logical `OR`.
@@ -104,7 +98,7 @@ where
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
-    /// #[derive(Debug, Eq, PartialEq, Clone)]
+    /// #[derive(Debug, PartialEq)]
     /// pub struct Car(usize, String);
     ///
     /// let cars = vec![
@@ -125,17 +119,16 @@ where
     ///     result);
     /// ```
     #[inline]
-    pub fn get_many<II>(&self, keys: II) -> impl Iterator<Item = &'a <I as Index<S::Index>>::Output>
+    pub fn get_many<II>(
+        &self,
+        keys: II,
+    ) -> impl Iterator<Item = &'a <I as Indexable<S::Index>>::Output>
     where
         II: IntoIterator<Item = S::Key> + 'a,
-        I: Index<S::Index>,
-        <I as Index<S::Index>>::Output: Sized,
-        S::Index: Clone,
+        I: Indexable<S::Index>,
+        <I as Indexable<S::Index>>::Output: Sized,
     {
-        self.0
-            .filter
-            .get_many(keys)
-            .map(|i| &self.0.items[i.clone()])
+        self.0.filter.get_many(keys).items(self.0.items)
     }
 
     /// Return filter methods from the `Store`.
@@ -146,7 +139,7 @@ where
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
-    /// #[derive(Debug, Eq, PartialEq, Clone)]
+    /// #[derive(Debug, PartialEq)]
     /// pub struct Car(usize, String);
     ///
     /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
@@ -166,10 +159,10 @@ where
     pub fn filter<P>(
         &self,
         predicate: P,
-    ) -> impl Iterator<Item = &'a <I as Index<S::Index>>::Output>
+    ) -> impl Iterator<Item = &'a <I as Indexable<S::Index>>::Output>
     where
         P: Fn(&Filter<'a, S, I>) -> Indices<'a, S::Index>,
-        I: Index<S::Index>,
+        I: Indexable<S::Index>,
         S::Index: Clone,
     {
         predicate(&self.0).items(self.0.items)
@@ -180,7 +173,7 @@ where
     pub fn create_view<It>(&self, keys: It) -> View<'a, S, S, I>
     where
         It: IntoIterator<Item = <S as Keys>::Key>,
-        I: Index<S::Index>,
+        I: Indexable<S::Index>,
         S: Filterable,
         S: Keys<Key = <S as Filterable>::Key>,
     {

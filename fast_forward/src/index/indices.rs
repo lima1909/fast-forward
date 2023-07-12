@@ -4,12 +4,12 @@
 //! which you can use for operations like [`std::ops::BitOr`] and [`std::ops::BitAnd`].
 use std::{
     borrow::Cow,
-    ops::{BitAnd, BitOr, Index},
+    ops::{BitAnd, BitOr},
 };
 
 use crate::index::{
     ops::{intersection, union},
-    to_itmes, Indexable,
+    Indexable,
 };
 
 /// `KeyIndices` contains all indices for a given `Key`.
@@ -87,20 +87,15 @@ where
     }
 
     /// Is a mapping from indices to Items from an given list.
-    pub fn items<Idx>(self, list: &'i Idx) -> impl Iterator<Item = &'i <Idx as Index<I>>::Output>
-    where
-        Idx: Index<I>,
-    {
-        #[allow(clippy::unnecessary_to_owned)]
-        self.0.into_owned().into_iter().map(|i| &list[i])
-    }
-
-    // TODO
-    pub fn items_x<Idx>(self, items: &'i Idx) -> impl Iterator<Item = &'i Idx::Output>
+    pub fn items<Idx>(
+        self,
+        list: &'i Idx,
+    ) -> impl Iterator<Item = &'i <Idx as Indexable<I>>::Output>
     where
         Idx: Indexable<I>,
     {
-        to_itmes(self.0.into_owned(), items)
+        #[allow(clippy::unnecessary_to_owned)]
+        self.0.into_owned().into_iter().map(|i| list.item(&i))
     }
 }
 

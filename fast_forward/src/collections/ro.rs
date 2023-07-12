@@ -1,15 +1,13 @@
 //! `Read-Only-List` with one index.
 //!
-use std::{
-    collections::HashMap,
-    hash::Hash,
-    marker::PhantomData,
-    ops::{Deref, Index},
-};
+use std::{collections::HashMap, hash::Hash, marker::PhantomData, ops::Deref};
 
 use crate::{
     collections::Retriever,
-    index::store::{Store, ToStore},
+    index::{
+        store::{Store, ToStore},
+        Indexable,
+    },
 };
 
 /// [`IList`] is a read only `List` (Vec, Array, ..., default is a Vec) which owned the given items.
@@ -23,7 +21,7 @@ pub struct IList<S, T, L = Vec<T>> {
 impl<S, T, L> IList<S, T, L>
 where
     S: Store<Index = usize>,
-    L: Index<usize, Output = T>,
+    L: Indexable<usize, Output = T>,
 {
     pub fn new<F, K>(field: F, items: L) -> Self
     where
@@ -98,11 +96,11 @@ impl<'s, T> Deref for Slice<'s, T> {
     }
 }
 
-impl<'s, T> Index<usize> for Slice<'s, T> {
+impl<'s, T> Indexable<usize> for Slice<'s, T> {
     type Output = T;
 
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
+    fn item(&self, idx: &usize) -> &Self::Output {
+        self.0.item(idx)
     }
 }
 
@@ -117,7 +115,7 @@ pub struct IMap<S, X, T, M = HashMap<X, T>> {
 impl<S, X, T, M> IMap<S, X, T, M>
 where
     S: Store<Index = X>,
-    M: Index<X>,
+    M: Indexable<X>,
 {
     pub fn new<F, K>(field: F, items: M) -> Self
     where
@@ -282,52 +280,51 @@ mod tests {
         assert_eq!(99, l.idx().meta().max());
     }
 
-    // #[test]
-    // fn ilist_hashmap_usize() {
-    //     use std::collections::HashMap;
+    #[test]
+    fn ilist_hashmap_usize() {
+        use std::collections::HashMap;
 
-    //     let mut m = HashMap::<usize, Car>::new();
-    //     m.insert(2, Car(2, "BMW".into()));
-    //     m.insert(5, Car(5, "Audi".into()));
-    //     m.insert(3, Car(3, "VW".into()));
-    //     m.insert(99, Car(99, "Porsche".into()));
+        let mut m = HashMap::<usize, Car>::new();
+        m.insert(2, Car(2, "BMW".into()));
+        m.insert(5, Car(5, "Audi".into()));
+        m.insert(3, Car(3, "VW".into()));
+        m.insert(99, Car(99, "Porsche".into()));
 
-    //     let l: IMap<UIntIndex<usize>, _, Car> = IMap::new(Car::id, m);
+        let l: IMap<UIntIndex<usize>, _, Car> = IMap::new(Car::id, m);
 
-    //     assert_eq!(4, l.len());
-    //     assert_eq!(Car(2, "BMW".into()), l[&2]);
+        assert_eq!(4, l.len());
+        assert_eq!(Car(2, "BMW".into()), l[&2]);
 
-    //     assert!(l.idx().contains(&2));
-    //     assert!(!l.idx().contains(&200));
+        assert!(l.idx().contains(&2));
+        assert!(!l.idx().contains(&200));
 
-    //     let mut it = l.idx().get(&&2);
-    //     assert_eq!(Some(&Car(2, "BMW".into())), it.next());
-    //     assert_eq!(Some(&Car(2, "VW".into())), it.next());
-    //     assert_eq!(None, it.next());
+        let mut it = l.idx().get(&2);
+        assert_eq!(Some(&Car(2, "BMW".into())), it.next());
+        assert_eq!(None, it.next());
 
-    // let mut it = l.idx().get_many([99, 5]);
-    // assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
-    // assert_eq!(Some(&Car(5, "Audi".into())), it.next());
-    // assert_eq!(None, it.next());
+        let mut it = l.idx().get_many([99, 5]);
+        assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+        assert_eq!(Some(&Car(5, "Audi".into())), it.next());
+        assert_eq!(None, it.next());
 
-    // let mut it = l.idx().filter(|f| {
-    //     assert!(f.contains(&99));
+        let mut it = l.idx().filter(|f| {
+            assert!(f.contains(&99));
 
-    //     let idxs = f.eq(&99);
-    //     assert_eq!(["Porsche"], idxs.as_slice());
+            let idxs = f.eq(&99);
+            assert_eq!([99], idxs.as_slice());
 
-    //     let mut it = f.items(&99);
-    //     assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
-    //     assert_eq!(None, it.next());
+            let mut it = f.items(&99);
+            assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+            assert_eq!(None, it.next());
 
-    //     idxs
-    // });
-    // assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
-    // assert_eq!(None, it.next());
+            idxs
+        });
+        assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
+        assert_eq!(None, it.next());
 
-    // assert_eq!(2, l.idx().meta().min());
-    // assert_eq!(99, l.idx().meta().max());
-    // }
+        assert_eq!(2, l.idx().meta().min());
+        assert_eq!(99, l.idx().meta().max());
+    }
 
     #[test]
     fn ilist_btreemap() {

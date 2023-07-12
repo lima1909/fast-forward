@@ -1,6 +1,5 @@
-use std::ops::Index;
-
-#[derive(Debug, Clone)]
+use crate::index::Indexable;
+#[derive(Debug)]
 pub struct List<T> {
     items: Vec<T>,
     deleted_pos: Vec<usize>,
@@ -109,14 +108,14 @@ impl<T> Default for List<T> {
     }
 }
 
-impl<T> Index<usize> for List<T> {
+impl<T> Indexable<usize> for List<T> {
     type Output = T;
 
-    fn index(&self, pos: usize) -> &Self::Output {
-        if self.is_deleted(pos) {
-            panic!("Item on index: '{pos}' was deleted");
+    fn item(&self, idx: &usize) -> &Self::Output {
+        if self.is_deleted(*idx) {
+            panic!("Item on index: '{idx}' was deleted");
         }
-        &self.items[pos]
+        self.items.item(idx)
     }
 }
 
@@ -235,7 +234,7 @@ mod tests {
 
         assert_eq!(Some(&1), l.iter().next());
         assert_eq!(Some(&2), l.get(1));
-        assert_eq!(3, l[2]); // get with Index
+        assert_eq!(&3, l.item(&2)); // get with Index
     }
 
     #[test]
@@ -308,7 +307,7 @@ mod tests {
     fn delete_index_panic() {
         let mut l: List<_> = vec![1, 2, 3].into();
         l.delete(0, |_, _| {});
-        assert_eq!(1, l[0]);
+        assert_eq!(&1, l.item(&0));
     }
 
     #[test]
