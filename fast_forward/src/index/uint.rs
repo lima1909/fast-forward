@@ -46,16 +46,6 @@ pub struct UIntIndex<K: Default = usize, X = usize> {
     _key: PhantomData<K>,
 }
 
-impl UIntIndex<usize> {
-    pub fn new() -> Self {
-        Self {
-            data: Vec::new(),
-            min_max_cache: MinMax::default(),
-            _key: PhantomData,
-        }
-    }
-}
-
 impl<K, X> Filterable for UIntIndex<K, X>
 where
     K: Default + Into<usize> + Copy,
@@ -217,6 +207,16 @@ impl<K: Default, X> UIntIndex<K, X> {
 mod tests {
     use super::{super::filter::Filter, *};
 
+    impl UIntIndex<usize> {
+        fn new() -> Self {
+            Self {
+                data: Vec::new(),
+                min_max_cache: MinMax::default(),
+                _key: PhantomData,
+            }
+        }
+    }
+
     #[test]
     fn retrieve() {
         let mut i = UIntIndex::new();
@@ -255,6 +255,32 @@ mod tests {
         i.insert(1, 3);
         assert_eq!(1, i.meta().min());
         assert_eq!(2, i.meta().max());
+    }
+
+    #[test]
+    fn index_str() {
+        let mut i = UIntIndex::<usize, String>::default();
+        i.insert(1, "Jasmin".into());
+        i.insert(2, "Mario 1".into());
+        i.insert(2, "Mario 2".into());
+        i.insert(5, "Paul".into());
+
+        assert!(i.contains(&5));
+
+        for idx in i.get(&1).iter() {
+            assert_eq!(&String::from("Jasmin"), idx);
+        }
+
+        let idxs = i.get(&1);
+        let mut it = idxs.iter();
+        assert_eq!(Some(&"Jasmin".into()), it.next());
+        assert_eq!(None, it.next());
+
+        let idxs = i.get(&2);
+        let mut it = idxs.iter();
+        assert_eq!(Some(&"Mario 1".into()), it.next());
+        assert_eq!(Some(&"Mario 2".into()), it.next());
+        assert_eq!(None, it.next());
     }
 
     mod unique {

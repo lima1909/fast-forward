@@ -36,17 +36,17 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash};
 /// `Key` is from type [`str`] and use [`std::collections::HashMap`] for the searching.
 #[derive(Debug, Default)]
 #[repr(transparent)]
-pub struct MapIndex<K: Default = String>(HashMap<K, KeyIndices>);
+pub struct MapIndex<K: Default = String, X = usize>(HashMap<K, KeyIndices<X>>);
 
-impl<K> Filterable for MapIndex<K>
+impl<K, X> Filterable for MapIndex<K, X>
 where
     K: Default + Hash + Eq,
 {
     type Key = K;
-    type Index = usize;
+    type Index = X;
 
     #[inline]
-    fn get(&self, key: &Self::Key) -> &[usize] {
+    fn get(&self, key: &Self::Key) -> &[Self::Index] {
         match self.0.get(key) {
             Some(i) => i.as_slice(),
             None => &[],
@@ -58,11 +58,12 @@ where
     }
 }
 
-impl<K> Store for MapIndex<K>
+impl<K, X> Store for MapIndex<K, X>
 where
     K: Default + Eq + Hash,
+    X: Ord,
 {
-    fn insert(&mut self, key: K, i: usize) {
+    fn insert(&mut self, key: K, i: Self::Index) {
         match self.0.get_mut(&key) {
             Some(v) => v.add(i),
             None => {
@@ -71,7 +72,7 @@ where
         }
     }
 
-    fn delete(&mut self, key: K, idx: &usize) {
+    fn delete(&mut self, key: K, idx: &Self::Index) {
         if let Some(rm_idx) = self.0.get_mut(&key) {
             if rm_idx.remove(idx).is_empty() {
                 self.0.remove(&key);
@@ -113,6 +114,12 @@ where
 mod tests {
     use super::*;
 
+    impl<K: Default> MapIndex<K> {
+        fn new() -> Self {
+            Self(HashMap::new())
+        }
+    }
+
     #[test]
     fn retrieve() {
         let mut i = MapIndex::default();
@@ -132,12 +139,37 @@ mod tests {
         assert_eq!(None, it.next());
     }
 
+    #[test]
+    fn index_str() {
+        let mut i = MapIndex::<String, String>::default();
+        i.insert("Jasmin".into(), "Jasmin".into());
+        i.insert("Mario".into(), "Mario 1".into());
+        i.insert("Mario".into(), "Mario 2".into());
+        i.insert("Paul".into(), "Paul".into());
+
+        assert!(i.contains(&"Paul".into()));
+
+        for idx in i.get(&"Jasmin".into()).iter() {
+            assert_eq!(&String::from("Jasmin"), idx);
+        }
+
+        let idxs = i.get(&"Jasmin".into());
+        let mut it = idxs.iter();
+        assert_eq!(Some(&"Jasmin".into()), it.next());
+        assert_eq!(None, it.next());
+
+        let idxs = i.get(&"Mario".into());
+        let mut it = idxs.iter();
+        assert_eq!(Some(&"Mario 1".into()), it.next());
+        assert_eq!(Some(&"Mario 2".into()), it.next());
+        assert_eq!(None, it.next());
+    }
     mod unique {
         use super::{super::super::filter::Filter, *};
 
         #[test]
         fn empty() {
-            let i = MapIndex::default();
+            let i = MapIndex::new();
             assert_eq!(0, i.get(&"Jasmin").len());
             assert!(i.0.is_empty());
         }
@@ -190,7 +222,7 @@ mod tests {
 
         #[test]
         fn out_of_bound() {
-            let i = MapIndex::default();
+            let i = MapIndex::new();
             assert_eq!(0, i.get(&"Jasmin").len());
         }
 
@@ -293,7 +325,7 @@ mod tests {
 
         #[test]
         fn empty() {
-            let i = MapIndex::default();
+            let i = MapIndex::new();
             assert_eq!(0, i.get(&"Jasmin").len());
             assert!(i.0.is_empty());
         }
