@@ -1,4 +1,4 @@
-//! `Read-Write-List` with one index.
+//! `Read-Write Collections` with one index.
 //!
 use crate::{
     collections::{

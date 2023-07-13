@@ -1,4 +1,4 @@
-//! `Read-Only-List` with one index.
+//! `Read-Only Collections` with one index.
 //!
 use std::{collections::HashMap, hash::Hash, marker::PhantomData, ops::Deref};
 
