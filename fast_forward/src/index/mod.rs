@@ -1,30 +1,8 @@
-//! The purpose of an Index is to find faster a specific item in a list (Slice, Vec, ...).
+//! The purpose of an Index is to find faster a specific item in a collection (Slice, Vec, Map, ...).
 //! This means, it does not have to touch and compare every item in the list.
 //!
-//! An Index has two parts, a `Key` (item to search for) and a position (the index in the list) `Index`.
+//! An Index has two parts, a `Key` (item to search for) and a position (the index in the collection) `Index`.
 //!
-//! There are two types of Index:
-//! - `Unique Index`: for a given `Key` exist exactly one Index.
-//! - `Multi Index` : for a given `Key` exists many Indices.
-//!
-//! # Example for an Vec-Multi-Index:
-//!
-//! Map-Index:
-//!
-//! - `Key`   = name (String)
-//! - `Index` = index is the position in a List (Vec)
-//!
-//! ```text
-//! let _names = vec!["Paul", "Jasmin", "Inge", "Paul", ...];
-//!
-//!  Key       | Index
-//! -------------------
-//!  "Jasmin"  | 1
-//!  "Paul"    | 0, 3
-//!  "Inge"    | 2
-//!   ...      | ...
-//! ```
-
 pub mod indices;
 pub mod map;
 pub mod ops;
@@ -39,11 +17,15 @@ pub trait Indexable<Idx> {
     type Output;
 
     /// Get the Item based on the given Index.
+    ///
+    /// #Panic
+    ///
+    /// If no Item exist for the given Index.
     fn item(&self, idx: &Idx) -> &Self::Output;
 }
 
 macro_rules! list_indexable {
-    ( $( $t:ty )* ) => {
+    ( $( $t:ty ),* ) => {
         $(
         impl<T> Indexable<usize> for $t {
             type Output = T;
@@ -56,7 +38,7 @@ macro_rules! list_indexable {
     };
 }
 
-list_indexable!(Vec<T> std::collections::VecDeque<T> &[T]);
+list_indexable!(Vec<T>, std::collections::VecDeque<T>, &[T]);
 
 impl<T, const N: usize> Indexable<usize> for [T; N] {
     type Output = T;

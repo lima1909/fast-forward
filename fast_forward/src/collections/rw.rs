@@ -19,7 +19,7 @@ where
     F: Fn(&I) -> K,
     S: Store<Key = K, Index = usize>,
 {
-    pub fn from_vec<It>(store: S, f: F, iter: It) -> Self
+    pub fn from_iter<It>(store: S, f: F, iter: It) -> Self
     where
         It: IntoIterator<Item = I>,
     {
@@ -115,7 +115,8 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_uint(cars: Vec<Car>) {
-        let cars = RWIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+        let cars =
+            RWIndexList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
         assert!(cars.idx().contains(&2));
         assert!(cars.get(2).is_some());
@@ -140,7 +141,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_map(cars: Vec<Car>) {
-        let cars = RWIndexList::from_vec(
+        let cars = RWIndexList::from_iter(
             MapIndex::with_capacity(cars.len()),
             |c: &Car| c.1.clone(),
             cars,
@@ -165,7 +166,7 @@ mod tests {
     #[rstest]
     fn one_indexed_list_update(cars: Vec<Car>) {
         let mut cars =
-            RWIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+            RWIndexList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
         // update name, where name is NOT a Index
         let updated = cars.update(0, |c| {
@@ -207,7 +208,7 @@ mod tests {
     #[rstest]
     fn one_indexed_list_delete(cars: Vec<Car>) {
         let mut cars =
-            RWIndexList::from_vec(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+            RWIndexList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
         // before delete: 2 Cars
         let r = cars.idx().get(&2).collect::<Vec<_>>();

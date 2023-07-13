@@ -29,7 +29,7 @@ fn main() {
         Car::new(99, "Porsche"),
     ];
 
-    let cars = RWIndexList::from_vec(
+    let cars = RWIndexList::from_iter(
         UIntIndex::with_capacity(cars.len()),
         |c: &Car| c.id,
         cars.clone(),
@@ -58,7 +58,7 @@ fn main() {
         Car::new(99, "Porsche"),
     ];
 
-    let cars = RWIndexList::from_vec(
+    let cars = RWIndexList::from_iter(
         MapIndex::with_capacity(cars.len()),
         |c: &Car| c.name.clone(),
         cars,

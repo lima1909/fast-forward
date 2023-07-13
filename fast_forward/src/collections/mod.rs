@@ -168,7 +168,7 @@ where
         predicate(&self.0).items(self.0.items)
     }
 
-    ///
+    /// Create a View by the given keys.
     #[inline]
     pub fn create_view<It>(&self, keys: It) -> View<'a, S, S, I>
     where
