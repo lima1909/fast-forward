@@ -135,7 +135,7 @@ impl Index {
             }
             Type::RefList => {
                 quote! {
-                    pub fn #name(&self) -> fast_forward::collections::Retriever<'_, #store, fast_forward::collections::ro::Slice<'a, #on>> {
+                    pub fn #name(&self) -> fast_forward::collections::Retriever<'_, #store, &'a [#on]> {
                         fast_forward::collections::Retriever::new(&self.#name, &self.items)
                     }
                 }

@@ -111,7 +111,7 @@ impl IndexedList {
                 quote! (
                     pub struct #list_name<'a> {
                         #(#fields)*
-                        items: fast_forward::collections::ro::Slice<'a, #on>,
+                        items: &'a [#on],
                     }
                 )
             }
@@ -158,7 +158,7 @@ impl IndexedList {
 
                             Self {
                                 #(#init_fields)*
-                                items: fast_forward::collections::ro::Slice(items),
+                                items,
                             }
                         }
                     }
@@ -239,7 +239,7 @@ impl IndexedList {
                         type Target = [#on];
 
                         fn deref(&self) -> &Self::Target {
-                            self.items.0
+                            self.items
                         }
                     }
                 )
@@ -350,7 +350,7 @@ mod tests {
 
         let ts2: TokenStream = parse_quote!(
             pub struct #list_name<'a> {
-                items: fast_forward::collections::ro::Slice<'a, #on>,
+                items: &'a [#on],
             }
         );
 

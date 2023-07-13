@@ -53,7 +53,7 @@ impl<S, T, L> Deref for IList<S, T, L> {
 /// The list supported one `Index`.
 pub struct IRefList<'l, S, T> {
     store: S,
-    items: Slice<'l, T>,
+    items: &'l [T],
 }
 
 impl<'l, S, T> IRefList<'l, S, T>
@@ -67,11 +67,11 @@ where
     {
         Self {
             store: items.to_store(field),
-            items: Slice(items),
+            items,
         }
     }
 
-    pub fn idx(&self) -> Retriever<'_, S, Slice<'l, T>> {
+    pub fn idx(&self) -> Retriever<'_, S, &'l [T]> {
         Retriever::new(&self.store, &self.items)
     }
 }
@@ -80,27 +80,7 @@ impl<S, T> Deref for IRefList<'_, S, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
-        self.items.0
-    }
-}
-
-/// Wrapper for `slices`.
-#[repr(transparent)]
-pub struct Slice<'s, T>(pub &'s [T]);
-
-impl<'s, T> Deref for Slice<'s, T> {
-    type Target = [T];
-
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
-
-impl<'s, T> Indexable<usize> for Slice<'s, T> {
-    type Output = T;
-
-    fn item(&self, idx: &usize) -> &Self::Output {
-        self.0.item(idx)
+        self.items
     }
 }
 
