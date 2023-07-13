@@ -10,8 +10,7 @@ use crate::{
     },
 };
 
-/// [`IList`] is a read only `List` (Vec, Array, ..., default is a Vec) which owned the given items.
-/// The list supported one `Index`.
+/// [`IList`] is a read only indexed `List` (Vec, Array, ..., default is a Vec) which owned the given items.
 pub struct IList<S, T, L = Vec<T>> {
     store: S,
     items: L,
@@ -49,8 +48,7 @@ impl<S, T, L> Deref for IList<S, T, L> {
     }
 }
 
-/// [`IRefList`] is a read only `List` with a reference (borrowed) to the given items.
-/// The list supported one `Index`.
+/// [`IRefList`] is a read only indexed `List` which borrowed the given items.
 pub struct IRefList<'l, S, T> {
     store: S,
     items: &'l [T],
@@ -84,7 +82,7 @@ impl<S, T> Deref for IRefList<'_, S, T> {
     }
 }
 
-/// [`IMap`] is a read only `Key-Value-Map` with one index.
+/// [`IMap`] is a read only indexed `Key-Value Map` which owned the given items.
 pub struct IMap<S, X, T, M = HashMap<X, T>> {
     store: S,
     items: M,
