@@ -19,7 +19,3 @@ watch filter="":
 # run cargo test and clippy
 clippy: test
   @cargo clippy --tests --workspace -- -D warnings
-
-# generate the README.md from the README.tpl + src/lib.rs
-readme:
-  cargo readme -o README.md 

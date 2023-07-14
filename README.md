@@ -1,4 +1,17 @@
-# fast_forward
+# Fast-Forward [![Build Status]][Build Action] [![Coverage Status]][Coverage Action]
+
+[Build Status]: https://github.com/lima1909/fast-forward/actions/workflows/continuous_integration.yml/badge.svg
+[Build Action]: https://github.com/lima1909/fast-forward/actions
+[Coverage Status]: https://codecov.io/gh/lima1909/fast-forward/branch/main/graph/badge.svg?token=VO3VV8BFLN
+[Coverage Action]: https://codecov.io/gh/lima1909/fast-forward
+
+
+⏩ Quering lists blazing fast.
+
+This is a very, very, ... early state. This means, this implementation is on the way to find out, what is a good solution 
+and want anyone use it. The API can change a lot! Please, try it out and give me feedback.
+
+# Overview
 
 __Fast-Forward__ is a library for finding or filtering items in a (large) collection (Vec, Map, ...), __faster__  than an `Iterator` or a search algorithm.
 It is not a replacement of the `Iterator` or searching, is more of an addition.
@@ -50,5 +63,8 @@ Tis library consists of the following parts (modules):
 - [`crate::index`]: to store Indices and the Indices themself
 - [`crate::collections`]: the implementations of indexed collections (e.g. read only: IList, IRefList, IMap).
 
+
+<hr>
+Current version: 0.0.1
 
 License: MIT

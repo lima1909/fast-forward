@@ -1,0 +1,8 @@
+# default, list all just Recipe
+default: 
+  @just -q --list
+
+
+# generate the README.md from the README.tpl + src/lib.rs
+readme:
+  cargo readme -o ../README.md 
