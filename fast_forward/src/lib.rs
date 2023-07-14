@@ -30,15 +30,15 @@
 //!
 //! // get many Cars with ID = 2 or 1
 //! assert_eq!(
+//!     l.idx().get_many([2, 1]).collect::<Vec<_>>(),
 //!     vec![&Car(2, "VW".into()), &Car(1, "BMW".into())],
-//!     l.idx().get_many([2, 1]).collect::<Vec<_>>()
 //! );
 //!
 //! // the same query with the filter-method
 //! // (which has the disadvantage, that this need a allocation)
 //! assert_eq!(
+//!     l.idx().filter(|f| f.eq(&2) | f.eq(&1)).collect::<Vec<_>>(),
 //!     vec![&Car(1, "BMW".into()), &Car(2, "VW".into())],
-//!     l.idx().filter(|f| f.eq(&2) | f.eq(&1)).collect::<Vec<_>>()
 //! );
 //! ```
 //!

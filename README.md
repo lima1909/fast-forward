@@ -1,46 +1,54 @@
-# Fast-Forward [![Build Status]][Build Action] [![Coverage Status]][Coverage Action]
+# fast_forward
 
-[Build Status]: https://github.com/lima1909/fast-forward/actions/workflows/continuous_integration.yml/badge.svg
-[Build Action]: https://github.com/lima1909/fast-forward/actions
-[Coverage Status]: https://codecov.io/gh/lima1909/fast-forward/branch/main/graph/badge.svg?token=VO3VV8BFLN
-[Coverage Action]: https://codecov.io/gh/lima1909/fast-forward
+__Fast-Forward__ is a library for finding or filtering items in a (large) collection (Vec, Map, ...), __faster__  than an `Iterator` or a search algorithm.
+It is not a replacement of the `Iterator` or searching, is more of an addition.
 
+This faster is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the collection.
 
-⏩ Quering lists blazing fast.
+An `Index` has two parts, a `Key` (item to searching for) and a `Position` (the index) in the collection.
 
-This is a very, very, ... early state. This means, this implementation is on the way to find out, what is a good solution 
-and want anyone use it. The API can change a lot! Please, try it out and give me feedback.
+### Example for an indexed read only List (ro::IList):
 
-# Overview
+```rust
+use fast_forward::{index::uint::UIntIndex, collections::ro::IList};
 
-**Fast-Forward** is a library for filtering items in a (large) list, _faster_ than an `Iterator` ([`std::iter::Iterator::filter`]).
-It is not a replacement of the `Iterator`, but an addition.
+#[derive(Debug, PartialEq)]
+pub struct Car(usize, String);
 
-This _faster_ is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the list.
+// create a list of Cars
+let cars = vec![Car(1, "BMW".into()), Car(2, "VW".into())];
 
-An `Index` has two parts, a `Key` (item to searching for) and a `Position` (the index) in the list.
+// created an indexed List with the UIntIndex on the Car property 0.
+let l = IList::<UIntIndex, _>::new(|c: &Car| c.0, cars);
 
-### A simple Example:
+// idx method pointed to the Car.0 property Index and
+// gives access to the `Retriever` object to handle queries, like: contains, get, filter.
+assert!(l.idx().contains(&2));
+assert!(!l.idx().contains(&2000));
 
+// get a Car with the ID = 2
+let mut it = l.idx().get(&2);
+assert_eq!(Some(&Car(2, "VW".into())), it.next());
+
+// get many Cars with ID = 2 or 1
+assert_eq!(
+    l.idx().get_many([2, 1]).collect::<Vec<_>>(),
+    vec![&Car(2, "VW".into()), &Car(1, "BMW".into())],
+);
+
+// the same query with the filter-method
+// (which has the disadvantage, that this need a allocation)
+assert_eq!(
+    l.idx().filter(|f| f.eq(&2) | f.eq(&1)).collect::<Vec<_>>(),
+    vec![&Car(1, "BMW".into()), &Car(2, "VW".into())],
+);
 ```
-let _list_with_names = vec!["Paul", "Jon", "Inge", "Paul", ...];
-```
 
-Index `Map(name, idx's)`:
+All supported options for retrieve Items can you find by [`crate::collections::Retriever`].
 
-```
- Key     | Idx
----------------
- "Paul"  | 0, 3
- "Jon"   | 1
- "Inge"  | 2
-  ...    | ...
-```
+Tis library consists of the following parts (modules):
+- [`crate::index`]: to store Indices and the Indices themself
+- [`crate::collections`]: the implementations of indexed collections (e.g. read only: IList, IRefList, IMap).
 
-To Find the `Key`: "Jon" with the `operation equals` is only one step necessary.
-
-
-<hr>
-Current version: 0.1.0
 
 License: MIT
