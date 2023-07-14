@@ -62,7 +62,7 @@ fn main() {
         Node::new(6, 5),
     ];
 
-    let n = RWIndexList::from_vec(
+    let n = RWIndexList::from_iter(
         UIntIndex::with_capacity(nodes.len()),
         |n: &Node| n.id,
         nodes,

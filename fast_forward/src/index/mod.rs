@@ -1,5 +1,4 @@
 //! The `index `module contains the structure for saving and accessing the `Index` implementations.
-
 pub mod indices;
 pub mod map;
 pub mod ops;
@@ -14,11 +13,15 @@ pub trait Indexable<Idx> {
     type Output;
 
     /// Get the Item based on the given Index.
+    ///
+    /// #Panic
+    ///
+    /// If no Item exist for the given Index.
     fn item(&self, idx: &Idx) -> &Self::Output;
 }
 
 macro_rules! list_indexable {
-    ( $( $t:ty )* ) => {
+    ( $( $t:ty ),* ) => {
         $(
         impl<T> Indexable<usize> for $t {
             type Output = T;
@@ -31,7 +34,7 @@ macro_rules! list_indexable {
     };
 }
 
-list_indexable!(Vec<T> std::collections::VecDeque<T> &[T]);
+list_indexable!(Vec<T>, std::collections::VecDeque<T>, &[T]);
 
 impl<T, const N: usize> Indexable<usize> for [T; N] {
     type Output = T;

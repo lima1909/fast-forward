@@ -10,8 +10,7 @@ use crate::{
     },
 };
 
-/// [`IList`] is a read only `List` (Vec, Array, ..., default is a Vec) which owned the given items.
-/// The list supported one `Index`.
+/// [`IList`] is a read only indexed `List` (Vec, Array, ..., default is a Vec) which owned the given items.
 pub struct IList<S, T, L = Vec<T>> {
     store: S,
     items: L,
@@ -49,11 +48,10 @@ impl<S, T, L> Deref for IList<S, T, L> {
     }
 }
 
-/// [`IRefList`] is a read only `List` with a reference (borrowed) to the given items.
-/// The list supported one `Index`.
+/// [`IRefList`] is a read only indexed `List` which borrowed the given items.
 pub struct IRefList<'l, S, T> {
     store: S,
-    items: Slice<'l, T>,
+    items: &'l [T],
 }
 
 impl<'l, S, T> IRefList<'l, S, T>
@@ -67,11 +65,11 @@ where
     {
         Self {
             store: items.to_store(field),
-            items: Slice(items),
+            items,
         }
     }
 
-    pub fn idx(&self) -> Retriever<'_, S, Slice<'l, T>> {
+    pub fn idx(&self) -> Retriever<'_, S, &'l [T]> {
         Retriever::new(&self.store, &self.items)
     }
 }
@@ -80,31 +78,11 @@ impl<S, T> Deref for IRefList<'_, S, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
-        self.items.0
+        self.items
     }
 }
 
-/// Wrapper for `slices`.
-#[repr(transparent)]
-pub struct Slice<'s, T>(pub &'s [T]);
-
-impl<'s, T> Deref for Slice<'s, T> {
-    type Target = [T];
-
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
-
-impl<'s, T> Indexable<usize> for Slice<'s, T> {
-    type Output = T;
-
-    fn item(&self, idx: &usize) -> &Self::Output {
-        self.0.item(idx)
-    }
-}
-
-/// [`IMap`] is a read only `Key-Value-Map` with one index.
+/// [`IMap`] is a read only indexed `Key-Value Map` which owned the given items.
 pub struct IMap<S, X, T, M = HashMap<X, T>> {
     store: S,
     items: M,
