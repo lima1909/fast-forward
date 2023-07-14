@@ -154,7 +154,7 @@ where
     ///
     /// ## Hint
     ///
-    /// The `OR` (`|`) generated a extra allocation.
+    /// Every `OR` (`|`) generated a extra allocation. `get_many` can be a better option.
     #[inline]
     pub fn filter<P>(
         &self,
@@ -168,7 +168,9 @@ where
         predicate(&self.0).items(self.0.items)
     }
 
-    ///
+    /// Create a `View` by a given list of keys.
+    /// The view represents a subset of the items in the list.
+    /// This is particularly useful if I don't want to show all items for non-existing rights.
     #[inline]
     pub fn create_view<It>(&self, keys: It) -> View<'a, S, S, I>
     where

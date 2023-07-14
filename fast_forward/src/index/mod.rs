@@ -1,29 +1,4 @@
-//! The purpose of an Index is to find faster a specific item in a list (Slice, Vec, ...).
-//! This means, it does not have to touch and compare every item in the list.
-//!
-//! An Index has two parts, a `Key` (item to search for) and a position (the index in the list) `Index`.
-//!
-//! There are two types of Index:
-//! - `Unique Index`: for a given `Key` exist exactly one Index.
-//! - `Multi Index` : for a given `Key` exists many Indices.
-//!
-//! # Example for an Vec-Multi-Index:
-//!
-//! Map-Index:
-//!
-//! - `Key`   = name (String)
-//! - `Index` = index is the position in a List (Vec)
-//!
-//! ```text
-//! let _names = vec!["Paul", "Jasmin", "Inge", "Paul", ...];
-//!
-//!  Key       | Index
-//! -------------------
-//!  "Jasmin"  | 1
-//!  "Paul"    | 0, 3
-//!  "Inge"    | 2
-//!   ...      | ...
-//! ```
+//! The `index `module contains the structure for saving and accessing the `Index` implementations.
 
 pub mod indices;
 pub mod map;

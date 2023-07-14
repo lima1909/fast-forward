@@ -1,5 +1,5 @@
 //! The Idea of a `View` is like by databases.
-//! Show a section of an [`crate::index::store::Store`].
+//! Show a subset of `Indices` which a saved in the [`crate::index::store::Store`].
 
 use crate::index::{indices::Indices, store::Filterable, Indexable};
 

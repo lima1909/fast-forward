@@ -1,13 +1,35 @@
-//! **Fast-Forward** is a library for filtering items in a (large) list, _faster_ than an `Iterator` ([`std::iter::Iterator::filter`]).
-//! It is not a replacement of the `Iterator`, rather an addition.
+//! **Fast-Forward** is a library for finding or filtering items in a (large) collection (Vec, Map, ...), _faster_  than an `Iterator` or a search algorithm.
+//! It is not a replacement of the `Iterator` or searching, rather an addition.
 //!
 //! This _faster_ is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the list.
 //!
 //! An `Index` has two parts, a `Key` (item to searching for) and a `Position` (the index) in the list.
 //!
-//! ## Example:
+//! ## Example for a indexed read only List (ro::IList):
 //!
-//! ```text
+//! ```
+//! use fast_forward::{index::uint::UIntIndex, collections::ro::IList};
+//!
+//! #[derive(Debug, PartialEq)]
+//! pub struct Car(usize, String);
+//!
+//! let cars = vec![Car(1, "BMW".into()), Car(2, "VW".into())];
+//!
+//! // created an indexed List with the UIntIndex on the Car property 0.
+//! let l = IList::<UIntIndex, _>::new(|c: &Car| c.0, cars);
+//!
+//! // idx method pointed to the Car.0 property
+//! assert!(l.idx().contains(&2));
+//! assert!(!l.idx().contains(&2000));
+//!
+//! // get Car with ID = 2
+//! let mut it = l.idx().get(&2);
+//! assert_eq!(Some(&Car(2, "VW".into())), it.next());
+//!
+//! // get many: Cars with ID = 2 oder 1
+//! let mut it = l.idx().get_many([2, 1]);
+//! assert_eq!(Some(&Car(2, "VW".into())), it.next());
+//! assert_eq!(Some(&Car(1, "BMW".into())), it.next());
 //! ```
 //!
 
@@ -35,6 +57,7 @@ pub mod index;
 ///     }
 /// );
 /// ```
+#[doc(hidden)]
 #[macro_export]
 macro_rules! fast {
     (
