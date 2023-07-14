@@ -1,31 +1,6 @@
-//! Indices for `Key`s  which implement: [`std::hash::Hash`] + [`std::cmp::Eq`].
+//! Is an `Index` which use tha hashing from the [`std::collections::HashMap`]
+//! to find the Indices for a given `Key`.
 //!
-//! The `Key` is the Hash-Key and the value are the `Index` which are saved in the [`MapIndex`]:
-//!
-//!
-//!```text
-//! let _list_names_unique = vec!["Paul", "Mario", "Jasmin", ...];
-//!
-//! Unique [`MapIndex`]:
-//!
-//!  Key      | Idx
-//! --------------------
-//!  "Jasmin" |  2
-//!  "Mario"  |  1
-//!  "Paul"   |  0
-//!   ...     | ...
-//!
-//! let _list_names__multi = vec!["Jasmin", "Mario", "Jasmin", ...];
-//!
-//! Multi [`MapIndex`]:
-//!
-//!  Key      | Idx
-//! --------------------
-//!  "Jasmin" |  0, 2
-//!  "Mario"  |  1
-//!   ...     | ...
-//!
-//! ```
 use crate::index::{
     indices::KeyIndices,
     store::{Filterable, Store},
@@ -33,7 +8,7 @@ use crate::index::{
 };
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
-/// `Key` is from type [`str`] and use [`std::collections::HashMap`] for the searching.
+/// `Key` default type is [`String`] and use [`std::collections::HashMap`] for the Index implementation.
 #[derive(Debug, Default)]
 #[repr(transparent)]
 pub struct MapIndex<K: Default = String, X = usize>(HashMap<K, KeyIndices<X>>);

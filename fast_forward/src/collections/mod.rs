@@ -1,5 +1,7 @@
 //! Different kinds of collections which are using `Indices`.
 //!
+//! This collections only support one Index for one property.
+//!
 #[doc(hidden)]
 pub(crate) mod list;
 pub mod ro;
@@ -12,7 +14,7 @@ use crate::index::{
     Indexable,
 };
 
-/// A `Retriever` is the interface for get Items by an given filter|query.
+/// A `Retriever` is the main interface for get Items by an given query.
 #[repr(transparent)]
 pub struct Retriever<'a, S, I>(Filter<'a, S, I>);
 

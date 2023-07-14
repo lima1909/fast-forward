@@ -1,4 +1,4 @@
-//! `Read-Only Collections` with one index.
+//! Read-Only Collections.
 //!
 use std::{collections::HashMap, hash::Hash, marker::PhantomData, ops::Deref};
 
@@ -200,6 +200,25 @@ mod tests {
         assert_eq!(4, l.len());
         assert_eq!(Car(2, "BMW".into()), l[0]);
         assert_eq!(&Car(99, "Porsche".into()), l.back().unwrap());
+
+        // store
+        assert!(l.idx().contains(&2));
+        assert!(!l.idx().contains(&2000));
+
+        let mut it = l.idx().get(&2);
+        assert_eq!(Some(&Car(2, "BMW".into())), it.next());
+        assert_eq!(Some(&Car(2, "VW".into())), it.next());
+        assert_eq!(None, it.next());
+    }
+
+    #[rstest]
+    fn ilist_array(cars: Vec<Car>) {
+        let cars: [Car; 4] = cars.try_into().unwrap();
+        let l = IList::<UIntIndex, _, [Car; 4]>::new(Car::id, cars);
+
+        // deref
+        assert_eq!(4, l.len());
+        assert_eq!(Car(2, "BMW".into()), l[0]);
 
         // store
         assert!(l.idx().contains(&2));

@@ -1,35 +1,5 @@
 //! This `Index` is well suitable for `IDs` with [`usize`] compatible data types (for example `Primary Keys`).
 //!
-//! Performance: The `eq - filter` is: O(1).
-//! The `Key` is the position (index) in the Vec..
-//!
-//!```text
-//! let _list_numbers_unique = vec![3, 2, 4, 1, ...];
-//!
-//! Unique-Index:
-//!
-//!  Key | Idx (_values)
-//! --------------------
-//!  0   |  -
-//!  1   |  3
-//!  2   |  1
-//!  3   |  0
-//!  4   |  2
-//! ...  | ...
-//!
-//!
-//! let _list_numbers_multi = vec![3, 2, 3, 1, 2, 2, ...];
-//!
-//! Muli-Index:
-//!
-//!  Key | Idx (_values)
-//! --------------------
-//!  0   |  -
-//!  1   |  3
-//!  2   |  1, 4, 5
-//!  3   |  0, 2
-//! ...  | ...
-//! ```
 use crate::index::{
     indices::KeyIndices,
     ops::MinMax,
@@ -155,6 +125,7 @@ impl<K: Default, X> MetaData for UIntIndex<K, X> {
     }
 }
 
+/// Meta data for the UIntIndex, like min and max value from the saved Index.
 pub struct UIntMeta<'s, K: Default + 's, X>(&'s UIntIndex<K, X>);
 
 impl<'s, K, X> UIntMeta<'s, K, X>

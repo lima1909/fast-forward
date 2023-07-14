@@ -1,11 +1,11 @@
-//! **Fast-Forward** is a library for finding or filtering items in a (large) collection (Vec, Map, ...), _faster_  than an `Iterator` or a search algorithm.
-//! It is not a replacement of the `Iterator` or searching, rather an addition.
+//! __Fast-Forward__ is a library for finding or filtering items in a (large) collection (Vec, Map, ...), __faster__  than an `Iterator` or a search algorithm.
+//! It is not a replacement of the `Iterator` or searching, is more of an addition.
 //!
-//! This _faster_ is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the list.
+//! This faster is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the collection.
 //!
-//! An `Index` has two parts, a `Key` (item to searching for) and a `Position` (the index) in the list.
+//! An `Index` has two parts, a `Key` (item to searching for) and a `Position` (the index) in the collection.
 //!
-//! ## Example for a indexed read only List (ro::IList):
+//! ## Example for an indexed read only List (ro::IList):
 //!
 //! ```
 //! use fast_forward::{index::uint::UIntIndex, collections::ro::IList};
@@ -13,24 +13,40 @@
 //! #[derive(Debug, PartialEq)]
 //! pub struct Car(usize, String);
 //!
+//! // create a list of Cars
 //! let cars = vec![Car(1, "BMW".into()), Car(2, "VW".into())];
 //!
 //! // created an indexed List with the UIntIndex on the Car property 0.
 //! let l = IList::<UIntIndex, _>::new(|c: &Car| c.0, cars);
 //!
-//! // idx method pointed to the Car.0 property
+//! // idx method pointed to the Car.0 property Index and
+//! // gives access to the `Retriever` object to handle queries, like: contains, get, filter.
 //! assert!(l.idx().contains(&2));
 //! assert!(!l.idx().contains(&2000));
 //!
-//! // get Car with ID = 2
+//! // get a Car with the ID = 2
 //! let mut it = l.idx().get(&2);
 //! assert_eq!(Some(&Car(2, "VW".into())), it.next());
 //!
-//! // get many: Cars with ID = 2 oder 1
-//! let mut it = l.idx().get_many([2, 1]);
-//! assert_eq!(Some(&Car(2, "VW".into())), it.next());
-//! assert_eq!(Some(&Car(1, "BMW".into())), it.next());
+//! // get many Cars with ID = 2 or 1
+//! assert_eq!(
+//!     vec![&Car(2, "VW".into()), &Car(1, "BMW".into())],
+//!     l.idx().get_many([2, 1]).collect::<Vec<_>>()
+//! );
+//!
+//! // the same query with the filter-method
+//! // (which has the disadvantage, that this need a allocation)
+//! assert_eq!(
+//!     vec![&Car(1, "BMW".into()), &Car(2, "VW".into())],
+//!     l.idx().filter(|f| f.eq(&2) | f.eq(&1)).collect::<Vec<_>>()
+//! );
 //! ```
+//!
+//! All supported options for retrieve Items can you find by [`crate::collections::Retriever`].
+//!
+//! Tis library consists of the following parts (modules):
+//! - [`crate::index`]: to store Indices and the Indices themself
+//! - [`crate::collections`]: the implementations of indexed collections (e.g. read only: IList, IRefList, IMap).
 //!
 
 pub mod collections;
