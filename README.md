@@ -28,11 +28,10 @@ use fast_forward::{index::uint::UIntIndex, collections::ro::IList};
 #[derive(Debug, PartialEq)]
 pub struct Car(usize, String);
 
-// create a list of Cars
-let cars = vec![Car(1, "BMW".into()), Car(2, "VW".into())];
-
 // created an indexed List with the UIntIndex on the Car property 0.
-let l = IList::<UIntIndex, _>::new(|c: &Car| c.0, cars);
+let l = IList::<UIntIndex, _>::new(|c: &Car| c.0, vec![
+                            Car(1, "BMW".into()),
+                            Car(2, "VW".into())]);
 
 // idx method pointed to the Car.0 property Index and
 // gives access to the `Retriever` object to handle queries, like: contains, get, filter.
@@ -40,8 +39,10 @@ assert!(l.idx().contains(&2));
 assert!(!l.idx().contains(&2000));
 
 // get a Car with the ID = 2
-let mut it = l.idx().get(&2);
-assert_eq!(Some(&Car(2, "VW".into())), it.next());
+assert_eq!(
+    l.idx().get(&2).collect::<Vec<_>>(),
+    vec![&Car(2, "VW".into())],
+);
 
 // get many Cars with ID = 2 or 1
 assert_eq!(
@@ -57,9 +58,36 @@ assert_eq!(
 );
 ```
 
-All supported options for retrieve Items can you find by [`crate::collections::Retriever`].
+All supported options for retrieve Items can you find by the [`crate::collections::Retriever`] struct.
 
-Tis library consists of the following parts (modules):
+### Example for a `View` of an indexed read only List (ro::IList):
+
+A `View` is like a database view. This means you get a subset of items, which you can see.
+It is useful, if you don't want to give full read access to the complete collection.
+
+```rust
+use fast_forward::{index::uint::UIntIndex, collections::ro::IList};
+
+#[derive(Debug, PartialEq)]
+pub struct Car(usize, String);
+
+// created an indexed List with the UIntIndex on the Car property 0.
+let l = IList::<UIntIndex, _>::new(|c: &Car| c.0, vec![
+                            Car(1, "BMW".into()),
+                            Car(2, "VW".into()),
+                            Car(3, "Audi".into())]);
+
+// create a view: only for Car ID = 1 0r 3
+let view = l.idx().create_view([1, 3]);
+
+// Car with ID 2 is not in the view
+assert!(!view.contains(&2));
+
+// the original list contains of course the Car with ID 2
+assert!(l.idx().contains(&2));
+```
+
+This library consists of the following parts (modules):
 - [`crate::index`]: to store Indices and the Indices themself
 - [`crate::collections`]: the implementations of indexed collections (e.g. read only: IList, IRefList, IMap).
 

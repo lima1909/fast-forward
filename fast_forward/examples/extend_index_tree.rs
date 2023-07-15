@@ -1,5 +1,5 @@
 use fast_forward::{
-    collections::rw::RWIndexList,
+    collections::rw::IList,
     index::uint::UIntIndex,
     index::{
         indices::Indices,
@@ -62,7 +62,7 @@ fn main() {
         Node::new(6, 5),
     ];
 
-    let n = RWIndexList::from_iter(
+    let n = IList::from_iter(
         UIntIndex::with_capacity(nodes.len()),
         |n: &Node| n.id,
         nodes,

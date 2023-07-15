@@ -1,5 +1,5 @@
 use fast_forward::{
-    collections::rw::RWIndexList,
+    collections::rw::IList,
     index::{map::MapIndex, store::Store, uint::UIntIndex},
 };
 
@@ -29,7 +29,7 @@ fn main() {
         Car::new(99, "Porsche"),
     ];
 
-    let cars = RWIndexList::from_iter(
+    let cars = IList::from_iter(
         UIntIndex::with_capacity(cars.len()),
         |c: &Car| c.id,
         cars.clone(),
@@ -58,7 +58,7 @@ fn main() {
         Car::new(99, "Porsche"),
     ];
 
-    let cars = RWIndexList::from_iter(
+    let cars = IList::from_iter(
         MapIndex::with_capacity(cars.len()),
         |c: &Car| c.name.clone(),
         cars,

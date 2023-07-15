@@ -1,4 +1,4 @@
-//! Read-Write Collections.
+//! read-write collections.
 //!
 use crate::{
     collections::{
@@ -8,13 +8,14 @@ use crate::{
     index::{store::Store, Indexable},
 };
 
-pub struct RWIndexList<S, K, I, F: Fn(&I) -> K> {
+/// [`IList`] is a read write indexed `List` which owned the given items.
+pub struct IList<S, K, I, F: Fn(&I) -> K> {
     store: S,
     items: List<I>,
     field: F,
 }
 
-impl<S, K, I, F> RWIndexList<S, K, I, F>
+impl<S, K, I, F> IList<S, K, I, F>
 where
     F: Fn(&I) -> K,
     S: Store<Key = K, Index = usize>,
@@ -86,7 +87,7 @@ where
     }
 }
 
-impl<S, K, I, F: Fn(&I) -> K> Indexable<usize> for RWIndexList<S, K, I, F> {
+impl<S, K, I, F: Fn(&I) -> K> Indexable<usize> for IList<S, K, I, F> {
     type Output = I;
 
     fn item(&self, idx: &usize) -> &Self::Output {
@@ -115,8 +116,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_uint(cars: Vec<Car>) {
-        let cars =
-            RWIndexList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+        let cars = IList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
         assert!(cars.idx().contains(&2));
         assert!(cars.get(2).is_some());
@@ -141,7 +141,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_map(cars: Vec<Car>) {
-        let cars = RWIndexList::from_iter(
+        let cars = IList::from_iter(
             MapIndex::with_capacity(cars.len()),
             |c: &Car| c.1.clone(),
             cars,
@@ -165,8 +165,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_update(cars: Vec<Car>) {
-        let mut cars =
-            RWIndexList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+        let mut cars = IList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
         // update name, where name is NOT a Index
         let updated = cars.update(0, |c| {
@@ -207,8 +206,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_delete(cars: Vec<Car>) {
-        let mut cars =
-            RWIndexList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+        let mut cars = IList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
 
         // before delete: 2 Cars
         let r = cars.idx().get(&2).collect::<Vec<_>>();

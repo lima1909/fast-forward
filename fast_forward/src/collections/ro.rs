@@ -1,4 +1,4 @@
-//! Read-Only Collections.
+//! read-only collections.
 //!
 use std::{collections::HashMap, hash::Hash, marker::PhantomData, ops::Deref};
 
