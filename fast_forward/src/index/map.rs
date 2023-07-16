@@ -74,6 +74,10 @@ where
         self.0.insert(key, KeyIndices::empty());
     }
 
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &'a K> + 'a> {
+        Box::new(self.0.keys())
+    }
+
     fn from_iter<I>(it: I) -> Self
     where
         I: IntoIterator<Item = K>,
@@ -359,6 +363,14 @@ mod tests {
             keys.add_key(String::from("Bar"));
             assert!(keys.exist(&"Bar".into()));
             assert!(keys.exist(&"Foo".into()));
+        }
+
+        #[test]
+        fn keys() {
+            let keys = MapIndex::from_iter([String::from("Foo"), String::from("Bar")]);
+            let r = keys.iter().collect::<Vec<_>>();
+            assert!(r.contains(&&String::from("Foo")));
+            assert!(r.contains(&&String::from("Bar")));
         }
     }
 }

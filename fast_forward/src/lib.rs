@@ -1,5 +1,6 @@
 //! __Fast-Forward__ is a library for finding or filtering items in a (large) collection (Vec, Map, ...), __faster__  than an `Iterator` or a search algorithm.
-//! It is not a replacement of the `Iterator` or searching, is more of an addition.
+//! It is a wrapper, which extends the given collections with very fast find operations.
+//! This means, that the wrapper is just as easy to use as the given (original) collection.
 //!
 //! This faster is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the collection.
 //!
@@ -41,6 +42,9 @@
 //!     l.idx().filter(|f| f.eq(&2) | f.eq(&1)).collect::<Vec<_>>(),
 //!     vec![&Car(1, "BMW".into()), &Car(2, "VW".into())],
 //! );
+//!
+//! // you can use the Vec methods too
+//! assert_eq!(2, l.len());
 //! ```
 //!
 //! All supported options for retrieve Items can you find by the [`crate::collections::Retriever`] struct.

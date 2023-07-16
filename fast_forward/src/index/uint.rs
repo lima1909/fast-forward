@@ -14,6 +14,7 @@ pub struct UIntIndex<K: Default = usize, X = usize> {
     data: Vec<Option<KeyIndices<X>>>,
     min_max_cache: MinMax<usize>,
     _key: PhantomData<K>,
+    keys: Vec<Option<K>>,
 }
 
 impl<K, X> Filterable for UIntIndex<K, X>
@@ -81,6 +82,7 @@ where
             data: Vec::with_capacity(capacity),
             min_max_cache: MinMax::default(),
             _key: PhantomData,
+            keys: Vec::new(),
         }
     }
 }
@@ -92,17 +94,21 @@ where
     type Key = K;
 
     fn exist(&self, key: &K) -> bool {
-        matches!(self.data.get((*key).into()), Some(Some(_)))
+        matches!(self.keys.get((*key).into()), Some(Some(_)))
     }
 
     fn add_key(&mut self, key: K) {
-        let k = key.into();
+        let pos: usize = key.into();
 
-        if self.data.len() <= k {
-            self.data.resize(k + 1, None);
+        if self.keys.len() <= pos {
+            self.keys.resize(pos + 1, None);
         }
 
-        self.data[k] = Some(KeyIndices::empty());
+        self.keys[pos] = Some(key)
+    }
+
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self::Key> + 'a> {
+        Box::new(self.keys.iter().filter_map(|o| o.as_ref()))
     }
 
     fn from_iter<I>(it: I) -> Self
@@ -184,6 +190,7 @@ mod tests {
                 data: Vec::new(),
                 min_max_cache: MinMax::default(),
                 _key: PhantomData,
+                keys: Vec::new(),
             }
         }
     }
@@ -552,6 +559,19 @@ mod tests {
             keys.add_key(1);
             assert!(keys.exist(&1));
             assert!(keys.exist(&2));
+        }
+
+        #[test]
+        fn keys() {
+            let keys = UIntIndex::from_iter([5usize, 1, 3]);
+            assert_eq!(keys.iter().collect::<Vec<_>>(), vec![&1, &3, &5]);
+
+            let keys = UIntIndex::from_iter([5u8, 1, 3]);
+            assert_eq!(keys.iter().collect::<Vec<_>>(), vec![&1, &3, &5]);
+
+            // true is twice, so it will be ignored ones
+            let keys = UIntIndex::from_iter([true, false, true]);
+            assert_eq!(keys.iter().collect::<Vec<_>>(), vec![&false, &true]);
         }
     }
 }

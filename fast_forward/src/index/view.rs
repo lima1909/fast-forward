@@ -1,7 +1,11 @@
 //! The Idea of a `View` is like by databases.
 //! Show a subset of `Indices` which a saved in the [`crate::index::store::Store`].
 
-use crate::index::{indices::Indices, store::Filterable, Indexable};
+use crate::index::{
+    indices::Indices,
+    store::{Filterable, Many},
+    Indexable,
+};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'a, F, I> {
@@ -52,6 +56,9 @@ pub trait Keys {
 
     /// Insert a new `Key`. If the Key already exists, then will be ignored.
     fn add_key(&mut self, key: Self::Key);
+
+    /// Return all known `Keys`.
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &Self::Key> + 'a>;
 
     /// Create a new `Key-Store` from a given List of `Key`s.
     fn from_iter<I>(it: I) -> Self
@@ -126,15 +133,12 @@ where
         predicate(filter).items(self.items)
     }
 
-    // pub fn items(&self) -> impl Iterator<Item = &'a <I as Index<usize>>::Output>
-    // where
-    //     I: IntoIterator,
-    // {
-    //     self.items
-    //         .into_iter()
-    //         .enumerate()
-    //         .filter(|(i, _)| self.view.contains(i))
-    // }
+    pub fn items(&'a self) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output>
+    where
+        <F as Filterable>::Key: Clone,
+    {
+        Many::new(self.store, self.keys.iter().cloned()).items(self.items)
+    }
 }
 
 impl<'a, K, F, I> Filterable for View<'a, K, F, I>
@@ -195,11 +199,30 @@ mod tests {
     fn view_eq(list: IList<UIntIndex, Car>) {
         let view = list.idx().create_view([1, 3, 99]);
 
-        assert!(view.eq(&7).as_slice().iter().next().is_none());
-        assert!(view.eq(&2000).as_slice().iter().next().is_none());
+        assert!(view.eq(&7).as_slice().is_empty());
+        assert!(view.eq(&2000).as_slice().is_empty());
 
         assert_eq!([3], view.eq(&1));
         assert_eq!([0, 2, 3], view.eq(&1) | view.eq(&99));
+    }
+
+    #[rstest]
+    fn view_2x_eq(list: IList<UIntIndex, Car>) {
+        let view1 = list.idx().create_view([1, 3, 99]);
+        let view2 = list.idx().create_view([5, 3, 7]);
+
+        assert!(view1.eq(&7).as_slice().is_empty());
+        assert!(view1.eq(&2000).as_slice().is_empty());
+
+        assert!(view2.eq(&5).as_slice().is_empty());
+        assert!(view2.eq(&3).as_slice().is_empty());
+        assert!(view2.eq(&2000).as_slice().is_empty());
+
+        assert_eq!([3], view1.eq(&1));
+        assert_eq!([0, 2, 3], view1.eq(&1) | view1.eq(&99));
+
+        assert_eq!([1], view2.eq(&7));
+        assert_eq!([1], view2.eq(&7) | view2.eq(&3));
     }
 
     #[rstest]
@@ -327,5 +350,51 @@ mod tests {
     #[rstest]
     fn view_with_range(list: IList<UIntIndex, Car>) {
         assert!(!list.idx().create_view(10..100).contains(&7))
+    }
+
+    #[rstest]
+    fn items(list: IList<UIntIndex, Car>) {
+        assert_eq!(
+            list.idx().create_view([1, 7]).items().collect::<Vec<_>>(),
+            vec![
+                &Car {
+                    id: 1,
+                    name: "Porsche",
+                },
+                &Car {
+                    id: 7,
+                    name: "Audi",
+                },
+            ]
+        );
+
+        assert_eq!(
+            list.idx()
+                .create_view([1, 2000])
+                .items()
+                .collect::<Vec<_>>(),
+            vec![&Car {
+                id: 1,
+                name: "Porsche",
+            },]
+        );
+
+        assert_eq!(
+            list.idx().create_view([99, 7]).items().collect::<Vec<_>>(),
+            vec![
+                &Car {
+                    id: 7,
+                    name: "Audi",
+                },
+                &Car {
+                    id: 99,
+                    name: "BMW 1",
+                },
+                &Car {
+                    id: 99,
+                    name: "BMW 2",
+                },
+            ]
+        );
     }
 }
