@@ -57,6 +57,9 @@ assert_eq!(
     l.idx().filter(|f| f.eq(&2) | f.eq(&1)).collect::<Vec<_>>(),
     vec![&Car(1, "BMW".into()), &Car(2, "VW".into())],
 );
+
+// you can use the Vec methods too
+assert_eq!(2, l.len());
 ```
 
 All supported options for retrieve Items can you find by the [`crate::collections::Retriever`] struct.

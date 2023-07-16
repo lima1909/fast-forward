@@ -397,4 +397,64 @@ mod tests {
             ]
         );
     }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Eq, Ord)]
+    enum Gender {
+        Male,
+        Female,
+        #[default]
+        None,
+    }
+
+    impl From<Gender> for usize {
+        fn from(g: Gender) -> Self {
+            match g {
+                Gender::None => 0,
+                Gender::Male => 1,
+                Gender::Female => 2,
+            }
+        }
+    }
+
+    #[derive(Debug, PartialEq)]
+    struct Person {
+        name: String,
+        gender: Gender,
+    }
+
+    impl Person {
+        fn new(name: &str, gender: Gender) -> Self {
+            Self {
+                name: name.to_string(),
+                gender,
+            }
+        }
+    }
+
+    #[test]
+    fn gender_person_list() {
+        use Gender::*;
+
+        let l = IList::<UIntIndex<Gender, _>, _>::new(
+            |p: &Person| p.gender,
+            vec![
+                Person::new("Jasmin", Female),
+                Person::new("Mario", Male),
+                Person::new("Other", None),
+                Person::new("Paul", Male),
+            ],
+        );
+
+        assert_eq!(
+            l.idx().get(&Male).collect::<Vec<_>>(),
+            vec![&Person::new("Mario", Male), &Person::new("Paul", Male)]
+        );
+
+        let females = l.idx().create_view([Female]);
+        assert!(females.get(&Male).next().is_none());
+        assert_eq!(
+            females.get(&Female).collect::<Vec<_>>(),
+            vec![&Person::new("Jasmin", Female)]
+        );
+    }
 }
