@@ -55,25 +55,31 @@
 //! It is useful, if you don't want to give full read access to the complete collection.
 //!
 //! ```
-//! use fast_forward::{index::uint::UIntIndex, collections::ro::IList};
+//! use fast_forward::{index::map::MapIndex, collections::ro::IList};
 //!
 //! #[derive(Debug, PartialEq)]
 //! pub struct Car(usize, String);
 //!
-//! // created an indexed List with the UIntIndex on the Car property 0.
-//! let l = IList::<UIntIndex, _>::new(|c: &Car| c.0, vec![
+//! // created an indexed List with the MapIndex on the Car property 1.
+//! let l = IList::<MapIndex, _>::new(|c: &Car| c.1.clone(), vec![
 //!                             Car(1, "BMW".into()),
 //!                             Car(2, "VW".into()),
 //!                             Car(3, "Audi".into())]);
 //!
-//! // create a view: only for Car ID = 1 0r 3
-//! let view = l.idx().create_view([1, 3]);
+//! // create a view: only for Car Name = "BMW" 0r "Audi"
+//! let view = l.idx().create_view([String::from("BMW"), String::from("Audi")]);
 //!
-//! // Car with ID 2 is not in the view
-//! assert!(!view.contains(&2));
+//! // Car with Name "VW" is not in the view
+//! assert!(!view.contains(&String::from("VW")));
 //!
-//! // the original list contains of course the Car with ID 2
-//! assert!(l.idx().contains(&2));
+//! // get the Care with the name "Audi"
+//! assert_eq!(
+//!     view.get(&String::from("Audi")).collect::<Vec<_>>(),
+//!     vec![&Car(3, "Audi".into())],
+//! );
+//!
+//! // the original list contains of course the Car with ID "VW"
+//! assert!(l.idx().contains(&String::from("VW")));
 //! ```
 //!
 //! This library consists of the following parts (modules):
