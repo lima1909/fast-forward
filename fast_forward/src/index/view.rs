@@ -1,11 +1,7 @@
 //! The Idea of a `View` is like by databases.
 //! Show a subset of `Indices` which a saved in the [`crate::index::store::Store`].
 
-use crate::index::{
-    indices::Indices,
-    store::{Filterable, Many},
-    Indexable,
-};
+use crate::index::{indices::Indices, store::Filterable, Indexable};
 
 /// [`Filter`] combines a given [`Filterable`] with the given list of items.
 pub struct Filter<'a, F, I> {
@@ -137,7 +133,7 @@ where
     where
         <F as Filterable>::Key: Clone,
     {
-        Many::new(self.store, self.keys.iter().cloned()).items(self.items)
+        Items::new(self.store, self.keys.iter()).items(self.items)
     }
 }
 
@@ -155,6 +151,70 @@ where
 
     fn get(&self, key: &Self::Key) -> &[F::Index] {
         self.store.get_with_check(key, |k| self.keys.exist(k))
+    }
+}
+
+// Items is an Iterator, like Many (redundant?).
+// The differents:
+// - Items:  <Item = &'a F::Key>
+// - Many:   <Item = F::Key>
+struct Items<'a, F, K>
+where
+    F: Filterable,
+{
+    filter: &'a F,
+    keys: K,
+    iter: std::slice::Iter<'a, F::Index>,
+}
+
+impl<'a, F, K> Items<'a, F, K>
+where
+    F: Filterable,
+    K: Iterator<Item = &'a F::Key> + 'a,
+{
+    fn new(filter: &'a F, mut keys: K) -> Self {
+        let iter = match keys.next() {
+            Some(k) => filter.get(k).iter(),
+            None => [].iter(),
+        };
+
+        Self { filter, keys, iter }
+    }
+
+    #[inline]
+    fn items<I>(self, items: &'a I) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output>
+    where
+        I: Indexable<F::Index>,
+        <I as Indexable<F::Index>>::Output: Sized,
+    {
+        self.map(|i| items.item(i))
+    }
+}
+
+impl<'a, F, K> Iterator for Items<'a, F, K>
+where
+    F: Filterable + 'a,
+    K: Iterator<Item = &'a F::Key>,
+    Self: 'a,
+{
+    type Item = &'a F::Index;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let idx = self.iter.next();
+
+        #[allow(clippy::nonminimal_bool)]
+        if !idx.is_none() {
+            return idx;
+        }
+
+        loop {
+            let key = self.keys.next()?;
+            let idx = self.filter.get(key);
+            if !idx.is_empty() {
+                self.iter = idx.iter();
+                return self.iter.next();
+            }
+        }
     }
 }
 
