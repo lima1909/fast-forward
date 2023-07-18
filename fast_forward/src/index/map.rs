@@ -55,6 +55,10 @@ where
         }
     }
 
+    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self::Key> + 'a> {
+        Box::new(self.0.keys())
+    }
+
     fn with_capacity(capacity: usize) -> Self {
         MapIndex(HashMap::with_capacity(capacity))
     }
@@ -143,6 +147,48 @@ mod tests {
         assert_eq!(Some(&"Mario 2".into()), it.next());
         assert_eq!(None, it.next());
     }
+
+    #[test]
+    fn keys() {
+        let mut i = MapIndex::default();
+        i.insert("Jasmin", 4);
+        i.insert("Mario", 8);
+        i.insert("Paul", 6);
+
+        {
+            let keys = i.keys().collect::<Vec<_>>();
+            assert_eq!(3, keys.len());
+            assert!(keys.contains(&&"Jasmin"));
+            assert!(keys.contains(&&"Mario"));
+            assert!(keys.contains(&&"Mario"));
+        }
+
+        i.insert("Foo", 10);
+        {
+            let keys = i.keys().collect::<Vec<_>>();
+            assert_eq!(4, keys.len());
+            assert!(keys.contains(&&"Foo"));
+        }
+
+        i.delete("Foo", &10);
+        {
+            let keys = i.keys().collect::<Vec<_>>();
+            assert_eq!(3, keys.len());
+            assert!(keys.contains(&&"Jasmin"));
+            assert!(keys.contains(&&"Mario"));
+            assert!(keys.contains(&&"Mario"));
+        }
+
+        i.insert("Paul", 10);
+        {
+            let keys = i.keys().collect::<Vec<_>>();
+            assert_eq!(3, keys.len());
+            assert!(keys.contains(&&"Jasmin"));
+            assert!(keys.contains(&&"Mario"));
+            assert!(keys.contains(&&"Mario"));
+        }
+    }
+
     mod unique {
         use super::{super::super::filter::Filter, *};
 

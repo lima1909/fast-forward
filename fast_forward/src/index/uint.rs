@@ -11,10 +11,9 @@ use std::marker::PhantomData;
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug, Default)]
 pub struct UIntIndex<K: Default = usize, X = usize> {
-    data: Vec<Option<KeyIndices<X>>>,
+    data: Vec<Option<(K, KeyIndices<X>)>>,
     min_max_cache: MinMax<usize>,
     _key: PhantomData<K>,
-    keys: Vec<Option<K>>,
 }
 
 impl<K, X> Filterable for UIntIndex<K, X>
@@ -28,7 +27,7 @@ where
     fn get(&self, key: &Self::Key) -> &[X] {
         let i: usize = (*key).into();
         match self.data.get(i) {
-            Some(Some(idx)) => idx.as_slice(),
+            Some(Some((_, idx))) => idx.as_slice(),
             _ => &[],
         }
     }
@@ -45,6 +44,7 @@ where
     X: Ord + Clone,
 {
     fn insert(&mut self, k: K, i: X) {
+        let orig_key = k;
         let k = k.into();
 
         if self.data.len() <= k {
@@ -52,8 +52,8 @@ where
         }
 
         match self.data[k].as_mut() {
-            Some(idx) => idx.add(i),
-            None => self.data[k] = Some(KeyIndices::new(i)),
+            Some((_, idx)) => idx.add(i),
+            None => self.data[k] = Some((orig_key, KeyIndices::new(i))),
         }
 
         self.min_max_cache.new_min_value(k);
@@ -62,7 +62,7 @@ where
 
     fn delete(&mut self, key: K, idx: &X) {
         let k = key.into();
-        if let Some(Some(rm_idx)) = self.data.get_mut(k) {
+        if let Some(Some((_, rm_idx))) = self.data.get_mut(k) {
             // if the Index is the last, then remove complete Index
             if rm_idx.remove(idx).is_empty() {
                 self.data[k] = None
@@ -77,12 +77,15 @@ where
         }
     }
 
+    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self::Key> + 'a> {
+        Box::new(self.data.iter().filter_map(|o| o.as_ref().map(|(k, _)| k)))
+    }
+
     fn with_capacity(capacity: usize) -> Self {
         UIntIndex {
             data: Vec::with_capacity(capacity),
             min_max_cache: MinMax::default(),
             _key: PhantomData,
-            keys: Vec::new(),
         }
     }
 }
@@ -94,21 +97,22 @@ where
     type Key = K;
 
     fn exist(&self, key: &K) -> bool {
-        matches!(self.keys.get((*key).into()), Some(Some(_)))
+        matches!(self.data.get((*key).into()), Some(Some(_)))
     }
 
     fn add_key(&mut self, key: K) {
+        let orig_key = key;
         let pos: usize = key.into();
 
-        if self.keys.len() <= pos {
-            self.keys.resize(pos + 1, None);
+        if self.data.len() <= pos {
+            self.data.resize(pos + 1, None);
         }
 
-        self.keys[pos] = Some(key)
+        self.data[pos] = Some((orig_key, KeyIndices::empty()))
     }
 
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self::Key> + 'a> {
-        Box::new(self.keys.iter().filter_map(|o| o.as_ref()))
+        Box::new(self.data.iter().filter_map(|o| o.as_ref().map(|(k, _)| k)))
     }
 
     fn from_iter<I>(it: I) -> Self
@@ -190,7 +194,6 @@ mod tests {
                 data: Vec::new(),
                 min_max_cache: MinMax::default(),
                 _key: PhantomData,
-                keys: Vec::new(),
             }
         }
     }
@@ -220,6 +223,25 @@ mod tests {
         i.insert(1, 3);
         let f = Filter(&i);
         assert_eq!([3, 4], (f.eq(&2) | f.eq(&1)));
+    }
+
+    #[test]
+    fn keys() {
+        let mut i = UIntIndex::new();
+        i.insert(2, 4);
+        i.insert(3, 6);
+        i.insert(4, 8);
+
+        assert_eq!(vec![&2, &3, &4], i.keys().collect::<Vec<_>>());
+
+        i.insert(5, 10);
+        assert_eq!(vec![&2, &3, &4, &5], i.keys().collect::<Vec<_>>());
+
+        i.delete(5, &10);
+        assert_eq!(vec![&2, &3, &4], i.keys().collect::<Vec<_>>());
+
+        i.insert(4, 16);
+        assert_eq!(vec![&2, &3, &4], i.keys().collect::<Vec<_>>());
     }
 
     #[test]
