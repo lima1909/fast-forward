@@ -37,7 +37,7 @@ where
 
     /// Checks whether the `Key` exists.
     ///
-    /// ## Example
+    /// # Example
     ///
     /// ```
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
@@ -60,7 +60,7 @@ where
 
     /// Get all items for a given `Key`.
     ///
-    /// ## Example
+    /// # Example
     ///
     /// ```
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
@@ -94,7 +94,7 @@ where
     /// get_many(2..6]) => get(2) OR get(3) OR get(4) OR get(5)
     /// ```
     ///
-    /// ## Example:
+    /// # Example:
     ///
     /// ```
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
@@ -135,7 +135,7 @@ where
 
     /// Return filter methods from the `Store`.
     ///
-    /// ## Example
+    /// # Example
     ///
     /// ```
     /// use fast_forward::index::{store::Store, uint::UIntIndex};
@@ -154,7 +154,7 @@ where
     /// );
     /// ```
     ///
-    /// ## Hint
+    /// # Hint
     ///
     /// Every `OR` (`|`) generated a extra allocation. `get_many` can be a better option.
     #[inline]
@@ -173,15 +173,44 @@ where
     /// Create a `View` by a given list of keys.
     /// The view represents a subset of the items in the list.
     /// This is particularly useful if I don't want to show all items for non-existing rights.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use fast_forward::index::{store::Store, uint::UIntIndex};
+    /// use fast_forward::collections::ro::IList;
+    ///
+    /// #[derive(Debug, PartialEq)]
+    /// pub struct Car(usize, String);
+    ///
+    /// let l = IList::<UIntIndex, _>::new(|c| c.0, vec![
+    ///                                 Car(1, "BMW".into()),
+    ///                                 Car(2, "Porsche".into()),
+    ///                                 Car(3, "Mercedes".into()),
+    ///                                 Car(5, "Audi".into())]);
+    ///
+    /// let view = l.idx().create_view(|_| [1, 2, 3]);
+    /// // or by using a `Range`
+    /// let view = l.idx().create_view(|_| 1..=3);
+    /// // or by using the `Key` iterator
+    /// let view = l.idx().create_view(|keys| keys.filter(|k| k != &5));
+    /// ```
     #[inline]
-    pub fn create_view<It>(&self, keys: It) -> View<'a, S, S, I>
+    pub fn create_view<P, It>(&self, predicate: P) -> View<'a, S, S, I>
     where
+        P: Fn(Box<dyn Iterator<Item = <S as Filterable>::Key> + 'a>) -> It,
         It: IntoIterator<Item = <S as Keys>::Key>,
-        I: Indexable<S::Index>,
+
         S: Filterable,
+        <S as Filterable>::Key: Clone,
         S: Keys<Key = <S as Filterable>::Key>,
+        I: Indexable<S::Index>,
     {
-        View::new(S::from_iter(keys), self.0.filter, self.0.items)
+        View::new(
+            S::from_iter(predicate(self.0.filter.keys())),
+            self.0.filter,
+            self.0.items,
+        )
     }
 
     /// Returns Meta data, if the [`crate::index::store::Store`] supports any.

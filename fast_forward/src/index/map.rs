@@ -55,8 +55,11 @@ where
         }
     }
 
-    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self::Key> + 'a> {
-        Box::new(self.0.keys())
+    fn keys(&self) -> Box<dyn Iterator<Item = Self::Key> + '_>
+    where
+        Self::Key: Clone,
+    {
+        Box::new(self.0.keys().cloned())
     }
 
     fn with_capacity(capacity: usize) -> Self {
@@ -158,34 +161,34 @@ mod tests {
         {
             let keys = i.keys().collect::<Vec<_>>();
             assert_eq!(3, keys.len());
-            assert!(keys.contains(&&"Jasmin"));
-            assert!(keys.contains(&&"Mario"));
-            assert!(keys.contains(&&"Mario"));
+            assert!(keys.contains(&"Jasmin"));
+            assert!(keys.contains(&"Mario"));
+            assert!(keys.contains(&"Mario"));
         }
 
         i.insert("Foo", 10);
         {
             let keys = i.keys().collect::<Vec<_>>();
             assert_eq!(4, keys.len());
-            assert!(keys.contains(&&"Foo"));
+            assert!(keys.contains(&"Foo"));
         }
 
         i.delete("Foo", &10);
         {
             let keys = i.keys().collect::<Vec<_>>();
             assert_eq!(3, keys.len());
-            assert!(keys.contains(&&"Jasmin"));
-            assert!(keys.contains(&&"Mario"));
-            assert!(keys.contains(&&"Mario"));
+            assert!(keys.contains(&"Jasmin"));
+            assert!(keys.contains(&"Mario"));
+            assert!(keys.contains(&"Mario"));
         }
 
         i.insert("Paul", 10);
         {
             let keys = i.keys().collect::<Vec<_>>();
             assert_eq!(3, keys.len());
-            assert!(keys.contains(&&"Jasmin"));
-            assert!(keys.contains(&&"Mario"));
-            assert!(keys.contains(&&"Mario"));
+            assert!(keys.contains(&"Jasmin"));
+            assert!(keys.contains(&"Mario"));
+            assert!(keys.contains(&"Mario"));
         }
     }
 

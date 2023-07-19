@@ -77,8 +77,16 @@ where
         }
     }
 
-    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self::Key> + 'a> {
-        Box::new(self.data.iter().filter_map(|o| o.as_ref().map(|(k, _)| k)))
+    fn keys(&self) -> Box<dyn Iterator<Item = Self::Key> + '_>
+    where
+        Self::Key: Clone,
+    {
+        Box::new(
+            self.data
+                .iter()
+                .filter_map(|o| o.as_ref().map(|(k, _)| k))
+                .cloned(),
+        )
     }
 
     fn with_capacity(capacity: usize) -> Self {
@@ -232,16 +240,16 @@ mod tests {
         i.insert(3, 6);
         i.insert(4, 8);
 
-        assert_eq!(vec![&2, &3, &4], i.keys().collect::<Vec<_>>());
+        assert_eq!(vec![2, 3, 4], i.keys().collect::<Vec<_>>());
 
         i.insert(5, 10);
-        assert_eq!(vec![&2, &3, &4, &5], i.keys().collect::<Vec<_>>());
+        assert_eq!(vec![2, 3, 4, 5], i.keys().collect::<Vec<_>>());
 
         i.delete(5, &10);
-        assert_eq!(vec![&2, &3, &4], i.keys().collect::<Vec<_>>());
+        assert_eq!(vec![2, 3, 4], i.keys().collect::<Vec<_>>());
 
         i.insert(4, 16);
-        assert_eq!(vec![&2, &3, &4], i.keys().collect::<Vec<_>>());
+        assert_eq!(vec![2, 3, 4], i.keys().collect::<Vec<_>>());
     }
 
     #[test]

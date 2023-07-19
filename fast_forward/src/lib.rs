@@ -1,6 +1,7 @@
-//! __Fast-Forward__ is a library for finding or filtering items in a (large) collection (Vec, Map, ...), __faster__  than an `Iterator` or a search algorithm.
-//! It is a wrapper, which extends the given collections with very fast find operations.
-//! This means, that the wrapper is just as easy to use as the given (original) collection.
+//! __Fast-Forward__ is a library for finding or filtering items in a (large) collection (Vec, Slice, Map, ...).
+//! This means faster than an `Iterator` or a search algorithm.
+//! It is a wrapper, which extends the given collection with very fast find operations.
+//! This wrapper is just as easy to use as the given (original) collection.
 //!
 //! This faster is achieved  by using `Indices`. This means, it does not have to touch and compare every item in the collection.
 //!
@@ -25,10 +26,7 @@
 //! assert!(!l.idx().contains(&2000));
 //!
 //! // get a Car with the ID = 2
-//! assert_eq!(
-//!     l.idx().get(&2).collect::<Vec<_>>(),
-//!     vec![&Car(2, "VW".into())],
-//! );
+//! assert_eq!(l.idx().get(&2).next(), Some(&Car(2, "VW".into())));
 //!
 //! // get many Cars with ID = 2 or 1
 //! assert_eq!(
@@ -54,6 +52,8 @@
 //! A `View` is like a database view. This means you get a subset of items, which you can see.
 //! It is useful, if you don't want to give full read access to the complete collection.
 //!
+//! All details to [`crate::collections::Retriever::create_view()`]
+//!
 //! ```
 //! use fast_forward::{index::map::MapIndex, collections::ro::IList};
 //!
@@ -67,9 +67,9 @@
 //!                             Car(3, "Audi".into())]);
 //!
 //! // create a view: only for Car Name = "BMW" 0r "Audi"
-//! let view = l.idx().create_view([String::from("BMW"), String::from("Audi")]);
+//! let view = l.idx().create_view(|_|  [String::from("BMW"), String::from("Audi")]);
 //!
-//! // Car with Name "VW" is not in the view
+//! // Car with Name "VW" is NOT in the view
 //! assert!(!view.contains(&String::from("VW")));
 //!
 //! // get the Care with the name "Audi"

@@ -34,7 +34,7 @@ fn main() {
     // let mut it = l.idx().create_view([1, 3, 99]).filter(|c| c.id < 10_000);
     let view = l
         .idx()
-        .create_view([String::from("Porsche"), String::from("BMW")]);
+        .create_view(|it| it.filter(|k| "Porsche".eq(k) || "BMW".eq(k)));
 
     // no ACL, can not see car Ferrari
     assert!(!view.contains(&String::from("Audi")));

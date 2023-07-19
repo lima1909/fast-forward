@@ -84,8 +84,10 @@ pub trait Store: Filterable {
     ///
     fn delete(&mut self, key: Self::Key, idx: &Self::Index);
 
-    /// Return all known `Keys`.
-    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self::Key> + 'a>;
+    /// Return a `Clone` of all known `Keys`.
+    fn keys(&self) -> Box<dyn Iterator<Item = Self::Key> + '_>
+    where
+        Self::Key: Clone;
 
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
@@ -140,7 +142,7 @@ pub trait Filterable {
 
     /// Combined all given `keys` with an logical `OR`.
     ///
-    /// ## Example:
+    /// # Example:
     ///```text
     /// [2, 5, 6] => get(2) OR get(5) OR get(6)
     /// [2..6] => get(2) OR get(3) OR get(4) OR get(5)
