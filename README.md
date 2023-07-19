@@ -41,10 +41,7 @@ assert!(l.idx().contains(&2));
 assert!(!l.idx().contains(&2000));
 
 // get a Car with the ID = 2
-assert_eq!(
-    l.idx().get(&2).collect::<Vec<_>>(),
-    vec![&Car(2, "VW".into())],
-);
+assert_eq!(l.idx().get(&2).next(), Some(&Car(2, "VW".into())));
 
 // get many Cars with ID = 2 or 1
 assert_eq!(

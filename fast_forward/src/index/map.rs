@@ -6,7 +6,13 @@ use crate::index::{
     store::{Filterable, Store},
     view::Keys,
 };
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash};
+
+#[cfg(feature = "hashbrown")]
+use hashbrown::HashMap;
+
+#[cfg(not(feature = "hashbrown"))]
+use std::collections::HashMap;
 
 /// `Key` default type is [`String`] and use [`std::collections::HashMap`] for the Index implementation.
 #[derive(Debug, Default)]

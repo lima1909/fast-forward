@@ -18,9 +18,13 @@ include = [
 ]
 
 [dependencies]
+hashbrown = { version = "0.14.0", optional = true }
+
+[features]
+hashbrown = [ "dep:hashbrown" ]
 
 [dev-dependencies]
-rstest = "0.17.0"
+rstest = "0.18"
 criterion = "0.5"
 
 [lib]
