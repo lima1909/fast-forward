@@ -42,16 +42,13 @@ where
     }
 }
 
-/// [`Keys`] is a special kind of a `Store`, which stores only `Key`s.
+/// [`Keys`] is a special kind of a `Store`, which is read only and stores only `Key`s.
 /// This is useful, if you want to create a `View` of a [`crate::index::store::Store`].
 pub trait Keys {
     type Key;
 
     /// Checks if the `Key`exist.
     fn exist(&self, key: &Self::Key) -> bool;
-
-    /// Insert a new `Key`. If the Key already exists, then will be ignored.
-    fn add_key(&mut self, key: Self::Key);
 
     /// Return all known `Keys`.
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &Self::Key> + 'a>;
@@ -389,7 +386,7 @@ mod tests {
     fn view_get_many_without_7(list: IList<UIntIndex, Car>) {
         let view = list.idx().create_view(|_| [1, 3, 99]);
 
-        let mut it = view.get_many([99, 7]);
+        let mut it = view.get_many([99, 7, 2000]);
         assert_eq!(
             Some(&Car {
                 id: 99,

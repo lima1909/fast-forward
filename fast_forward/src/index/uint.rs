@@ -108,17 +108,6 @@ where
         matches!(self.data.get((*key).into()), Some(Some(_)))
     }
 
-    fn add_key(&mut self, key: K) {
-        let orig_key = key;
-        let pos: usize = key.into();
-
-        if self.data.len() <= pos {
-            self.data.resize(pos + 1, None);
-        }
-
-        self.data[pos] = Some((orig_key, KeyIndices::empty()))
-    }
-
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self::Key> + 'a> {
         Box::new(self.data.iter().filter_map(|o| o.as_ref().map(|(k, _)| k)))
     }
@@ -127,9 +116,23 @@ where
     where
         I: IntoIterator<Item = K>,
     {
+        fn add_key<K>(view: &mut UIntIndex<K>, key: K)
+        where
+            K: Default + Into<usize> + Copy + Ord,
+        {
+            let orig_key = key;
+            let pos: usize = key.into();
+
+            if view.data.len() <= pos {
+                view.data.resize(pos + 1, None);
+            }
+
+            view.data[pos] = Some((orig_key, KeyIndices::empty()))
+        }
+
         let v = Vec::from_iter(it);
         let mut view = Self::with_capacity(v.iter().max().map(|k| (*k).into()).unwrap_or_default());
-        v.into_iter().for_each(|key| view.add_key(key));
+        v.into_iter().for_each(|key| add_key(&mut view, key));
         view
     }
 }
@@ -577,17 +580,6 @@ mod tests {
         fn one() {
             let keys = UIntIndex::from_iter([2usize]);
             assert!(!keys.exist(&1));
-            assert!(keys.exist(&2));
-        }
-
-        #[test]
-        fn add_key() {
-            let mut keys = UIntIndex::from_iter([2usize]);
-            assert!(!keys.exist(&1));
-            assert!(keys.exist(&2));
-
-            keys.add_key(1);
-            assert!(keys.exist(&1));
             assert!(keys.exist(&2));
         }
 

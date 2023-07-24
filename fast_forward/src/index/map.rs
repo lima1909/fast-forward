@@ -83,10 +83,6 @@ where
         self.0.contains_key(key)
     }
 
-    fn add_key(&mut self, key: K) {
-        self.0.insert(key, KeyIndices::empty());
-    }
-
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &'a K> + 'a> {
         Box::new(self.0.keys())
     }
@@ -97,7 +93,9 @@ where
     {
         let v = Vec::from_iter(it);
         let mut view = Self::with_capacity(v.len());
-        v.into_iter().for_each(|key| view.add_key(key));
+        v.into_iter().for_each(|key| {
+            view.0.insert(key, KeyIndices::empty());
+        });
         view
     }
 }
@@ -406,17 +404,6 @@ mod tests {
         fn one() {
             let keys = MapIndex::from_iter([String::from("Foo")]);
             assert!(!keys.exist(&"Bar".into()));
-            assert!(keys.exist(&"Foo".into()));
-        }
-
-        #[test]
-        fn add_key() {
-            let mut keys = MapIndex::from_iter([String::from("Foo")]);
-            assert!(!keys.exist(&"Bar".into()));
-            assert!(keys.exist(&"Foo".into()));
-
-            keys.add_key(String::from("Bar"));
-            assert!(keys.exist(&"Bar".into()));
             assert!(keys.exist(&"Foo".into()));
         }
 
