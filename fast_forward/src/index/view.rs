@@ -38,7 +38,9 @@ where
     where
         I: Indexable<F::Index>,
     {
-        self.filter.get(key).iter().map(|i| self.items.item(i))
+        // TODO
+        // self.filter.get(key).iter().map(|i| self.items.item(i))
+        self.items.items(self.filter.get(key).iter())
     }
 }
 

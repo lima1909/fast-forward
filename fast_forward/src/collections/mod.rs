@@ -84,7 +84,9 @@ where
     where
         I: Indexable<S::Index>,
     {
-        self.0.filter.get(key).iter().map(|i| self.0.items.item(i))
+        // TODO
+        // self.0.filter.get(key).iter().map(|i| self.0.items.item(i))
+        self.0.items.items(self.0.filter.get(key).iter())
     }
 
     /// Combined all given `keys` with an logical `OR`.

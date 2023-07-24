@@ -18,6 +18,43 @@ pub trait Indexable<Idx> {
     ///
     /// If no Item exist for the given Index.
     fn item(&self, idx: &Idx) -> &Self::Output;
+
+    /// Return an `Iterator` with all `Items`
+    /// for a given `Iterator` with `Indices`.
+    fn items<'a, I>(&'a self, indices: I) -> Items<Self, Idx, I>
+    where
+        I: Iterator<Item = &'a Idx>,
+        Self: Sized,
+    {
+        Items {
+            items: self,
+            indices,
+        }
+    }
+}
+
+pub struct Items<'a, It, X, Idx>
+where
+    It: Indexable<X>,
+    Idx: Iterator<Item = &'a X>,
+    X: 'a,
+{
+    items: &'a It,
+    indices: Idx,
+}
+
+impl<'a, It, X, Idx> Iterator for Items<'a, It, X, Idx>
+where
+    It: Indexable<X>,
+    It::Output: 'a,
+    Idx: Iterator<Item = &'a X>,
+    X: 'a,
+{
+    type Item = &'a It::Output;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.indices.next().map(|idx| self.items.item(idx))
+    }
 }
 
 macro_rules! list_indexable {
