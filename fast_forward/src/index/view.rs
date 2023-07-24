@@ -254,7 +254,7 @@ mod tests {
 
     #[rstest]
     fn view_eq(list: IList<UIntIndex, Car>) {
-        let view = list.idx().create_view(|_| [1, 3, 99]);
+        let view = list.idx().create_view([1, 3, 99]);
 
         assert!(view.eq(&7).as_slice().is_empty());
         assert!(view.eq(&2000).as_slice().is_empty());
@@ -265,8 +265,8 @@ mod tests {
 
     #[rstest]
     fn view_2x_eq(list: IList<UIntIndex, Car>) {
-        let view1 = list.idx().create_view(|_| [1, 3, 99]);
-        let view2 = list.idx().create_view(|_| [5, 3, 7]);
+        let view1 = list.idx().create_view([1, 3, 99]);
+        let view2 = list.idx().create_view([5, 3, 7]);
 
         assert!(view1.eq(&7).as_slice().is_empty());
         assert!(view1.eq(&2000).as_slice().is_empty());
@@ -284,7 +284,7 @@ mod tests {
 
     #[rstest]
     fn view_filter(list: IList<UIntIndex, Car>) {
-        let view = list.idx().create_view(|_| [1, 3, 99]);
+        let view = list.idx().create_view([1, 3, 99]);
 
         // 7 is not allowed
         assert_eq!(None, view.filter(|f| f.eq(&7)).next());
@@ -351,7 +351,7 @@ mod tests {
 
     #[rstest]
     fn view_without_7(list: IList<UIntIndex, Car>) {
-        let view = list.idx().create_view(|_| [1, 3, 99]);
+        let view = list.idx().create_view([1, 3, 99]);
 
         assert!(!view.contains(&7));
         assert_eq!(None, view.get(&7).next());
@@ -360,7 +360,7 @@ mod tests {
 
     #[rstest]
     fn view_get_without_7(list: IList<UIntIndex, Car>) {
-        let view = list.idx().create_view(|_| [1, 3, 99]);
+        let view = list.idx().create_view([1, 3, 99]);
 
         assert_eq!(3, view.get_many([1, 99, 7]).collect::<Vec<_>>().len());
 
@@ -384,7 +384,7 @@ mod tests {
 
     #[rstest]
     fn view_get_many_without_7(list: IList<UIntIndex, Car>) {
-        let view = list.idx().create_view(|_| [1, 3, 99]);
+        let view = list.idx().create_view([1, 3, 99]);
 
         let mut it = view.get_many([99, 7, 2000]);
         assert_eq!(
@@ -406,16 +406,13 @@ mod tests {
 
     #[rstest]
     fn view_with_range(list: IList<UIntIndex, Car>) {
-        assert!(!list.idx().create_view(|_| 10..100).contains(&7))
+        assert!(!list.idx().create_view(10..100).contains(&7))
     }
 
     #[rstest]
     fn items(list: IList<UIntIndex, Car>) {
         assert_eq!(
-            list.idx()
-                .create_view(|_| [1, 7])
-                .items()
-                .collect::<Vec<_>>(),
+            list.idx().create_view([1, 7]).items().collect::<Vec<_>>(),
             vec![
                 &Car {
                     id: 1,
@@ -430,7 +427,7 @@ mod tests {
 
         assert_eq!(
             list.idx()
-                .create_view(|_| [1, 2000])
+                .create_view([1, 2000])
                 .items()
                 .collect::<Vec<_>>(),
             vec![&Car {
@@ -440,10 +437,7 @@ mod tests {
         );
 
         assert_eq!(
-            list.idx()
-                .create_view(|_| [99, 7])
-                .items()
-                .collect::<Vec<_>>(),
+            list.idx().create_view([99, 7]).items().collect::<Vec<_>>(),
             vec![
                 &Car {
                     id: 7,
@@ -513,7 +507,7 @@ mod tests {
             vec![&Person::new("Mario", Male), &Person::new("Paul", Male)]
         );
 
-        let females = l.idx().create_view(|_| [Female]);
+        let females = l.idx().create_view([Female]);
         assert!(females.get(&Male).next().is_none());
         assert_eq!(
             females.get(&Female).collect::<Vec<_>>(),

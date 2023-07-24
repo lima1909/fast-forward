@@ -189,28 +189,18 @@ where
     ///                                 Car(3, "Mercedes".into()),
     ///                                 Car(5, "Audi".into())]);
     ///
-    /// let view = l.idx().create_view(|_| [1, 2, 3]);
+    /// let view = l.idx().create_view([1, 2, 3]);
     /// // or by using a `Range`
-    /// let view = l.idx().create_view(|_| 1..=3);
-    /// // or by using the `Key` iterator
-    /// let view = l.idx().create_view(|keys| keys.filter(|k| k != &5));
+    /// let view = l.idx().create_view(1..=3);
     /// ```
     #[inline]
-    pub fn create_view<P, It>(&self, predicate: P) -> View<'a, S, S, I>
+    pub fn create_view<It>(&self, keys: It) -> View<'a, S, S, I>
     where
-        P: Fn(Box<dyn Iterator<Item = <S as Filterable>::Key> + 'a>) -> It,
         It: IntoIterator<Item = <S as Keys>::Key>,
-
-        S: Filterable,
-        <S as Filterable>::Key: Clone,
         S: Keys<Key = <S as Filterable>::Key>,
         I: Indexable<S::Index>,
     {
-        View::new(
-            S::from_iter(predicate(self.0.filter.keys())),
-            self.0.filter,
-            self.0.items,
-        )
+        View::new(S::from_iter(keys), self.0.filter, self.0.items)
     }
 
     /// Returns Meta data, if the [`crate::index::store::Store`] supports any.

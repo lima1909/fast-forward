@@ -67,7 +67,7 @@
 //!                             Car(3, "Audi".into())]);
 //!
 //! // create a view: only for Car Name = "BMW" 0r "Audi"
-//! let view = l.idx().create_view(|_|  [String::from("BMW"), String::from("Audi")]);
+//! let view = l.idx().create_view([String::from("BMW"), String::from("Audi")]);
 //!
 //! // Car with Name "VW" is NOT in the view
 //! assert!(!view.contains(&String::from("VW")));
