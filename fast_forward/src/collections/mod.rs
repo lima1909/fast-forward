@@ -84,8 +84,6 @@ where
     where
         I: Indexable<S::Index>,
     {
-        // TODO
-        // self.0.filter.get(key).iter().map(|i| self.0.items.item(i))
         self.0.items.items(self.0.filter.get(key).iter())
     }
 

@@ -38,8 +38,6 @@ where
     where
         I: Indexable<F::Index>,
     {
-        // TODO
-        // self.filter.get(key).iter().map(|i| self.items.item(i))
         self.items.items(self.filter.get(key).iter())
     }
 }
@@ -97,10 +95,11 @@ where
         &'a self,
         key: &'a F::Key,
     ) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output> {
-        self.store
-            .get_with_check(key, |k| self.keys.exist(k))
-            .iter()
-            .map(|i| self.items.item(i))
+        self.items.items(
+            self.store
+                .get_with_check(key, |k| self.keys.exist(k))
+                .iter(),
+        )
     }
 
     #[inline]
@@ -186,7 +185,7 @@ where
         I: Indexable<F::Index>,
         <I as Indexable<F::Index>>::Output: Sized,
     {
-        self.map(|i| items.item(i))
+        items.items(self)
     }
 }
 

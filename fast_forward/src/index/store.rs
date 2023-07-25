@@ -200,7 +200,7 @@ where
         I: Indexable<F::Index>,
         <I as Indexable<F::Index>>::Output: Sized,
     {
-        self.map(|i| items.item(i))
+        items.items(self)
     }
 
     pub fn items_vec<I>(self, items: &'m I) -> Vec<&'m <I as Indexable<F::Index>>::Output>
@@ -208,7 +208,7 @@ where
         I: Indexable<F::Index>,
         <I as Indexable<F::Index>>::Output: Sized,
     {
-        self.items(items).collect()
+        items.items(self).collect()
     }
 }
 
