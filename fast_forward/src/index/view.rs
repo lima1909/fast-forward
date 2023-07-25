@@ -73,7 +73,7 @@ where
     F: Filterable,
     I: Indexable<F::Index>,
 {
-    pub fn new(keys: K, store: &'a F, items: &'a I) -> Self {
+    pub const fn new(keys: K, store: &'a F, items: &'a I) -> Self {
         Self { keys, store, items }
     }
 
