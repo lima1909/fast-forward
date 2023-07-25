@@ -77,18 +77,6 @@ where
         }
     }
 
-    fn keys(&self) -> Box<dyn Iterator<Item = Self::Key> + '_>
-    where
-        Self::Key: Clone,
-    {
-        Box::new(
-            self.data
-                .iter()
-                .filter_map(|o| o.as_ref().map(|(k, _)| k))
-                .cloned(),
-        )
-    }
-
     fn with_capacity(capacity: usize) -> Self {
         UIntIndex {
             data: Vec::with_capacity(capacity),
@@ -234,25 +222,6 @@ mod tests {
         i.insert(1, 3);
         let f = Filter(&i);
         assert_eq!([3, 4], (f.eq(&2) | f.eq(&1)));
-    }
-
-    #[test]
-    fn keys() {
-        let mut i = UIntIndex::new();
-        i.insert(2, 4);
-        i.insert(3, 6);
-        i.insert(4, 8);
-
-        assert_eq!(vec![2, 3, 4], i.keys().collect::<Vec<_>>());
-
-        i.insert(5, 10);
-        assert_eq!(vec![2, 3, 4, 5], i.keys().collect::<Vec<_>>());
-
-        i.delete(5, &10);
-        assert_eq!(vec![2, 3, 4], i.keys().collect::<Vec<_>>());
-
-        i.insert(4, 16);
-        assert_eq!(vec![2, 3, 4], i.keys().collect::<Vec<_>>());
     }
 
     #[test]

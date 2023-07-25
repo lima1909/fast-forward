@@ -84,11 +84,6 @@ pub trait Store: Filterable {
     ///
     fn delete(&mut self, key: Self::Key, idx: &Self::Index);
 
-    /// Return a `Clone` of all known `Keys`.
-    fn keys(&self) -> Box<dyn Iterator<Item = Self::Key> + '_>
-    where
-        Self::Key: Clone;
-
     /// To reduce memory allocations can create an `Index-store` with capacity.
     fn with_capacity(capacity: usize) -> Self;
 
