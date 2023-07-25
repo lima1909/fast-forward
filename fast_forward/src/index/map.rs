@@ -15,13 +15,19 @@ use hashbrown::HashMap;
 use std::collections::HashMap;
 
 /// `Key` default type is [`String`] and use [`std::collections::HashMap`] for the Index implementation.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 #[repr(transparent)]
-pub struct MapIndex<K: Default = String, X = usize>(HashMap<K, KeyIndices<X>>);
+pub struct MapIndex<K = String, X = usize>(HashMap<K, KeyIndices<X>>);
+
+impl<K, X> Default for MapIndex<K, X> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
 
 impl<K, X> Filterable for MapIndex<K, X>
 where
-    K: Default + Hash + Eq,
+    K: Hash + Eq,
 {
     type Key = K;
     type Index = X;
@@ -41,7 +47,7 @@ where
 
 impl<K, X> Store for MapIndex<K, X>
 where
-    K: Default + Eq + Hash,
+    K: Hash + Eq,
     X: Ord,
 {
     fn insert(&mut self, key: K, i: Self::Index) {
@@ -68,7 +74,7 @@ where
 
 impl<K> Keys for MapIndex<K>
 where
-    K: Default + Eq + Hash,
+    K: Hash + Eq,
 {
     type Key = K;
 

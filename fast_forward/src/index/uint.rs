@@ -9,16 +9,26 @@ use crate::index::{
 use std::marker::PhantomData;
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
-#[derive(Debug, Default)]
-pub struct UIntIndex<K: Default = usize, X = usize> {
+#[derive(Debug)]
+pub struct UIntIndex<K = usize, X = usize> {
     data: Vec<Option<(K, KeyIndices<X>)>>,
     min_max_cache: MinMax<usize>,
     _key: PhantomData<K>,
 }
 
+impl<K, X> Default for UIntIndex<K, X> {
+    fn default() -> Self {
+        Self {
+            data: vec![],
+            min_max_cache: MinMax::default(),
+            _key: PhantomData,
+        }
+    }
+}
+
 impl<K, X> Filterable for UIntIndex<K, X>
 where
-    K: Default + Into<usize> + Copy,
+    K: Into<usize> + Copy,
 {
     type Key = K;
     type Index = X;
@@ -32,6 +42,7 @@ where
         }
     }
 
+    #[inline]
     fn contains(&self, key: &Self::Key) -> bool {
         let i: usize = (*key).into();
         matches!(self.data.get(i), Some(Some(_)))
@@ -40,7 +51,7 @@ where
 
 impl<K, X> Store for UIntIndex<K, X>
 where
-    K: Default + Into<usize> + Copy,
+    K: Into<usize> + Copy,
     X: Ord + Clone,
 {
     fn insert(&mut self, k: K, i: X) {
@@ -88,7 +99,7 @@ where
 
 impl<K> Keys for UIntIndex<K>
 where
-    K: Default + Into<usize> + Copy + Ord,
+    K: Into<usize> + Copy + Ord,
 {
     type Key = K;
 
@@ -106,7 +117,7 @@ where
     {
         fn add_key<K>(view: &mut UIntIndex<K>, key: K)
         where
-            K: Default + Into<usize> + Copy + Ord,
+            K: Into<usize> + Copy + Ord,
         {
             let orig_key = key;
             let pos: usize = key.into();
@@ -126,7 +137,7 @@ where
 }
 
 // type Meta<'m> = UIntMeta<'m, K> where K:'m;
-impl<K: Default, X> MetaData for UIntIndex<K, X> {
+impl<K, X> MetaData for UIntIndex<K, X> {
     type Meta<'m> = UIntMeta<'m, K,X> where K: 'm, X:'m;
 
     fn meta(&self) -> Self::Meta<'_> {
@@ -135,11 +146,11 @@ impl<K: Default, X> MetaData for UIntIndex<K, X> {
 }
 
 /// Meta data for the UIntIndex, like min and max value from the saved Index.
-pub struct UIntMeta<'s, K: Default + 's, X>(&'s UIntIndex<K, X>);
+pub struct UIntMeta<'s, K: 's, X>(&'s UIntIndex<K, X>);
 
 impl<'s, K, X> UIntMeta<'s, K, X>
 where
-    K: Default + 's,
+    K: 's,
 {
     /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
     pub const fn min(&self) -> usize {
@@ -152,7 +163,7 @@ where
     }
 }
 
-impl<K: Default, X> UIntIndex<K, X> {
+impl<K, X> UIntIndex<K, X> {
     /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
     pub const fn min(&self) -> usize {
         self.min_max_cache.min
