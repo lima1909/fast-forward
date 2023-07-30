@@ -25,7 +25,7 @@ An `Index` has two parts, a `Key` (item to searching for) and a `Position` (the 
 ### Example for an indexed read only List (ro::IList):
 
 ```rust
-use fast_forward::{index::uint::UIntIndex, collections::ro::IList};
+use fast_forward::{index::UIntIndex, collections::ro::IList};
 
 #[derive(Debug, PartialEq)]
 pub struct Car(usize, String);
@@ -70,7 +70,7 @@ It is useful, if you don't want to give full read access to the complete collect
 All details to [`crate::collections::Retriever::create_view()`]
 
 ```rust
-use fast_forward::{index::map::MapIndex, collections::ro::IList};
+use fast_forward::{index::MapIndex, collections::ro::IList};
 
 #[derive(Debug, PartialEq)]
 pub struct Car(usize, String);

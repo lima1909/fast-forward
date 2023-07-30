@@ -40,17 +40,17 @@ where
     /// # Example
     ///
     /// ```
-    /// use fast_forward::index::{store::Store, uint::UIntIndex};
+    /// use fast_forward::index::{store::Store, int::IntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, PartialEq)]
-    /// pub struct Car(usize, String);
+    /// pub struct Car(i32, String);
     ///
-    /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
+    /// let cars = vec![Car(-2, "BMW".into()), Car(5, "Audi".into())];
     ///
-    /// let l = IList::<UIntIndex, _>::new(|c| c.0, cars);
+    /// let l = IList::<IntIndex, _>::new(|c| c.0, cars);
     ///
-    /// assert!(l.idx().contains(&2));
+    /// assert!(l.idx().contains(&-2));
     /// assert!(!l.idx().contains(&99));
     /// ```
     #[inline]
@@ -97,25 +97,25 @@ where
     /// # Example:
     ///
     /// ```
-    /// use fast_forward::index::{store::Store, uint::UIntIndex};
+    /// use fast_forward::index::{store::Store, int::IntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, PartialEq)]
-    /// pub struct Car(usize, String);
+    /// pub struct Car(i32, String);
     ///
     /// let cars = vec![
-    ///     Car(2, "BMW".into()),
+    ///     Car(-2, "BMW".into()),
     ///     Car(5, "Audi".into()),
-    ///     Car(2, "VW".into()),
-    ///     Car(99, "Porsche".into()),
+    ///     Car(-2, "VW".into()),
+    ///     Car(-99, "Porsche".into()),
     /// ];
     ///
-    /// let l = IList::<UIntIndex, _>::new(|c| c.0, cars);
+    /// let l = IList::<IntIndex, _>::new(|c| c.0, cars);
     ///
-    /// let result = l.idx().get_many([2, 5]).collect::<Vec<_>>();
+    /// let result = l.idx().get_many([-2, 5]).collect::<Vec<_>>();
     /// assert_eq!(vec![
-    ///     &Car(2, "BMW".into()),
-    ///     &Car(2, "VW".into()),
+    ///     &Car(-2, "BMW".into()),
+    ///     &Car(-2, "VW".into()),
     ///     &Car(5, "Audi".into()),
     ///     ],
     ///     result);
@@ -177,21 +177,28 @@ where
     /// # Example
     ///
     /// ```
-    /// use fast_forward::index::{store::Store, uint::UIntIndex};
+    /// use fast_forward::index::{store::Store, int::IntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, PartialEq)]
-    /// pub struct Car(usize, String);
+    /// pub struct Car(i32, String);
     ///
-    /// let l = IList::<UIntIndex, _>::new(|c| c.0, vec![
+    /// let l = IList::<IntIndex, _>::new(|c| c.0, vec![
     ///                                 Car(1, "BMW".into()),
     ///                                 Car(2, "Porsche".into()),
-    ///                                 Car(3, "Mercedes".into()),
-    ///                                 Car(5, "Audi".into())]);
+    ///                                 Car(-3, "Mercedes".into()),
+    ///                                 Car(-5, "Audi".into())]);
     ///
-    /// let view = l.idx().create_view([1, 2, 3]);
+    /// let view = l.idx().create_view([1, 2, -3]);
+    /// assert!(view.contains(&-3));
+    /// assert!(view.contains(&1));
+    /// assert_eq!(None, view.get(&-5).next());
+    ///
     /// // or by using a `Range`
-    /// let view = l.idx().create_view(1..=3);
+    /// let view = l.idx().create_view(-3..=3);
+    /// assert!(view.contains(&-3));
+    /// assert!(view.contains(&1));
+    /// assert_eq!(None, view.get(&-5).next());
     /// ```
     #[inline]
     pub fn create_view<It>(&self, keys: It) -> View<'a, S, S, I>

@@ -44,8 +44,7 @@ where
 
     #[inline]
     fn contains(&self, key: &Self::Key) -> bool {
-        let i: usize = (*key).into();
-        matches!(self.data.get(i), Some(Some(_)))
+        matches!(self.data.get((*key).into()), Some(Some(_)))
     }
 }
 

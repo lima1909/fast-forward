@@ -1,10 +1,15 @@
 //! The `index `module contains the structure for saving and accessing the `Index` implementations.
 pub mod indices;
+pub mod int;
 pub mod map;
 pub mod ops;
 pub mod store;
 pub mod uint;
 pub mod view;
+
+pub use int::IntIndex;
+pub use map::MapIndex;
+pub use uint::UIntIndex;
 
 /// [`Indexable`] means a collection (Map, Vec, Array, ...)
 /// where Items are accessable via an Index.
@@ -33,6 +38,8 @@ pub trait Indexable<Idx> {
     }
 }
 
+/// `Itmes`is an `Iterator` which is created by the `Indexable` trait.
+/// `Items` contains all `Items` for a given amount of `Indices`.
 pub struct Items<'a, It, X, Idx>
 where
     It: Indexable<X>,
