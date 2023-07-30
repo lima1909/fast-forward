@@ -43,6 +43,12 @@
 //!
 //! // you can use the Vec methods too
 //! assert_eq!(2, l.len());
+//!
+//! // or you can get MetaData like min and max Key value
+//! use fast_forward::index::store::MetaData;
+//!
+//! assert_eq!(1, l.idx().meta().min_key());
+//! assert_eq!(2, l.idx().meta().max_key());
 //! ```
 //!
 //! All supported options for retrieve Items can you find by the [`crate::collections::Retriever`] struct.
@@ -320,8 +326,9 @@ mod tests {
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
 
         // min and max
-        assert_eq!(2, cars.id.min());
-        assert_eq!(99, cars.id.max());
+        use crate::index::store::MetaData;
+        assert_eq!(2, cars.id.meta().min_key());
+        assert_eq!(99, cars.id.meta().max_key());
     }
 
     #[test]

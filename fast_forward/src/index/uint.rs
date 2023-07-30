@@ -152,27 +152,17 @@ where
     K: 's,
 {
     /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
-    pub const fn min(&self) -> usize {
+    pub const fn min_key(&self) -> usize {
         self.0.min_max_cache.min
     }
 
     /// Filter for get the highest (`max`) `Key` which is stored in `UIntIndex`.
-    pub const fn max(&self) -> usize {
+    pub const fn max_key(&self) -> usize {
         self.0.min_max_cache.max
     }
 }
 
 impl<K, X> UIntIndex<K, X> {
-    /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
-    pub const fn min(&self) -> usize {
-        self.min_max_cache.min
-    }
-
-    /// Filter for get the highest (`max`) `Key` which is stored in `UIntIndex`.
-    pub const fn max(&self) -> usize {
-        self.min_max_cache.max
-    }
-
     /// Find `min` key. _Importand_ if the min value was removed, to find the new valid `min Key`.
     fn _find_min(&self) -> usize {
         self.data
@@ -218,8 +208,8 @@ mod tests {
         assert_eq!(Some(&4), it.next());
         assert_eq!(None, it.next());
 
-        assert_eq!(1, i.meta().min());
-        assert_eq!(2, i.meta().max());
+        assert_eq!(1, i.meta().min_key());
+        assert_eq!(2, i.meta().max_key());
     }
 
     #[test]
@@ -239,12 +229,12 @@ mod tests {
         let mut i = UIntIndex::new();
         i.insert(2, 4);
 
-        assert_eq!(2, i.meta().min());
-        assert_eq!(2, i.meta().max());
+        assert_eq!(2, i.meta().min_key());
+        assert_eq!(2, i.meta().max_key());
 
         i.insert(1, 3);
-        assert_eq!(1, i.meta().min());
-        assert_eq!(2, i.meta().max());
+        assert_eq!(1, i.meta().min_key());
+        assert_eq!(2, i.meta().max_key());
     }
 
     #[test]
@@ -392,19 +382,19 @@ mod tests {
         #[test]
         fn min() {
             let mut idx = UIntIndex::<u16>::with_capacity(100);
-            assert_eq!(0, idx.min());
+            assert_eq!(0, idx.meta().min_key());
             assert_eq!(0, idx._find_min());
 
             idx.insert(4, 4);
-            assert_eq!(4, idx.min());
+            assert_eq!(4, idx.meta().min_key());
             assert_eq!(4, idx._find_min());
 
             idx.insert(2, 8);
-            assert_eq!(2, idx.min());
+            assert_eq!(2, idx.meta().min_key());
             assert_eq!(2, idx._find_min());
 
             idx.insert(99, 6);
-            assert_eq!(2, idx.min());
+            assert_eq!(2, idx.meta().min_key());
             assert_eq!(2, idx._find_min());
         }
 
@@ -412,32 +402,32 @@ mod tests {
         fn min_rm() {
             let mut idx = UIntIndex::<u16>::with_capacity(100);
             idx.insert(4, 4);
-            assert_eq!(4, idx.min());
+            assert_eq!(4, idx.meta().min_key());
             assert_eq!(4, idx._find_min());
 
             idx.insert(2, 8);
-            assert_eq!(2, idx.min());
+            assert_eq!(2, idx.meta().min_key());
             assert_eq!(2, idx._find_min());
 
             // remove min value on Index 2
             *idx.data.get_mut(2).unwrap() = None;
-            assert_eq!(2, idx.min()); // this cached value is now false
+            assert_eq!(2, idx.meta().min_key()); // this cached value is now false
             assert_eq!(4, idx._find_min()); // this is the correct value
         }
 
         #[test]
         fn max() {
             let mut idx = UIntIndex::<u16>::with_capacity(100);
-            assert_eq!(0, idx.max());
+            assert_eq!(0, idx.meta().max_key());
 
             idx.insert(4, 4);
-            assert_eq!(4, idx.max());
+            assert_eq!(4, idx.meta().max_key());
 
             idx.insert(2, 8);
-            assert_eq!(4, idx.max());
+            assert_eq!(4, idx.meta().max_key());
 
             idx.insert(99, 6);
-            assert_eq!(99, idx.max());
+            assert_eq!(99, idx.meta().max_key());
         }
 
         #[test]
@@ -445,8 +435,8 @@ mod tests {
             let mut idx = UIntIndex::new();
             idx.insert(2, 4);
 
-            assert_eq!(2, idx.min());
-            assert_eq!(2, idx.max());
+            assert_eq!(2, idx.meta().min_key());
+            assert_eq!(2, idx.meta().max_key());
 
             // (old) Key: 99 do not exist, insert a (new) Key 100?
             idx.update(99, 4, 100);
@@ -462,8 +452,8 @@ mod tests {
             assert_eq!([8], idx.get(&4));
             assert_eq!([4], idx.get(&2));
 
-            assert_eq!(2, idx.min());
-            assert_eq!(100, idx.max());
+            assert_eq!(2, idx.meta().min_key());
+            assert_eq!(100, idx.meta().max_key());
         }
 
         #[test]
@@ -473,8 +463,8 @@ mod tests {
             idx.insert(2, 3);
             idx.insert(3, 1);
 
-            assert_eq!(2, idx.min());
-            assert_eq!(3, idx.max());
+            assert_eq!(2, idx.meta().min_key());
+            assert_eq!(3, idx.meta().max_key());
 
             // delete correct Key with wrong Index, nothing happens
             idx.delete(2, &100);
@@ -488,8 +478,8 @@ mod tests {
             idx.delete(2, &4);
             assert!(idx.get(&2).is_empty());
 
-            assert_eq!(3, idx.min());
-            assert_eq!(3, idx.max());
+            assert_eq!(3, idx.meta().min_key());
+            assert_eq!(3, idx.meta().max_key());
         }
     }
 

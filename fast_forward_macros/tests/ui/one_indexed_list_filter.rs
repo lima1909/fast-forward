@@ -33,6 +33,6 @@ fn main() {
     let mut it = cars.id().get(&1000);
     assert_eq!(it.next(), None);
 
-    assert_eq!(2, cars.id().meta().min());
-    assert_eq!(99, cars.id().meta().max());
+    assert_eq!(2, cars.id().meta().min_key());
+    assert_eq!(99, cars.id().meta().max_key());
 }

@@ -58,6 +58,13 @@ assert_eq!(
 
 // you can use the Vec methods too
 assert_eq!(2, l.len());
+
+// or you can get MetaData like min and max Key value
+use fast_forward::index::store::MetaData;
+
+assert_eq!(1, l.idx().meta().min_key());
+assert_eq!(2, l.idx().meta().max_key());
+
 ```
 
 All supported options for retrieve Items can you find by the [`crate::collections::Retriever`] struct.

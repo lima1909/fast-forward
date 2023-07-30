@@ -187,8 +187,8 @@ mod tests {
         assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
         assert_eq!(None, it.next());
 
-        assert_eq!(2, l.idx().meta().min());
-        assert_eq!(99, l.idx().meta().max());
+        assert_eq!(2, l.idx().meta().min_key());
+        assert_eq!(99, l.idx().meta().max_key());
     }
 
     #[rstest]
@@ -273,8 +273,8 @@ mod tests {
         assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
         assert_eq!(None, it.next());
 
-        assert_eq!(2, l.idx().meta().min());
-        assert_eq!(99, l.idx().meta().max());
+        assert_eq!(2, l.idx().meta().min_key());
+        assert_eq!(99, l.idx().meta().max_key());
     }
 
     #[test]
@@ -319,8 +319,8 @@ mod tests {
         assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
         assert_eq!(None, it.next());
 
-        assert_eq!(2, l.idx().meta().min());
-        assert_eq!(99, l.idx().meta().max());
+        assert_eq!(2, l.idx().meta().min_key());
+        assert_eq!(99, l.idx().meta().max_key());
     }
 
     #[test]
