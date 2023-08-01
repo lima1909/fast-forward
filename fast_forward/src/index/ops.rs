@@ -97,7 +97,7 @@ impl<K: Default + Ord> MinMax<K> {
     }
 
     pub fn new_max_value(&mut self, key: K) -> &K {
-        if self.max < key {
+        if self.max == K::default() || self.max < key {
             self.max = key
         }
         &self.max

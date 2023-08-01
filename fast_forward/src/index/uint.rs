@@ -12,11 +12,14 @@ use std::marker::PhantomData;
 #[derive(Debug)]
 pub struct UIntIndex<K = usize, X = usize> {
     data: Vec<Option<(K, KeyIndices<X>)>>,
-    min_max_cache: MinMax<usize>,
+    min_max_cache: MinMax<K>,
     _key: PhantomData<K>,
 }
 
-impl<K, X> Default for UIntIndex<K, X> {
+impl<K, X> Default for UIntIndex<K, X>
+where
+    K: Default,
+{
     fn default() -> Self {
         Self {
             data: vec![],
@@ -50,7 +53,7 @@ where
 
 impl<K, X> Store for UIntIndex<K, X>
 where
-    K: Into<usize> + Copy,
+    K: Default + Into<usize> + Copy + Ord,
     X: Ord + Clone,
 {
     fn insert(&mut self, k: K, i: X) {
@@ -66,11 +69,12 @@ where
             None => self.data[k] = Some((orig_key, KeyIndices::new(i))),
         }
 
-        self.min_max_cache.new_min_value(k);
-        self.min_max_cache.new_max_value(k);
+        self.min_max_cache.new_min_value(orig_key);
+        self.min_max_cache.new_max_value(orig_key);
     }
 
     fn delete(&mut self, key: K, idx: &X) {
+        let orig_key = key;
         let k = key.into();
         if let Some(Some((_, rm_idx))) = self.data.get_mut(k) {
             // if the Index is the last, then remove complete Index
@@ -79,10 +83,10 @@ where
             }
         }
 
-        if k == self.min_max_cache.min {
+        if orig_key == self.min_max_cache.min {
             self.min_max_cache.min = self._find_min();
         }
-        if k == self.min_max_cache.max {
+        if orig_key == self.min_max_cache.max {
             self.min_max_cache.max = self._find_max();
         }
     }
@@ -98,7 +102,7 @@ where
 
 impl<K> Keys for UIntIndex<K>
 where
-    K: Into<usize> + Copy + Ord,
+    K: Default + Into<usize> + Copy + Ord,
 {
     type Key = K;
 
@@ -135,7 +139,6 @@ where
     }
 }
 
-// type Meta<'m> = UIntMeta<'m, K> where K:'m;
 impl<K, X> MetaData for UIntIndex<K, X> {
     type Meta<'m> = UIntMeta<'m, K,X> where K: 'm, X:'m;
 
@@ -149,37 +152,38 @@ pub struct UIntMeta<'s, K: 's, X>(&'s UIntIndex<K, X>);
 
 impl<'s, K, X> UIntMeta<'s, K, X>
 where
-    K: 's,
+    K: Copy + 's,
 {
     /// Filter for get the smallest (`min`) `Key` which is stored in `UIntIndex`.
-    pub const fn min_key(&self) -> usize {
+    pub const fn min_key(&self) -> K {
         self.0.min_max_cache.min
     }
 
     /// Filter for get the highest (`max`) `Key` which is stored in `UIntIndex`.
-    pub const fn max_key(&self) -> usize {
+    pub const fn max_key(&self) -> K {
         self.0.min_max_cache.max
     }
 }
 
-impl<K, X> UIntIndex<K, X> {
-    /// Find `min` key. _Importand_ if the min value was removed, to find the new valid `min Key`.
-    fn _find_min(&self) -> usize {
+impl<K, X> UIntIndex<K, X>
+where
+    K: Default + Copy,
+{
+    /// Find `min` key.
+    fn _find_min(&self) -> K {
         self.data
             .iter()
-            .enumerate()
-            .find(|(_i, item)| item.is_some())
-            .map(|(pos, _item)| pos)
+            .find_map(|o| o.as_ref().map(|(k, _)| *k))
             .unwrap_or_default()
     }
 
-    /// Find `max` key. _Importand_ if the max value was removed, to find the new valid `max Key`.
-    fn _find_max(&self) -> usize {
-        if self.data.is_empty() {
-            0
-        } else {
-            self.data.len() - 1
-        }
+    /// Find `max` key.
+    fn _find_max(&self) -> K {
+        self.data
+            .iter()
+            .rev()
+            .find_map(|o| o.as_ref().map(|(k, _)| *k))
+            .unwrap_or_default()
     }
 }
 
@@ -473,13 +477,19 @@ mod tests {
             // delete correct Key with correct Index
             idx.delete(2, &3);
             assert_eq!([4], idx.get(&2));
+            assert_eq!(2, idx.meta().min_key());
+            assert_eq!(3, idx.meta().max_key());
 
             // delete correct Key with last correct Index, Key now longer exist
             idx.delete(2, &4);
             assert!(idx.get(&2).is_empty());
-
             assert_eq!(3, idx.meta().min_key());
             assert_eq!(3, idx.meta().max_key());
+
+            idx.insert(2, 4);
+            // remove max key
+            idx.delete(3, &1);
+            assert_eq!(2, idx.meta().max_key());
         }
     }
 

@@ -350,7 +350,7 @@ mod tests {
         assert_eq!([1], fid.eq(&4) | fname.eq(&"Porsche".into()));
     }
 
-    #[derive(Clone, Copy, Default)]
+    #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
     enum Gender {
         Male,
         Female,
