@@ -102,6 +102,14 @@ impl<K: Default + Ord> MinMax<K> {
         }
         &self.max
     }
+
+    pub fn new_value(&mut self, key: K)
+    where
+        K: Copy,
+    {
+        self.new_min_value(key);
+        self.new_max_value(key);
+    }
 }
 
 #[cfg(test)]
@@ -148,6 +156,22 @@ mod tests {
             max.new_max_value(1);
             max.new_max_value(2);
             assert_eq!(2, max.max);
+        }
+
+        #[test]
+        fn new_value() {
+            let mut v = MinMax::default();
+            v.new_value(1);
+            assert_eq!(1, v.max);
+            assert_eq!(1, v.min);
+
+            v.new_value(-1);
+            assert_eq!(1, v.max);
+            assert_eq!(-1, v.min);
+
+            v.new_value(2);
+            assert_eq!(2, v.max);
+            assert_eq!(-1, v.min);
         }
     }
 }

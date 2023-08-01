@@ -38,8 +38,7 @@ where
 
     #[inline]
     fn get(&self, key: &Self::Key) -> &[X] {
-        let i: usize = (*key).into();
-        match self.data.get(i) {
+        match self.data.get((*key).into()) {
             Some(Some((_, idx))) => idx.as_slice(),
             _ => &[],
         }
@@ -69,8 +68,7 @@ where
             None => self.data[k] = Some((orig_key, KeyIndices::new(i))),
         }
 
-        self.min_max_cache.new_min_value(orig_key);
-        self.min_max_cache.new_max_value(orig_key);
+        self.min_max_cache.new_value(orig_key);
     }
 
     fn delete(&mut self, key: K, idx: &X) {

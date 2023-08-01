@@ -61,8 +61,7 @@ where
             None => data[pos] = Some((orig_key, KeyIndices::new(x))),
         }
 
-        self.min_max_cache.new_min_value(orig_key);
-        self.min_max_cache.new_max_value(orig_key);
+        self.min_max_cache.new_value(orig_key);
     }
 
     fn delete(&mut self, key: K, x: &X) {
@@ -162,7 +161,7 @@ fn pos(key: i32) -> usize {
     } else {
         key.try_into()
     }
-    .expect("expect key, which can convert into: i32")
+    .expect("key could not convert into usize")
 }
 
 struct KeyIntIter<'a, K> {
@@ -239,17 +238,15 @@ where
             .iter()
             .rev()
             .find_map(|o| o.as_ref().map(|(k, _)| *k));
-        let p = self
-            .pos_data
-            .iter()
-            .find_map(|o| o.as_ref().map(|(k, _)| *k));
 
-        match (p, n) {
-            (None, None) => K::default(),
-            (None, Some(n)) => n,
-            (Some(p), None) => p,
-            (Some(_), Some(n)) => n,
+        if let Some(n) = n {
+            return n;
         }
+
+        self.pos_data
+            .iter()
+            .find_map(|o| o.as_ref().map(|(k, _)| *k))
+            .unwrap_or_default()
     }
 
     /// Find `max` key.
@@ -259,17 +256,15 @@ where
             .iter()
             .rev()
             .find_map(|o| o.as_ref().map(|(k, _)| *k));
-        let n = self
-            .neg_data
-            .iter()
-            .find_map(|o| o.as_ref().map(|(k, _)| *k));
 
-        match (p, n) {
-            (None, None) => K::default(),
-            (None, Some(n)) => n,
-            (Some(p), None) => p,
-            (Some(p), Some(_)) => p,
+        if let Some(p) = p {
+            return p;
         }
+
+        self.neg_data
+            .iter()
+            .find_map(|o| o.as_ref().map(|(k, _)| *k))
+            .unwrap_or_default()
     }
 }
 
