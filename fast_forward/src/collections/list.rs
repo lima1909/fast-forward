@@ -1,4 +1,5 @@
 use crate::index::Indexable;
+
 #[derive(Debug)]
 pub struct List<T> {
     items: Vec<T>,
@@ -61,15 +62,22 @@ impl<T> List<T> {
 
     /// Get the Item on the given position/index in the List.
     /// If the Item was deleted, the return value is `None`
-    pub fn get(&self, index: usize) -> Option<&T> {
-        if self.is_deleted(index) {
+    pub fn get(&self, pos: usize) -> Option<&T> {
+        if self.is_deleted(pos) {
             return None;
         }
-        self.items.get(index)
+        self.items.get(pos)
     }
 
+    /// Check, is the Item on `pos` (`Index`) deleted.
+    #[inline]
     pub fn is_deleted(&self, pos: usize) -> bool {
         self.deleted_pos.contains(&pos)
+    }
+
+    // Returns all removed `Indices`.
+    pub fn deleted_indices(&self) -> &[usize] {
+        &self.deleted_pos
     }
 
     /// The number of not deleted Items in the List.
@@ -87,10 +95,12 @@ impl<T> List<T> {
         self.items.len()
     }
 
+    /// Returns an `Iterator` over all not deleted `Items`.
     pub const fn iter(&self) -> Iter<'_, T> {
         Iter::new(self)
     }
 
+    /// Create a `List` with given `capacity`.
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             items: Vec::with_capacity(capacity),
@@ -115,7 +125,7 @@ impl<T> Indexable<usize> for List<T> {
         if self.is_deleted(*idx) {
             panic!("Item on index: '{idx}' was deleted");
         }
-        self.items.item(idx)
+        &self.items[*idx]
     }
 }
 
@@ -181,6 +191,10 @@ mod tests {
 
         assert_eq!(0, l.insert("A", |_, _| {}));
         assert_eq!(1, l.insert("B", |_, _| {}));
+
+        assert_eq!(2, l.len());
+        assert_eq!(2, l.count());
+        assert!(!l.is_empty());
     }
 
     #[test]
@@ -201,12 +215,13 @@ mod tests {
     #[test]
     fn update() {
         let mut l = List::default();
-
         assert_eq!(0, l.insert("A", |_, _| {}));
         assert_eq!(1, l.insert("B", |_, _| {}));
 
         assert!(l.update(0, |_| "C", |_, _, _| {}));
         assert!(!l.update(100, |_| "C", |_, _, _| {}));
+
+        assert_eq!(Some(&"C"), l.get(0));
     }
 
     #[test]
@@ -232,7 +247,12 @@ mod tests {
         assert_eq!(3, l.len());
         assert_eq!(3, l.count());
 
-        assert_eq!(Some(&1), l.iter().next());
+        let mut it = l.iter();
+        assert_eq!(Some(&1), it.next());
+        assert_eq!(Some(&2), it.next());
+        assert_eq!(Some(&3), it.next());
+        assert_eq!(None, it.next());
+
         assert_eq!(Some(&2), l.get(1));
         assert_eq!(&3, l.item(&2)); // get with Index
     }
@@ -255,9 +275,11 @@ mod tests {
         assert_eq!(Some(&1), l.delete(0, |_, _| {}));
         assert_eq!(3, l.len());
         assert_eq!(2, l.count());
+        assert_eq!(&[0usize], l.deleted_indices());
 
         assert!(l.is_deleted(0));
         assert!(!l.is_deleted(1));
+        assert!(!l.is_deleted(2));
         assert!(!l.is_deleted(99));
 
         let mut it = l.iter();
@@ -273,6 +295,7 @@ mod tests {
         l.delete(1, |_, _| {});
         assert_eq!(3, l.len());
         assert_eq!(2, l.count());
+        assert_eq!(&[1usize], l.deleted_indices());
 
         assert!(!l.is_deleted(0));
         assert!(l.is_deleted(1));
@@ -291,6 +314,7 @@ mod tests {
         l.delete(2, |_, _| {});
         assert_eq!(3, l.len());
         assert_eq!(2, l.count());
+        assert_eq!(&[2usize], l.deleted_indices());
 
         assert!(!l.is_deleted(0));
         assert!(!l.is_deleted(1));
@@ -299,6 +323,26 @@ mod tests {
         let mut it = l.iter();
         assert_eq!(Some(&1), it.next());
         assert_eq!(Some(&2), it.next());
+        assert_eq!(None, it.next());
+    }
+
+    #[test]
+    fn insert_after_delete_last() {
+        let mut l: List<_> = vec![1, 2, 3].into();
+
+        l.delete(2, |_, _| {});
+        assert_eq!(3, l.len());
+        assert_eq!(2, l.count());
+        assert_eq!(&[2usize], l.deleted_indices());
+
+        l.insert(5, |_, _| {});
+        assert_eq!(4, l.len());
+        assert_eq!(3, l.count());
+
+        let mut it = l.iter();
+        assert_eq!(Some(&1), it.next());
+        assert_eq!(Some(&2), it.next());
+        assert_eq!(Some(&5), it.next());
         assert_eq!(None, it.next());
     }
 
