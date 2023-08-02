@@ -20,14 +20,14 @@ where
     F: Fn(&I) -> K,
     S: Store<Key = K, Index = usize>,
 {
-    pub fn from_iter<It>(store: S, f: F, iter: It) -> Self
+    pub fn from_iter<It>(f: F, iter: It) -> Self
     where
-        It: IntoIterator<Item = I>,
+        It: IntoIterator<Item = I> + ExactSizeIterator,
     {
         let mut s = Self {
-            store,
+            store: S::with_capacity(iter.len()),
             field: f,
-            items: List::default(),
+            items: List::with_capacity(iter.len()),
         };
 
         iter.into_iter().for_each(|item| {
@@ -82,6 +82,11 @@ where
         self.items.is_deleted(pos)
     }
 
+    // Returns all removed `Indices`.
+    pub fn deleted_indices(&self) -> &[usize] {
+        self.items.deleted_indices()
+    }
+
     pub const fn iter(&self) -> Iter<'_, I> {
         self.items.iter()
     }
@@ -98,7 +103,7 @@ impl<S, K, I, F: Fn(&I) -> K> Indexable<usize> for IList<S, K, I, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::{map::MapIndex, store::Store, uint::UIntIndex};
+    use crate::index::{MapIndex, UIntIndex};
     use rstest::{fixture, rstest};
 
     #[derive(Debug, Eq, PartialEq, Clone)]
@@ -116,10 +121,10 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_uint(cars: Vec<Car>) {
-        let cars = IList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+        let cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
 
         assert!(cars.idx().contains(&2));
-        assert!(cars.get(2).is_some());
+        assert_eq!(Some(&Car(2, "VW".into())), cars.get(2));
 
         let r = cars.idx().get(&2).collect::<Vec<_>>();
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
@@ -141,11 +146,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_map(cars: Vec<Car>) {
-        let cars = IList::from_iter(
-            MapIndex::with_capacity(cars.len()),
-            |c: &Car| c.1.clone(),
-            cars,
-        );
+        let cars = IList::<MapIndex, _, _, _>::from_iter(|c: &Car| c.1.clone(), cars.into_iter());
 
         assert!(cars.idx().contains(&"BMW".into()));
 
@@ -165,7 +166,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_update(cars: Vec<Car>) {
-        let mut cars = IList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+        let mut cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
 
         // update name, where name is NOT a Index
         let updated = cars.update(0, |c| {
@@ -199,14 +200,14 @@ mod tests {
 
         // update wrong ID
         let updated = cars.update(10_000, |_c| {
-            panic!("wrong ID, never call this update function")
+            panic!("wrong ID, this trigger is never called")
         });
         assert!(!updated);
     }
 
     #[rstest]
     fn one_indexed_list_delete(cars: Vec<Car>) {
-        let mut cars = IList::from_iter(UIntIndex::with_capacity(cars.len()), |c: &Car| c.0, cars);
+        let mut cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
 
         // before delete: 2 Cars
         let r = cars.idx().get(&2).collect::<Vec<_>>();
@@ -223,6 +224,7 @@ mod tests {
         assert_eq!(3, cars.count());
         assert_eq!(4, cars.len());
         assert!(cars.is_deleted(0));
+        assert_eq!(&[0], cars.deleted_indices());
 
         // delete a second Car
         let deleted_car = cars.delete(3);
@@ -230,6 +232,7 @@ mod tests {
         assert_eq!(2, cars.count());
         assert_eq!(4, cars.len());
         assert!(cars.is_deleted(3));
+        assert_eq!(&[0, 3], cars.deleted_indices());
 
         // delete wrong ID
         assert_eq!(None, cars.delete(10_000));
