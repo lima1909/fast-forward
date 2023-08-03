@@ -3,7 +3,7 @@
 //! This collections only support one Index for one property.
 //!
 #[doc(hidden)]
-pub(crate) mod drop;
+pub(crate) mod base;
 #[doc(hidden)]
 pub(crate) mod list;
 pub mod ro;
