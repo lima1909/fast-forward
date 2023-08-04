@@ -8,8 +8,8 @@ use crate::{
 /// [`IList`] is a read write indexed `List` which owned the given items.
 pub struct IList<S, K, I, F: Fn(&I) -> K> {
     store: S,
-    items: Retain<I>,
     field: F,
+    items: Retain<I>,
 }
 
 impl<S, K, I, F> IList<S, K, I, F>
@@ -42,10 +42,10 @@ where
 
     /// Insert a new `Item` to the List.
     pub fn insert(&mut self, item: I) -> usize {
-        let key = (self.field)(&item);
-        let pos = self.items.insert(item);
-        self.store.insert(key, pos);
-        pos
+        self.items.insert(item, |item, idx| {
+            let key = (self.field)(item);
+            self.store.insert(key, idx);
+        })
     }
 
     /// Update the item on the given position.
@@ -62,10 +62,10 @@ where
 
     /// The Item in the list will be marked as deleted.
     pub fn drop(&mut self, pos: usize) -> Option<&I> {
-        let item = self.items.drop(pos)?;
-        let key = (self.field)(item);
-        self.store.delete(key, &pos);
-        Some(item)
+        self.items.drop(pos, |item, idx| {
+            let key = (self.field)(item);
+            self.store.delete(key, idx);
+        })
     }
 
     pub fn idx(&self) -> Retriever<'_, S, Retain<I>> {

@@ -22,8 +22,12 @@ impl<T> Retain<T> {
     }
 
     /// Insert a new `Item` to the List.
-    pub fn insert(&mut self, item: T) -> usize {
+    pub fn insert<F>(&mut self, item: T, mut trigger: F) -> usize
+    where
+        F: FnMut(&T, usize),
+    {
         let pos = self.items.len();
+        trigger(&item, pos);
         self.items.push(item);
         pos
     }
@@ -46,9 +50,13 @@ impl<T> Retain<T> {
     }
 
     /// The Item in the list will be marked as deleted.
-    pub fn drop(&mut self, pos: usize) -> Option<&T> {
+    pub fn drop<F>(&mut self, pos: usize, mut trigger: F) -> Option<&T>
+    where
+        F: FnMut(&T, &usize),
+    {
         let item = self.items.get(pos)?;
         if !self.is_droped(pos) {
+            trigger(item, &pos);
             self.droped.push(pos);
         }
         Some(item)
@@ -171,8 +179,8 @@ mod tests {
         assert_eq!(0, v.count());
         assert!(v.is_empty());
 
-        assert_eq!(0, v.insert("A"));
-        assert_eq!(1, v.insert("B"));
+        assert_eq!(0, v.insert("A", |_, _| {}));
+        assert_eq!(1, v.insert("B", |_, _| {}));
 
         assert_eq!(2, v.len());
         assert_eq!(2, v.count());
@@ -182,6 +190,18 @@ mod tests {
         assert_eq!(Some(&"A"), it.next());
         assert_eq!(Some(&"B"), it.next());
         assert_eq!(None, it.next());
+    }
+
+    #[rstest]
+    fn insert_trigger(mut v: Retain<String>) {
+        let mut call_trigger_pos = 0usize;
+        assert_eq!(
+            3,
+            v.insert(String::from("D"), |_, pos| {
+                call_trigger_pos += pos;
+            })
+        );
+        assert_eq!(3, call_trigger_pos);
     }
 
     #[rstest]
@@ -205,8 +225,26 @@ mod tests {
     }
 
     #[rstest]
+    fn drop_trigger(mut v: Retain<String>) {
+        let mut call_trigger_pos = 0usize;
+        v.drop(1, |_, pos| {
+            call_trigger_pos += pos;
+        });
+        assert_eq!(1, call_trigger_pos);
+    }
+
+    #[rstest]
+    fn drop_no_trigger(mut v: Retain<String>) {
+        let mut call_trigger_pos = 0usize;
+        v.drop(1000, |_, pos| {
+            call_trigger_pos += pos;
+        });
+        assert_eq!(0, call_trigger_pos);
+    }
+
+    #[rstest]
     fn drop_first(mut v: Retain<String>) {
-        assert_eq!(Some(&String::from("A")), v.drop(0));
+        assert_eq!(Some(&String::from("A")), v.drop(0, |_, _| {}));
 
         assert_eq!(3, v.len());
         assert_eq!(2, v.count());
@@ -227,7 +265,7 @@ mod tests {
 
     #[rstest]
     fn drop_mid(mut v: Retain<String>) {
-        assert_eq!(Some(&String::from("B")), v.drop(1));
+        assert_eq!(Some(&String::from("B")), v.drop(1, |_, _| {}));
 
         assert_eq!(3, v.len());
         assert_eq!(2, v.count());
@@ -248,7 +286,7 @@ mod tests {
 
     #[rstest]
     fn drop_last(mut v: Retain<String>) {
-        assert_eq!(Some(&String::from("C")), v.drop(2));
+        assert_eq!(Some(&String::from("C")), v.drop(2, |_, _| {}));
 
         assert_eq!(3, v.len());
         assert_eq!(2, v.count());
@@ -269,7 +307,7 @@ mod tests {
 
     #[rstest]
     fn delete_bad_index(mut v: Retain<String>) {
-        assert_eq!(None, v.drop(1000));
+        assert_eq!(None, v.drop(1000, |_, _| {}));
     }
 
     #[rstest]
@@ -277,24 +315,24 @@ mod tests {
         assert!(!v.is_empty());
         assert_eq!(Some(&"A".into()), v.get(0));
 
-        assert_eq!(Some(&String::from("A")), v.drop(0));
+        assert_eq!(Some(&String::from("A")), v.drop(0, |_, _| {}));
 
         assert_eq!(2, v.count());
         assert_eq!(3, v.len());
         assert!(!v.is_empty());
 
         // drop again 0
-        assert_eq!(Some(&String::from("A")), v.drop(0));
+        assert_eq!(Some(&String::from("A")), v.drop(0, |_, _| {}));
         assert_eq!(2, v.count());
         assert_eq!(3, v.len());
         assert!(!v.is_empty());
 
-        assert_eq!(Some(&String::from("B")), v.drop(1));
+        assert_eq!(Some(&String::from("B")), v.drop(1, |_, _| {}));
         assert_eq!(1, v.count());
         assert_eq!(3, v.len());
         assert!(!v.is_empty());
 
-        assert_eq!(Some(&String::from("C")), v.drop(2));
+        assert_eq!(Some(&String::from("C")), v.drop(2, |_, _| {}));
         assert_eq!(0, v.count());
         assert_eq!(3, v.len());
         assert!(v.is_empty());
@@ -303,24 +341,24 @@ mod tests {
     #[test]
     fn reorg() {
         let mut l = v();
-        assert_eq!(Some(&String::from("B")), l.drop(1));
+        assert_eq!(Some(&String::from("B")), l.drop(1, |_, _| {}));
         l = l.reorg();
         assert_eq!(vec![String::from("A"), String::from("C")], l.items);
         assert_eq!(2, l.len());
         assert_eq!(2, l.count());
 
         let mut l = v();
-        assert_eq!(Some(&String::from("A")), l.drop(0));
-        assert_eq!(Some(&String::from("C")), l.drop(2));
+        assert_eq!(Some(&String::from("A")), l.drop(0, |_, _| {}));
+        assert_eq!(Some(&String::from("C")), l.drop(2, |_, _| {}));
         l = l.reorg();
         assert_eq!(vec![String::from("B")], l.items);
         assert_eq!(1, l.len());
         assert_eq!(1, l.count());
 
         let mut l = v();
-        assert_eq!(Some(&String::from("A")), l.drop(0));
-        assert_eq!(Some(&String::from("C")), l.drop(2));
-        assert_eq!(Some(&String::from("B")), l.drop(1));
+        assert_eq!(Some(&String::from("A")), l.drop(0, |_, _| {}));
+        assert_eq!(Some(&String::from("C")), l.drop(2, |_, _| {}));
+        assert_eq!(Some(&String::from("B")), l.drop(1, |_, _| {}));
         l = l.reorg();
         assert!(l.is_empty());
         assert_eq!(0, l.len());
