@@ -1,14 +1,61 @@
 //! read-write collections.
 //!
+use std::marker::PhantomData;
+
 use crate::{
     collections::{base::Retain, Retriever},
     index::{store::Store, Indexable},
 };
 
-/// [`IList`] is a read write indexed `List` which owned the given items.
-pub struct IList<S, K, I, F: Fn(&I) -> K> {
+/// [`ItemStore`] is an [`crate::index::store::Store`] for an `Item` (field of an `Item`).
+pub struct ItemStore<S, K, I, F: Fn(&I) -> K> {
     store: S,
     field: F,
+    _item: PhantomData<I>,
+}
+
+impl<S, K, I, F> ItemStore<S, K, I, F>
+where
+    F: Fn(&I) -> K,
+    S: Store<Key = K, Index = usize>,
+{
+    pub fn new(capacity: usize, field: F) -> Self {
+        Self {
+            store: S::with_capacity(capacity),
+            field,
+            _item: PhantomData,
+        }
+    }
+
+    /// Insert a new `Item` to the List.
+    pub fn insert(&mut self, item: &I, idx: usize) {
+        let key = (self.field)(item);
+        self.store.insert(key, idx);
+    }
+
+    /// Update the item on the given position.
+    pub fn update(&mut self, old_key: K, idx: usize, new_key: K) {
+        self.store.update(old_key, idx, new_key);
+    }
+
+    /// The Item in the list will be marked as deleted.
+    pub fn drop(&mut self, item: &I, idx: &usize) {
+        let key = (self.field)(item);
+        self.store.delete(key, idx);
+    }
+
+    pub fn store(&self) -> &S {
+        &self.store
+    }
+
+    pub fn field(&self) -> &F {
+        &self.field
+    }
+}
+
+/// [`IList`] is a read write indexed `List` which owned the given items.
+pub struct IList<S, K, I, F: Fn(&I) -> K> {
+    store: ItemStore<S, K, I, F>,
     items: Retain<I>,
 }
 
@@ -17,13 +64,12 @@ where
     F: Fn(&I) -> K,
     S: Store<Key = K, Index = usize>,
 {
-    pub fn from_iter<It>(f: F, iter: It) -> Self
+    pub fn from_iter<It>(field: F, iter: It) -> Self
     where
         It: IntoIterator<Item = I> + ExactSizeIterator,
     {
         let mut s = Self {
-            store: S::with_capacity(iter.len()),
-            field: f,
+            store: ItemStore::new(iter.len(), field),
             items: Retain::with_capacity(iter.len()),
         };
 
@@ -43,8 +89,7 @@ where
     /// Insert a new `Item` to the List.
     pub fn insert(&mut self, item: I) -> usize {
         self.items.insert(item, |item, idx| {
-            let key = (self.field)(item);
-            self.store.insert(key, idx);
+            self.store.insert(item, idx);
         })
     }
 
@@ -53,7 +98,7 @@ where
     where
         U: FnMut(&mut I),
     {
-        if let Some((old_key, new_key)) = self.items.update(pos, update, &self.field) {
+        if let Some((old_key, new_key)) = self.items.update(pos, update, &self.store.field) {
             self.store.update(old_key, pos, new_key);
             return true;
         }
@@ -63,13 +108,12 @@ where
     /// The Item in the list will be marked as deleted.
     pub fn drop(&mut self, pos: usize) -> Option<&I> {
         self.items.drop(pos, |item, idx| {
-            let key = (self.field)(item);
-            self.store.delete(key, idx);
+            self.store.drop(item, idx);
         })
     }
 
     pub fn idx(&self) -> Retriever<'_, S, Retain<I>> {
-        Retriever::new(&self.store, &self.items)
+        Retriever::new(&self.store.store, &self.items)
     }
 
     pub fn is_empty(&self) -> bool {

@@ -193,6 +193,12 @@ mod tests {
     }
 
     #[rstest]
+    #[should_panic]
+    fn get_item_not_found(v: Retain<String>) {
+        v.item(&10000);
+    }
+
+    #[rstest]
     fn insert_trigger(mut v: Retain<String>) {
         let mut call_trigger_pos = 0usize;
         assert_eq!(
