@@ -1,5 +1,7 @@
 //! Base module for `Collections`.
-#![allow(dead_code)]
+use std::ops::Index;
+
+use crate::index::Indexable;
 
 /// `Retain` is like a normal [`std::vec::Vec`] which store the given `Items`.
 /// If an `Item` was deleted, then is the `Position (Index)` of this `Item` is saved
@@ -19,17 +21,37 @@ impl<T> Retain<T> {
         self.items.get(pos)
     }
 
+    /// Insert a new `Item` to the List.
+    pub fn insert(&mut self, item: T) -> usize {
+        let pos = self.items.len();
+        self.items.push(item);
+        pos
+    }
+
+    /// Update the item on the given position.
+    pub fn update<U, F, K>(&mut self, pos: usize, mut update: U, key: &F) -> Option<(K, K)>
+    where
+        U: FnMut(&mut T),
+        F: Fn(&T) -> K,
+    {
+        match self.items.get_mut(pos) {
+            Some(item) => {
+                let old_key = key(item);
+                (update)(item);
+                let new_key = key(item);
+                Some((old_key, new_key))
+            }
+            None => None,
+        }
+    }
+
     /// The Item in the list will be marked as deleted.
-    ///
-    /// # Panics
-    ///
-    /// Panics if index is out of bounds.
-    pub fn drop(&mut self, pos: usize) -> &T {
-        let item = &self.items[pos];
+    pub fn drop(&mut self, pos: usize) -> Option<&T> {
+        let item = self.items.get(pos)?;
         if !self.is_droped(pos) {
             self.droped.push(pos);
         }
-        item
+        Some(item)
     }
 
     /// Check, is the Item on `pos` (`Index`) deleted.
@@ -102,9 +124,29 @@ impl<T> Retain<T> {
     }
 }
 
+impl<T> Indexable<usize> for Retain<T> {
+    type Output = T;
+
+    fn item(&self, idx: &usize) -> &Self::Output {
+        if self.is_droped(*idx) {
+            panic!("Item on index: '{idx}' was deleted");
+        }
+        &self.items[*idx]
+    }
+}
+
+impl<T> Index<usize> for Retain<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.items[index]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::{fixture, rstest};
 
     impl<T> From<Vec<T>> for Retain<T> {
         fn from(v: Vec<T>) -> Self {
@@ -115,6 +157,13 @@ mod tests {
         }
     }
 
+    #[fixture]
+    pub fn v() -> Retain<String> {
+        let v: Retain<String> =
+            vec![String::from("A"), String::from("B"), String::from("C")].into();
+        v
+    }
+
     #[test]
     fn len_count_empty() {
         let mut v = Retain::with_capacity(2);
@@ -122,8 +171,8 @@ mod tests {
         assert_eq!(0, v.count());
         assert!(v.is_empty());
 
-        v.items.push("A");
-        v.items.push("B");
+        assert_eq!(0, v.insert("A"));
+        assert_eq!(1, v.insert("B"));
 
         assert_eq!(2, v.len());
         assert_eq!(2, v.count());
@@ -135,11 +184,29 @@ mod tests {
         assert_eq!(None, it.next());
     }
 
-    #[test]
-    fn drop_first() {
-        let mut v: Retain<_> = vec![String::from("A"), String::from("B"), String::from("C")].into();
+    #[rstest]
+    fn update(mut v: Retain<String>) {
+        assert_eq!(Some(&String::from("A")), v.get(0));
 
-        assert_eq!(&String::from("A"), v.drop(0));
+        // update: "A" -> "AA" => (1, 2)
+        assert_eq!(
+            Some((1, 2)),
+            v.update(0, |s| *s = String::from("AA"), &|s| s.len())
+        );
+        assert_eq!(Some(&String::from("AA")), v.get(0));
+    }
+
+    #[rstest]
+    fn update_not_found(mut v: Retain<String>) {
+        assert_eq!(
+            None,
+            v.update(1000, |s| *s = String::from("AA"), &|s| s.len())
+        );
+    }
+
+    #[rstest]
+    fn drop_first(mut v: Retain<String>) {
+        assert_eq!(Some(&String::from("A")), v.drop(0));
 
         assert_eq!(3, v.len());
         assert_eq!(2, v.count());
@@ -158,11 +225,9 @@ mod tests {
         assert_eq!(None, it.next());
     }
 
-    #[test]
-    fn drop_mid() {
-        let mut v: Retain<_> = vec![String::from("A"), String::from("B"), String::from("C")].into();
-
-        assert_eq!(&String::from("B"), v.drop(1));
+    #[rstest]
+    fn drop_mid(mut v: Retain<String>) {
+        assert_eq!(Some(&String::from("B")), v.drop(1));
 
         assert_eq!(3, v.len());
         assert_eq!(2, v.count());
@@ -181,11 +246,9 @@ mod tests {
         assert_eq!(None, it.next());
     }
 
-    #[test]
-    fn drop_last() {
-        let mut v: Retain<_> = vec![String::from("A"), String::from("B"), String::from("C")].into();
-
-        assert_eq!(&String::from("C"), v.drop(2));
+    #[rstest]
+    fn drop_last(mut v: Retain<String>) {
+        assert_eq!(Some(&String::from("C")), v.drop(2));
 
         assert_eq!(3, v.len());
         assert_eq!(2, v.count());
@@ -204,37 +267,34 @@ mod tests {
         assert_eq!(None, it.next());
     }
 
-    #[test]
-    #[should_panic]
-    fn delete_index_panic() {
-        let mut v: Retain<_> = vec![String::from("A"), String::from("B"), String::from("C")].into();
-        v.drop(1000);
+    #[rstest]
+    fn delete_bad_index(mut v: Retain<String>) {
+        assert_eq!(None, v.drop(1000));
     }
 
-    #[test]
-    fn is_empty() {
-        let mut v: Retain<_> = vec![String::from("A"), String::from("B"), String::from("C")].into();
+    #[rstest]
+    fn is_empty(mut v: Retain<String>) {
         assert!(!v.is_empty());
         assert_eq!(Some(&"A".into()), v.get(0));
 
-        assert_eq!(&String::from("A"), v.drop(0));
+        assert_eq!(Some(&String::from("A")), v.drop(0));
 
         assert_eq!(2, v.count());
         assert_eq!(3, v.len());
         assert!(!v.is_empty());
 
         // drop again 0
-        assert_eq!(&String::from("A"), v.drop(0));
+        assert_eq!(Some(&String::from("A")), v.drop(0));
         assert_eq!(2, v.count());
         assert_eq!(3, v.len());
         assert!(!v.is_empty());
 
-        assert_eq!(&String::from("B"), v.drop(1));
+        assert_eq!(Some(&String::from("B")), v.drop(1));
         assert_eq!(1, v.count());
         assert_eq!(3, v.len());
         assert!(!v.is_empty());
 
-        assert_eq!(&String::from("C"), v.drop(2));
+        assert_eq!(Some(&String::from("C")), v.drop(2));
         assert_eq!(0, v.count());
         assert_eq!(3, v.len());
         assert!(v.is_empty());
@@ -242,28 +302,28 @@ mod tests {
 
     #[test]
     fn reorg() {
-        let mut v: Retain<_> = vec![String::from("A"), String::from("B"), String::from("C")].into();
-        assert_eq!(&String::from("B"), v.drop(1));
-        v = v.reorg();
-        assert_eq!(vec![String::from("A"), String::from("C")], v.items);
-        assert_eq!(2, v.len());
-        assert_eq!(2, v.count());
+        let mut l = v();
+        assert_eq!(Some(&String::from("B")), l.drop(1));
+        l = l.reorg();
+        assert_eq!(vec![String::from("A"), String::from("C")], l.items);
+        assert_eq!(2, l.len());
+        assert_eq!(2, l.count());
 
-        let mut v: Retain<_> = vec![String::from("A"), String::from("B"), String::from("C")].into();
-        assert_eq!(&String::from("A"), v.drop(0));
-        assert_eq!(&String::from("C"), v.drop(2));
-        v = v.reorg();
-        assert_eq!(vec![String::from("B")], v.items);
-        assert_eq!(1, v.len());
-        assert_eq!(1, v.count());
+        let mut l = v();
+        assert_eq!(Some(&String::from("A")), l.drop(0));
+        assert_eq!(Some(&String::from("C")), l.drop(2));
+        l = l.reorg();
+        assert_eq!(vec![String::from("B")], l.items);
+        assert_eq!(1, l.len());
+        assert_eq!(1, l.count());
 
-        let mut v: Retain<_> = vec![String::from("A"), String::from("B"), String::from("C")].into();
-        assert_eq!(&String::from("A"), v.drop(0));
-        assert_eq!(&String::from("C"), v.drop(2));
-        assert_eq!(&String::from("B"), v.drop(1));
-        v = v.reorg();
-        assert!(v.is_empty());
-        assert_eq!(0, v.len());
-        assert_eq!(0, v.count());
+        let mut l = v();
+        assert_eq!(Some(&String::from("A")), l.drop(0));
+        assert_eq!(Some(&String::from("C")), l.drop(2));
+        assert_eq!(Some(&String::from("B")), l.drop(1));
+        l = l.reorg();
+        assert!(l.is_empty());
+        assert_eq!(0, l.len());
+        assert_eq!(0, l.count());
     }
 }

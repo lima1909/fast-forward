@@ -1,17 +1,14 @@
 //! read-write collections.
 //!
 use crate::{
-    collections::{
-        list::{Iter, List},
-        Retriever,
-    },
+    collections::{base::Retain, Retriever},
     index::{store::Store, Indexable},
 };
 
 /// [`IList`] is a read write indexed `List` which owned the given items.
 pub struct IList<S, K, I, F: Fn(&I) -> K> {
     store: S,
-    items: List<I>,
+    items: Retain<I>,
     field: F,
 }
 
@@ -27,7 +24,7 @@ where
         let mut s = Self {
             store: S::with_capacity(iter.len()),
             field: f,
-            items: List::with_capacity(iter.len()),
+            items: Retain::with_capacity(iter.len()),
         };
 
         iter.into_iter().for_each(|item| {
@@ -37,33 +34,42 @@ where
         s
     }
 
-    pub fn insert(&mut self, item: I) -> usize {
-        self.items.insert(item, |it, idx| {
-            self.store.insert((self.field)(it), idx);
-        })
-    }
-
-    pub fn update<U>(&mut self, pos: usize, update_fn: U) -> bool
-    where
-        U: Fn(&I) -> I,
-    {
-        self.items
-            .update(pos, update_fn, |old: &I, pos: usize, new: &I| {
-                self.store.update((self.field)(old), pos, (self.field)(new));
-            })
-    }
-
-    pub fn delete(&mut self, pos: usize) -> Option<&I> {
-        self.items
-            .delete(pos, |it, idx| self.store.delete((self.field)(it), idx))
-    }
-
-    pub fn idx(&self) -> Retriever<'_, S, List<I>> {
-        Retriever::new(&self.store, &self.items)
-    }
-
+    /// Get the Item on the given position/index in the List.
+    /// If the Item was deleted, the return value is `None`
     pub fn get(&self, index: usize) -> Option<&I> {
         self.items.get(index)
+    }
+
+    /// Insert a new `Item` to the List.
+    pub fn insert(&mut self, item: I) -> usize {
+        let key = (self.field)(&item);
+        let pos = self.items.insert(item);
+        self.store.insert(key, pos);
+        pos
+    }
+
+    /// Update the item on the given position.
+    pub fn update<U>(&mut self, pos: usize, update: U) -> bool
+    where
+        U: FnMut(&mut I),
+    {
+        if let Some((old_key, new_key)) = self.items.update(pos, update, &self.field) {
+            self.store.update(old_key, pos, new_key);
+            return true;
+        }
+        false
+    }
+
+    /// The Item in the list will be marked as deleted.
+    pub fn drop(&mut self, pos: usize) -> Option<&I> {
+        let item = self.items.drop(pos)?;
+        let key = (self.field)(item);
+        self.store.delete(key, &pos);
+        Some(item)
+    }
+
+    pub fn idx(&self) -> Retriever<'_, S, Retain<I>> {
+        Retriever::new(&self.store, &self.items)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -78,16 +84,22 @@ where
         self.items.count()
     }
 
-    pub fn is_deleted(&self, pos: usize) -> bool {
-        self.items.is_deleted(pos)
+    /// Check, is the Item on `pos` (`Index`) deleted.
+    pub fn is_droped(&self, pos: usize) -> bool {
+        self.items.is_droped(pos)
     }
 
     // Returns all removed `Indices`.
-    pub fn deleted_indices(&self) -> &[usize] {
-        self.items.deleted_indices()
+    pub fn droped_indices(&self) -> &[usize] {
+        self.items.droped_indices()
     }
 
-    pub const fn iter(&self) -> Iter<'_, I> {
+    // Returns all removed `Items`.
+    pub fn droped_items(&self) -> impl Iterator<Item = &'_ I> {
+        self.droped_indices().iter().map(|i| &self.items[*i])
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &'_ I> {
         self.items.iter()
     }
 }
@@ -170,9 +182,7 @@ mod tests {
 
         // update name, where name is NOT a Index
         let updated = cars.update(0, |c| {
-            let mut c_update = c.clone();
-            c_update.1 = "BMW updated".into();
-            c_update
+            c.1 = "BMW updated".into();
         });
         assert!(updated);
 
@@ -183,9 +193,7 @@ mod tests {
 
         // update ID, where ID is a Index
         let updated = cars.update(0, |c| {
-            let mut c_update = c.clone();
-            c_update.0 = 5;
-            c_update
+            c.0 = 5;
         });
         assert!(updated);
 
@@ -214,7 +222,7 @@ mod tests {
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
         assert_eq!(4, cars.count());
 
-        let deleted_car = cars.delete(0);
+        let deleted_car = cars.drop(0);
         assert_eq!(Some(&Car(2, "BMW".into())), deleted_car);
         assert!(cars.get(0).is_none());
 
@@ -223,18 +231,29 @@ mod tests {
         assert_eq!(vec![&Car(2, "VW".into())], r);
         assert_eq!(3, cars.count());
         assert_eq!(4, cars.len());
-        assert!(cars.is_deleted(0));
-        assert_eq!(&[0], cars.deleted_indices());
+        assert!(cars.is_droped(0));
+        assert_eq!(&[0], cars.droped_indices());
+        assert_eq!(
+            vec![&Car(2, "BMW".into())],
+            cars.droped_items().collect::<Vec<_>>()
+        );
 
         // delete a second Car
-        let deleted_car = cars.delete(3);
+        let deleted_car = cars.drop(3);
         assert_eq!(Some(&Car(99, "Porsche".into())), deleted_car);
         assert_eq!(2, cars.count());
         assert_eq!(4, cars.len());
-        assert!(cars.is_deleted(3));
-        assert_eq!(&[0, 3], cars.deleted_indices());
+        assert!(cars.is_droped(3));
+        assert_eq!(&[0, 3], cars.droped_indices());
+        assert_eq!(
+            vec![&Car(2, "BMW".into()), &Car(99, "Porsche".into())],
+            cars.droped_items().collect::<Vec<_>>()
+        );
+    }
 
-        // delete wrong ID
-        assert_eq!(None, cars.delete(10_000));
+    #[rstest]
+    fn delete_wrong_id(cars: Vec<Car>) {
+        let mut cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
+        assert_eq!(None, cars.drop(10_000));
     }
 }

@@ -227,7 +227,7 @@ mod tests {
         index::{filter::Filter, map::MapIndex, store::Filterable, uint::UIntIndex},
     };
 
-    #[derive(Debug, Eq, PartialEq, Clone)]
+    #[derive(Debug, Eq, PartialEq)]
     struct Car(usize, String);
 
     #[test]
