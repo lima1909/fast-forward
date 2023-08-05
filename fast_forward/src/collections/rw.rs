@@ -159,11 +159,33 @@ impl<S, K, I, F: Fn(&I) -> K> Indexable<usize> for IList<S, K, I, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::{MapIndex, UIntIndex};
+    use crate::index::{store::Filterable, IntIndex, MapIndex, UIntIndex};
     use rstest::{fixture, rstest};
 
     #[derive(Debug, Eq, PartialEq, Clone)]
     pub struct Car(usize, String);
+
+    #[test]
+    fn item_store() {
+        pub struct Person(i32, &'static str);
+
+        let mut s = ItemStore::<IntIndex, _, Person, _>::new(2, |p| p.0);
+        s.insert(&Person(-1, "A"), 0);
+        s.insert(&Person(1, "B"), 1);
+        assert_eq!(&[0], s.store().get(&-1));
+
+        // drop
+        s.drop(&Person(-1, "A"), &0);
+        assert!(s.store().get(&-1).is_empty());
+
+        // update
+        assert_eq!(&[1], s.store().get(&1));
+        s.update(1, 1, 2);
+        assert_eq!(&[1], s.store().get(&2));
+        assert!(s.store().get(&1).is_empty());
+
+        assert_eq!(-1, s.field()(&Person(-1, "A")));
+    }
 
     #[fixture]
     pub fn cars() -> Vec<Car> {
@@ -173,6 +195,24 @@ mod tests {
             Car(2, "VW".into()),
             Car(99, "Porsche".into()),
         ]
+    }
+
+    #[rstest]
+    fn item_from_idx(cars: Vec<Car>) {
+        let cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
+        assert_eq!(&Car(5, "Audi".into()), cars.item(&1));
+    }
+
+    #[rstest]
+    fn iter_after_drop(cars: Vec<Car>) {
+        let mut cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
+        cars.drop(2);
+        cars.drop(0);
+
+        let mut iter = cars.iter();
+        assert_eq!(Some(&Car(5, "Audi".into())), iter.next());
+        assert_eq!(Some(&Car(99, "Porsche".into())), iter.next());
+        assert_eq!(None, iter.next());
     }
 
     #[rstest]
@@ -275,6 +315,7 @@ mod tests {
         assert_eq!(vec![&Car(2, "VW".into())], r);
         assert_eq!(3, cars.count());
         assert_eq!(4, cars.len());
+        assert!(!cars.is_empty());
         assert!(cars.is_droped(0));
         assert_eq!(&[0], cars.droped_indices());
         assert_eq!(
