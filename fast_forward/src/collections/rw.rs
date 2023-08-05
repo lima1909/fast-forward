@@ -8,38 +8,40 @@ use crate::{
 };
 
 /// [`ItemStore`] is an [`crate::index::store::Store`] for an `Item` (field of an `Item`).
-pub struct ItemStore<S, K, I, F: Fn(&I) -> K> {
+pub struct ItemStore<S, K, I, F: Fn(&I) -> K, X = usize> {
     store: S,
     field: F,
     _item: PhantomData<I>,
+    _index: PhantomData<X>,
 }
 
-impl<S, K, I, F> ItemStore<S, K, I, F>
+impl<S, K, I, F, X> ItemStore<S, K, I, F, X>
 where
     F: Fn(&I) -> K,
-    S: Store<Key = K, Index = usize>,
+    S: Store<Key = K, Index = X>,
 {
     pub fn new(capacity: usize, field: F) -> Self {
         Self {
             store: S::with_capacity(capacity),
             field,
             _item: PhantomData,
+            _index: PhantomData,
         }
     }
 
     /// Insert a new `Item` to the List.
-    pub fn insert(&mut self, item: &I, idx: usize) {
+    pub fn insert(&mut self, item: &I, idx: X) {
         let key = (self.field)(item);
         self.store.insert(key, idx);
     }
 
     /// Update the item on the given position.
-    pub fn update(&mut self, old_key: K, idx: usize, new_key: K) {
+    pub fn update(&mut self, old_key: K, idx: X, new_key: K) {
         self.store.update(old_key, idx, new_key);
     }
 
     /// The Item in the list will be marked as deleted.
-    pub fn drop(&mut self, item: &I, idx: &usize) {
+    pub fn drop(&mut self, item: &I, idx: &X) {
         let key = (self.field)(item);
         self.store.delete(key, idx);
     }
@@ -166,7 +168,7 @@ mod tests {
     pub struct Car(usize, String);
 
     #[test]
-    fn item_store() {
+    fn item_store_usize() {
         pub struct Person(i32, &'static str);
 
         let mut s = ItemStore::<IntIndex, _, Person, _>::new(2, |p| p.0);
@@ -185,6 +187,31 @@ mod tests {
         assert!(s.store().get(&1).is_empty());
 
         assert_eq!(-1, s.field()(&Person(-1, "A")));
+    }
+
+    #[test]
+    fn item_store_str() {
+        pub struct Person(i32, &'static str);
+
+        let mut s =
+            ItemStore::<MapIndex<&'static str, usize>, &'static str, Person, _>::new(2, |p| {
+                p.1.clone()
+            });
+        s.insert(&Person(-1, "A"), 0);
+        s.insert(&Person(1, "B"), 1);
+        assert_eq!(&[0], s.store().get(&"A"));
+
+        // drop
+        s.drop(&Person(-1, "A"), &0);
+        assert!(s.store().get(&"A").is_empty());
+
+        // update
+        assert_eq!(&[1], s.store().get(&"B"));
+        s.update("B", 1, "C");
+        assert_eq!(&[1], s.store().get(&"C"));
+        assert!(s.store().get(&"B").is_empty());
+
+        assert_eq!("X", s.field()(&Person(-1, "X")));
     }
 
     #[fixture]
