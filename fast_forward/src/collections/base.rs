@@ -33,20 +33,18 @@ impl<T> Retain<T> {
     }
 
     /// Update the item on the given position.
-    pub fn update<U, F, K>(&mut self, pos: usize, mut update: U, key: &F) -> Option<(K, K)>
+    pub fn update<U, F, A>(&mut self, pos: usize, mut update: U, trigger: F) -> bool
     where
         U: FnMut(&mut T),
-        F: Fn(&T) -> K,
+        F: FnOnce(&T) -> A,
+        A: FnOnce(&T),
     {
-        match self.items.get_mut(pos) {
-            Some(item) => {
-                let old_key = key(item);
-                (update)(item);
-                let new_key = key(item);
-                Some((old_key, new_key))
-            }
-            None => None,
-        }
+        self.items.get_mut(pos).map_or(false, |item| {
+            let after = trigger(item);
+            update(item);
+            after(item);
+            true
+        })
     }
 
     /// The Item in the list will be marked as deleted.
@@ -222,16 +220,21 @@ mod tests {
         assert_eq!(Some(&String::from("A")), v.get(0));
 
         // update: "A" -> "AA" => (1, 2)
-        assert_eq!(
-            Some((1, 2)),
-            v.update(0, |s| *s = String::from("AA"), &|s| s.len())
-        );
+        assert!(v.update(
+            0,
+            |s| *s = String::from("AA"), // update
+            |s| {
+                assert_eq!(&String::from("A"), s); // before update
+                |s| assert_eq!(&String::from("AA"), s) // after update
+            }
+        ));
+
         assert_eq!(Some(&String::from("AA")), v.get(0));
     }
 
     #[rstest]
     fn update_not_found(mut v: Retain<String>) {
-        assert_eq!(None, v.update(1000, |_| {}, &|_| 0));
+        assert!(!v.update(1000, |_| {}, |_| { |_| {} }));
     }
 
     #[rstest]

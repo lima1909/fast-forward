@@ -1,6 +1,5 @@
 //! read-write collections.
 //!
-use std::marker::PhantomData;
 
 use crate::{
     collections::{base::Retain, Retriever},
@@ -8,40 +7,50 @@ use crate::{
 };
 
 /// [`ItemStore`] is an [`crate::index::store::Store`] for an `Item` (field of an `Item`).
-pub struct ItemStore<S, K, I, F: Fn(&I) -> K, X = usize> {
+pub struct ItemStore<S, F> {
     store: S,
     field: F,
-    _item: PhantomData<I>,
-    _index: PhantomData<X>,
 }
 
-impl<S, K, I, F, X> ItemStore<S, K, I, F, X>
+impl<S, F> ItemStore<S, F>
 where
-    F: Fn(&I) -> K,
-    S: Store<Key = K, Index = X>,
+    S: Store,
 {
-    pub fn new(capacity: usize, field: F) -> Self {
+    pub fn new<I>(capacity: usize, field: F) -> Self
+    where
+        F: Fn(&I) -> S::Key,
+    {
         Self {
             store: S::with_capacity(capacity),
             field,
-            _item: PhantomData,
-            _index: PhantomData,
         }
     }
 
     /// Insert a new `Item` to the List.
-    pub fn insert(&mut self, item: &I, idx: X) {
+    pub fn insert<I>(&mut self, idx: S::Index, item: &I)
+    where
+        F: Fn(&I) -> S::Key,
+    {
         let key = (self.field)(item);
         self.store.insert(key, idx);
     }
 
     /// Update the item on the given position.
-    pub fn update(&mut self, old_key: K, idx: X, new_key: K) {
-        self.store.update(old_key, idx, new_key);
+    pub fn update<I>(&mut self, idx: S::Index, item: &I) -> impl FnOnce(&I) + '_
+    where
+        F: Fn(&I) -> S::Key,
+    {
+        let old_key = (self.field)(item);
+        move |item: &I| {
+            self.store.update(old_key, idx, (self.field)(item));
+        }
     }
 
     /// The Item in the list will be marked as deleted.
-    pub fn drop(&mut self, item: &I, idx: &X) {
+    pub fn drop<I>(&mut self, idx: &S::Index, item: &I)
+    where
+        F: Fn(&I) -> S::Key,
+    {
         let key = (self.field)(item);
         self.store.delete(key, idx);
     }
@@ -56,15 +65,15 @@ where
 }
 
 /// [`IList`] is a read write indexed `List` which owned the given items.
-pub struct IList<S, K, I, F: Fn(&I) -> K> {
-    store: ItemStore<S, K, I, F>,
+pub struct IList<S, I, F> {
+    store: ItemStore<S, F>,
     items: Retain<I>,
 }
 
-impl<S, K, I, F> IList<S, K, I, F>
+impl<S, I, F> IList<S, I, F>
 where
-    F: Fn(&I) -> K,
-    S: Store<Key = K, Index = usize>,
+    S: Store<Index = usize>,
+    F: Fn(&I) -> S::Key,
 {
     pub fn from_iter<It>(field: F, iter: It) -> Self
     where
@@ -91,7 +100,7 @@ where
     /// Insert a new `Item` to the List.
     pub fn insert(&mut self, item: I) -> usize {
         self.items.insert(item, |item, idx| {
-            self.store.insert(item, idx);
+            self.store.insert(idx, item);
         })
     }
 
@@ -100,17 +109,16 @@ where
     where
         U: FnMut(&mut I),
     {
-        if let Some((old_key, new_key)) = self.items.update(pos, update, &self.store.field) {
-            self.store.update(old_key, pos, new_key);
-            return true;
-        }
-        false
+        self.items.update(pos, update, |item| {
+            let after = self.store.update(pos, item);
+            |item_after| after(item_after)
+        })
     }
 
     /// The Item in the list will be marked as deleted.
     pub fn drop(&mut self, pos: usize) -> Option<&I> {
         self.items.drop(pos, |item, idx| {
-            self.store.drop(item, idx);
+            self.store.drop(idx, item);
         })
     }
 
@@ -150,7 +158,7 @@ where
     }
 }
 
-impl<S, K, I, F: Fn(&I) -> K> Indexable<usize> for IList<S, K, I, F> {
+impl<S, I, F> Indexable<usize> for IList<S, I, F> {
     type Output = I;
 
     fn item(&self, idx: &usize) -> &Self::Output {
@@ -164,25 +172,27 @@ mod tests {
     use crate::index::{store::Filterable, IntIndex, MapIndex, UIntIndex};
     use rstest::{fixture, rstest};
 
-    #[derive(Debug, Eq, PartialEq, Clone)]
+    #[derive(Debug, Eq, PartialEq)]
     pub struct Car(usize, String);
 
     #[test]
     fn item_store_usize() {
         pub struct Person(i32, &'static str);
 
-        let mut s = ItemStore::<IntIndex, _, Person, _>::new(2, |p| p.0);
-        s.insert(&Person(-1, "A"), 0);
-        s.insert(&Person(1, "B"), 1);
+        let mut s = ItemStore::<IntIndex, _>::new(2, |p: &Person| p.0);
+        s.insert(0, &Person(-1, "A"));
+        s.insert(1, &Person(1, "B"));
         assert_eq!(&[0], s.store().get(&-1));
 
         // drop
-        s.drop(&Person(-1, "A"), &0);
+        s.drop(&0, &Person(-1, "A"));
         assert!(s.store().get(&-1).is_empty());
 
         // update
         assert_eq!(&[1], s.store().get(&1));
-        s.update(1, 1, 2);
+        // update ID from 1 -> 2 (on Index 1)
+        s.update(1, &Person(1, "B"))(&Person(2, "B"));
+
         assert_eq!(&[1], s.store().get(&2));
         assert!(s.store().get(&1).is_empty());
 
@@ -193,21 +203,20 @@ mod tests {
     fn item_store_str() {
         pub struct Person(i32, &'static str);
 
-        let mut s =
-            ItemStore::<MapIndex<&'static str, usize>, &'static str, Person, _>::new(2, |p| {
-                p.1.clone()
-            });
-        s.insert(&Person(-1, "A"), 0);
-        s.insert(&Person(1, "B"), 1);
+        let mut s = ItemStore::<MapIndex<&'static str, usize>, _>::new(2, |p: &Person| p.1.clone());
+        s.insert(0, &Person(-1, "A"));
+        s.insert(1, &Person(1, "B"));
         assert_eq!(&[0], s.store().get(&"A"));
 
         // drop
-        s.drop(&Person(-1, "A"), &0);
+        s.drop(&0, &Person(-1, "A"));
         assert!(s.store().get(&"A").is_empty());
 
         // update
         assert_eq!(&[1], s.store().get(&"B"));
-        s.update("B", 1, "C");
+        // update Name from "B" -> "C" (on Index 1)
+        s.update(1, &Person(1, "B"))(&Person(1, "C"));
+
         assert_eq!(&[1], s.store().get(&"C"));
         assert!(s.store().get(&"B").is_empty());
 
@@ -226,13 +235,13 @@ mod tests {
 
     #[rstest]
     fn item_from_idx(cars: Vec<Car>) {
-        let cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
+        let cars = IList::<UIntIndex, Car, _>::from_iter(|c| c.0, cars.into_iter());
         assert_eq!(&Car(5, "Audi".into()), cars.item(&1));
     }
 
     #[rstest]
     fn iter_after_drop(cars: Vec<Car>) {
-        let mut cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
+        let mut cars = IList::<UIntIndex, Car, _>::from_iter(|c| c.0, cars.into_iter());
         cars.drop(2);
         cars.drop(0);
 
@@ -244,7 +253,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_uint(cars: Vec<Car>) {
-        let cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
+        let cars = IList::<UIntIndex, Car, _>::from_iter(|c| c.0, cars.into_iter());
 
         assert!(cars.idx().contains(&2));
         assert_eq!(Some(&Car(2, "VW".into())), cars.get(2));
@@ -269,7 +278,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_map(cars: Vec<Car>) {
-        let cars = IList::<MapIndex, _, _, _>::from_iter(|c: &Car| c.1.clone(), cars.into_iter());
+        let cars = IList::<MapIndex, Car, _>::from_iter(|c| c.1.clone(), cars.into_iter());
 
         assert!(cars.idx().contains(&"BMW".into()));
 
@@ -289,7 +298,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_update(cars: Vec<Car>) {
-        let mut cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
+        let mut cars = IList::<UIntIndex, Car, _>::from_iter(|c| c.0, cars.into_iter());
 
         // update name, where name is NOT a Index
         let updated = cars.update(0, |c| {
@@ -326,7 +335,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_delete(cars: Vec<Car>) {
-        let mut cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
+        let mut cars = IList::<UIntIndex, Car, _>::from_iter(|c| c.0, cars.into_iter());
 
         // before delete: 2 Cars
         let r = cars.idx().get(&2).collect::<Vec<_>>();
@@ -365,7 +374,7 @@ mod tests {
 
     #[rstest]
     fn delete_wrong_id(cars: Vec<Car>) {
-        let mut cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.0, cars.into_iter());
+        let mut cars = IList::<UIntIndex, Car, _>::from_iter(|c| c.0, cars.into_iter());
         assert_eq!(None, cars.drop(10_000));
     }
 }

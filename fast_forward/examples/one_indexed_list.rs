@@ -29,7 +29,7 @@ fn main() {
         Car::new(99, "Porsche"),
     ];
 
-    let cars = IList::<UIntIndex, _, _, _>::from_iter(|c: &Car| c.id, cars.clone().into_iter());
+    let cars = IList::<UIntIndex, _, _>::from_iter(|c: &Car| c.id, cars.clone().into_iter());
 
     let r = cars.idx().get(&2).collect::<Vec<_>>();
     assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
@@ -54,7 +54,7 @@ fn main() {
         Car::new(99, "Porsche"),
     ];
 
-    let cars = IList::<MapIndex, _, _, _>::from_iter(|c: &Car| c.name.clone(), cars.into_iter());
+    let cars = IList::<MapIndex, _, _>::from_iter(|c: &Car| c.name.clone(), cars.into_iter());
 
     let r: Vec<&Car> = cars.idx().get(&"VW".into()).collect();
     assert_eq!(vec![&Car::new(2, "VW")], r);
