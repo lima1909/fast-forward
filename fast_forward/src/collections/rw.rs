@@ -1,45 +1,41 @@
 //! read-write collections.
 //!
 
+use std::marker::PhantomData;
+
 use crate::{
     collections::{base::Retain, Retriever},
     index::{store::Store, Indexable},
 };
 
 /// [`ItemStore`] is an [`crate::index::store::Store`] for an `Item` (field of an `Item`).
-pub struct ItemStore<S, F> {
+pub struct ItemStore<S, I, F> {
     store: S,
     field: F,
+    _item: PhantomData<I>,
 }
 
-impl<S, F> ItemStore<S, F>
+impl<S, I, F> ItemStore<S, I, F>
 where
     S: Store,
+    F: Fn(&I) -> S::Key,
 {
-    pub fn new<I>(capacity: usize, field: F) -> Self
-    where
-        F: Fn(&I) -> S::Key,
-    {
+    pub fn new(capacity: usize, field: F) -> Self {
         Self {
             store: S::with_capacity(capacity),
             field,
+            _item: PhantomData,
         }
     }
 
     /// Insert a new `Item` to the List.
-    pub fn insert<I>(&mut self, idx: S::Index, item: &I)
-    where
-        F: Fn(&I) -> S::Key,
-    {
+    pub fn insert(&mut self, idx: S::Index, item: &I) {
         let key = (self.field)(item);
         self.store.insert(key, idx);
     }
 
     /// Update the item on the given position.
-    pub fn update<I>(&mut self, idx: S::Index, item: &I) -> impl FnOnce(&I) + '_
-    where
-        F: Fn(&I) -> S::Key,
-    {
+    pub fn update(&mut self, idx: S::Index, item: &I) -> impl FnOnce(&I) + '_ {
         let old_key = (self.field)(item);
         move |item: &I| {
             self.store.update(old_key, idx, (self.field)(item));
@@ -47,26 +43,15 @@ where
     }
 
     /// The Item in the list will be marked as deleted.
-    pub fn drop<I>(&mut self, idx: &S::Index, item: &I)
-    where
-        F: Fn(&I) -> S::Key,
-    {
+    pub fn drop(&mut self, idx: &S::Index, item: &I) {
         let key = (self.field)(item);
         self.store.delete(key, idx);
-    }
-
-    pub fn store(&self) -> &S {
-        &self.store
-    }
-
-    pub fn field(&self) -> &F {
-        &self.field
     }
 }
 
 /// [`IList`] is a read write indexed `List` which owned the given items.
 pub struct IList<S, I, F> {
-    store: ItemStore<S, F>,
+    store: ItemStore<S, I, F>,
     items: Retain<I>,
 }
 
@@ -179,48 +164,44 @@ mod tests {
     fn item_store_usize() {
         pub struct Person(i32, &'static str);
 
-        let mut s = ItemStore::<IntIndex, _>::new(2, |p: &Person| p.0);
+        let mut s = ItemStore::<IntIndex, Person, _>::new(2, |p| p.0);
         s.insert(0, &Person(-1, "A"));
         s.insert(1, &Person(1, "B"));
-        assert_eq!(&[0], s.store().get(&-1));
+        assert_eq!(&[0], s.store.get(&-1));
 
         // drop
         s.drop(&0, &Person(-1, "A"));
-        assert!(s.store().get(&-1).is_empty());
+        assert!(s.store.get(&-1).is_empty());
 
         // update
-        assert_eq!(&[1], s.store().get(&1));
+        assert_eq!(&[1], s.store.get(&1));
         // update ID from 1 -> 2 (on Index 1)
         s.update(1, &Person(1, "B"))(&Person(2, "B"));
 
-        assert_eq!(&[1], s.store().get(&2));
-        assert!(s.store().get(&1).is_empty());
-
-        assert_eq!(-1, s.field()(&Person(-1, "A")));
+        assert_eq!(&[1], s.store.get(&2));
+        assert!(s.store.get(&1).is_empty());
     }
 
     #[test]
     fn item_store_str() {
         pub struct Person(i32, &'static str);
 
-        let mut s = ItemStore::<MapIndex<&'static str, usize>, _>::new(2, |p: &Person| p.1.clone());
+        let mut s = ItemStore::<MapIndex<&'static str, usize>, Person, _>::new(2, |p| p.1.clone());
         s.insert(0, &Person(-1, "A"));
         s.insert(1, &Person(1, "B"));
-        assert_eq!(&[0], s.store().get(&"A"));
+        assert_eq!(&[0], s.store.get(&"A"));
 
         // drop
         s.drop(&0, &Person(-1, "A"));
-        assert!(s.store().get(&"A").is_empty());
+        assert!(s.store.get(&"A").is_empty());
 
         // update
-        assert_eq!(&[1], s.store().get(&"B"));
+        assert_eq!(&[1], s.store.get(&"B"));
         // update Name from "B" -> "C" (on Index 1)
         s.update(1, &Person(1, "B"))(&Person(1, "C"));
 
-        assert_eq!(&[1], s.store().get(&"C"));
-        assert!(s.store().get(&"B").is_empty());
-
-        assert_eq!("X", s.field()(&Person(-1, "X")));
+        assert_eq!(&[1], s.store.get(&"C"));
+        assert!(s.store.get(&"B").is_empty());
     }
 
     #[fixture]
