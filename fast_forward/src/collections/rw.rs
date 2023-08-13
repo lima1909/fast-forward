@@ -1,57 +1,14 @@
 //! read-write collections.
 //!
-
-use std::marker::PhantomData;
-
 use crate::{
     collections::{base::Retain, Retriever},
     index::{store::Store, Indexable},
 };
 
-/// [`ItemStore`] is an [`crate::index::store::Store`] for an `Item` (field of an `Item`).
-pub struct ItemStore<S, I, F> {
-    store: S,
-    field: F,
-    _item: PhantomData<I>,
-}
-
-impl<S, I, F> ItemStore<S, I, F>
-where
-    S: Store,
-    F: Fn(&I) -> S::Key,
-{
-    pub fn new(capacity: usize, field: F) -> Self {
-        Self {
-            store: S::with_capacity(capacity),
-            field,
-            _item: PhantomData,
-        }
-    }
-
-    /// Insert a new `Item` to the List.
-    pub fn insert(&mut self, idx: S::Index, item: &I) {
-        let key = (self.field)(item);
-        self.store.insert(key, idx);
-    }
-
-    /// Update the item on the given position.
-    pub fn update(&mut self, idx: S::Index, item: &I) -> impl FnOnce(&I) + '_ {
-        let old_key = (self.field)(item);
-        move |item: &I| {
-            self.store.update(old_key, idx, (self.field)(item));
-        }
-    }
-
-    /// The Item in the list will be marked as deleted.
-    pub fn drop(&mut self, idx: &S::Index, item: &I) {
-        let key = (self.field)(item);
-        self.store.delete(key, idx);
-    }
-}
-
 /// [`IList`] is a read write indexed `List` which owned the given items.
 pub struct IList<S, I, F> {
-    store: ItemStore<S, I, F>,
+    store: S,
+    field: F,
     items: Retain<I>,
 }
 
@@ -65,7 +22,8 @@ where
         It: IntoIterator<Item = I> + ExactSizeIterator,
     {
         let mut s = Self {
-            store: ItemStore::new(iter.len(), field),
+            store: S::with_capacity(iter.len()),
+            field,
             items: Retain::with_capacity(iter.len()),
         };
 
@@ -85,7 +43,8 @@ where
     /// Insert a new `Item` to the List.
     pub fn insert(&mut self, item: I) -> usize {
         self.items.insert(item, |item, idx| {
-            self.store.insert(idx, item);
+            let key = (self.field)(item);
+            self.store.insert(key, idx);
         })
     }
 
@@ -95,20 +54,23 @@ where
         U: FnMut(&mut I),
     {
         self.items.update(pos, update, |item| {
-            let after = self.store.update(pos, item);
-            |item_after| after(item_after)
+            let key = (self.field)(item);
+            |after| {
+                self.store.update(key, pos, (self.field)(after));
+            }
         })
     }
 
     /// The Item in the list will be marked as deleted.
     pub fn drop(&mut self, pos: usize) -> Option<&I> {
-        self.items.drop(pos, |item, idx| {
-            self.store.drop(idx, item);
+        self.items.drop(pos, |item| {
+            let key = (self.field)(item);
+            self.store.delete(key, &pos);
         })
     }
 
     pub fn idx(&self) -> Retriever<'_, S, Retain<I>> {
-        Retriever::new(&self.store.store, &self.items)
+        Retriever::new(&self.store, &self.items)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -154,54 +116,56 @@ impl<S, I, F> Indexable<usize> for IList<S, I, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::{store::Filterable, IntIndex, MapIndex, UIntIndex};
+    use crate::index::{IntIndex, MapIndex, UIntIndex};
     use rstest::{fixture, rstest};
 
     #[derive(Debug, Eq, PartialEq)]
     pub struct Car(usize, String);
 
     #[test]
-    fn item_store_usize() {
+    fn ilist_usize() {
         pub struct Person(i32, &'static str);
 
-        let mut s = ItemStore::<IntIndex, Person, _>::new(2, |p| p.0);
-        s.insert(0, &Person(-1, "A"));
-        s.insert(1, &Person(1, "B"));
-        assert_eq!(&[0], s.store.get(&-1));
+        let mut s =
+            IList::<IntIndex, Person, _>::from_iter(|p| p.0, vec![Person(-1, "A")].into_iter());
+        s.insert(Person(1, "B"));
+        assert!(s.idx().contains(&-1));
 
         // drop
-        s.drop(&0, &Person(-1, "A"));
-        assert!(s.store.get(&-1).is_empty());
+        s.drop(0);
+        assert!(!s.idx().contains(&-1));
 
         // update
-        assert_eq!(&[1], s.store.get(&1));
+        assert!(s.idx().contains(&1));
         // update ID from 1 -> 2 (on Index 1)
-        s.update(1, &Person(1, "B"))(&Person(2, "B"));
+        s.update(1, |p| p.0 = 2);
 
-        assert_eq!(&[1], s.store.get(&2));
-        assert!(s.store.get(&1).is_empty());
+        assert!(!s.idx().contains(&1));
+        assert!(s.idx().contains(&2));
     }
 
     #[test]
     fn item_store_str() {
         pub struct Person(i32, &'static str);
 
-        let mut s = ItemStore::<MapIndex<&'static str, usize>, Person, _>::new(2, |p| p.1.clone());
-        s.insert(0, &Person(-1, "A"));
-        s.insert(1, &Person(1, "B"));
-        assert_eq!(&[0], s.store.get(&"A"));
+        let mut s = IList::<MapIndex<&'static str, usize>, Person, _>::from_iter(
+            |p| p.1.clone(),
+            vec![Person(-1, "A")].into_iter(),
+        );
+        s.insert(Person(1, "B"));
+        assert!(s.idx().contains(&"A"));
 
         // drop
-        s.drop(&0, &Person(-1, "A"));
-        assert!(s.store.get(&"A").is_empty());
+        s.drop(0);
+        assert!(!s.idx().contains(&"A"));
 
         // update
-        assert_eq!(&[1], s.store.get(&"B"));
+        assert!(s.idx().contains(&"B"));
         // update Name from "B" -> "C" (on Index 1)
-        s.update(1, &Person(1, "B"))(&Person(1, "C"));
+        s.update(1, |p| p.1 = "C");
 
-        assert_eq!(&[1], s.store.get(&"C"));
-        assert!(s.store.get(&"B").is_empty());
+        assert!(!s.idx().contains(&"B"));
+        assert!(s.idx().contains(&"C"));
     }
 
     #[fixture]
