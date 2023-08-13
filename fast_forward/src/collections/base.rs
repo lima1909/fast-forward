@@ -33,17 +33,15 @@ impl<T> Retain<T> {
     }
 
     /// Update the item on the given position.
-    pub fn update<U, F, A>(&mut self, pos: usize, mut update: U, trigger: F) -> bool
+    pub fn update<U, F, K>(&mut self, pos: usize, mut update: U, trigger: F) -> Option<(K, &T)>
     where
         U: FnMut(&mut T),
-        F: FnOnce(&T) -> A,
-        A: FnOnce(&T),
+        F: FnOnce(&T) -> K,
     {
-        self.items.get_mut(pos).map_or(false, |item| {
-            let after = trigger(item);
+        self.items.get_mut(pos).map(|item| {
+            let key = trigger(item);
             update(item);
-            after(item);
-            true
+            (key, &*item)
         })
     }
 
@@ -220,21 +218,24 @@ mod tests {
         assert_eq!(Some(&String::from("A")), v.get(0));
 
         // update: "A" -> "AA" => (1, 2)
-        assert!(v.update(
-            0,
-            |s| *s = String::from("AA"), // update
-            |s| {
-                assert_eq!(&String::from("A"), s); // before update
-                |s| assert_eq!(&String::from("AA"), s) // after update
-            }
-        ));
+        assert_eq!(
+            Some(("KEY", &String::from("AA"))), // after update
+            v.update(
+                0,
+                |s| *s = String::from("AA"), // update
+                |s| {
+                    assert_eq!(&String::from("A"), s); // before update
+                    "KEY"
+                }
+            )
+        );
 
         assert_eq!(Some(&String::from("AA")), v.get(0));
     }
 
     #[rstest]
     fn update_not_found(mut v: Retain<String>) {
-        assert!(!v.update(1000, |_| {}, |_| { |_| {} }));
+        assert_eq!(None, v.update(1000, |_| {}, |_| {}));
     }
 
     #[rstest]

@@ -53,12 +53,12 @@ where
     where
         U: FnMut(&mut I),
     {
-        self.items.update(pos, update, |item| {
-            let key = (self.field)(item);
-            |after| {
-                self.store.update(key, pos, (self.field)(after));
-            }
-        })
+        self.items
+            .update(pos, update, |item| (self.field)(item))
+            .map_or(false, |(key, item)| {
+                self.store.update(key, pos, (self.field)(item));
+                true
+            })
     }
 
     /// The Item in the list will be marked as deleted.
