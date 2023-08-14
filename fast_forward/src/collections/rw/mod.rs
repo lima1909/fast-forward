@@ -1,5 +1,6 @@
 //! Base module for `Collections`.
 pub mod list;
+pub mod new_try;
 
 use crate::index::Indexable;
 use std::ops::Index;
