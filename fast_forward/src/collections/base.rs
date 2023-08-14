@@ -21,6 +21,15 @@ impl<T> Retain<T> {
         self.items.get(pos)
     }
 
+    /// Get a mutable Item on the given position/index in the List.
+    /// If the Item was deleted, the return value is `None`
+    pub fn get_mut(&mut self, pos: usize) -> Option<&mut T> {
+        if self.is_droped(pos) {
+            return None;
+        }
+        self.items.get_mut(pos)
+    }
+
     /// Insert a new `Item` to the List.
     pub fn insert<F>(&mut self, item: T, mut trigger: F) -> usize
     where
@@ -30,19 +39,6 @@ impl<T> Retain<T> {
         trigger(&item, pos);
         self.items.push(item);
         pos
-    }
-
-    /// Update the item on the given position.
-    pub fn update<U, F, K>(&mut self, pos: usize, mut update: U, trigger: F) -> Option<(K, &T)>
-    where
-        U: FnMut(&mut T),
-        F: FnOnce(&T) -> K,
-    {
-        self.items.get_mut(pos).map(|item| {
-            let key = trigger(item);
-            update(item);
-            (key, &*item)
-        })
     }
 
     /// The Item in the list will be marked as deleted.
@@ -218,24 +214,21 @@ mod tests {
         assert_eq!(Some(&String::from("A")), v.get(0));
 
         // update: "A" -> "AA" => (1, 2)
-        assert_eq!(
-            Some(("KEY", &String::from("AA"))), // after update
-            v.update(
-                0,
-                |s| *s = String::from("AA"), // update
-                |s| {
-                    assert_eq!(&String::from("A"), s); // before update
-                    "KEY"
-                }
-            )
-        );
-
+        let s = v.get_mut(0).unwrap();
+        *s = String::from("AA");
         assert_eq!(Some(&String::from("AA")), v.get(0));
     }
 
     #[rstest]
     fn update_not_found(mut v: Retain<String>) {
-        assert_eq!(None, v.update(1000, |_| {}, |_| {}));
+        assert!(v.get_mut(10_000).is_none());
+    }
+
+    #[rstest]
+    fn update_deleted_item(mut v: Retain<String>) {
+        assert!(v.get(0).is_some());
+        v.drop(0, |_| {});
+        assert!(v.get_mut(0).is_none());
     }
 
     #[rstest]

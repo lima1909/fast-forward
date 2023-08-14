@@ -49,16 +49,16 @@ where
     }
 
     /// Update the item on the given position.
-    pub fn update<U>(&mut self, pos: usize, update: U) -> bool
+    pub fn update<U>(&mut self, pos: usize, mut update: U) -> bool
     where
         U: FnMut(&mut I),
     {
-        self.items
-            .update(pos, update, |item| (self.field)(item))
-            .map_or(false, |(key, item)| {
-                self.store.update(key, pos, (self.field)(item));
-                true
-            })
+        self.items.get_mut(pos).map_or(false, |item| {
+            let key = (self.field)(item);
+            update(item);
+            self.store.update(key, pos, (self.field)(item));
+            true
+        })
     }
 
     /// The Item in the list will be marked as deleted.
