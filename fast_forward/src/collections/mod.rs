@@ -2,7 +2,6 @@
 //!
 //! This collections only support one Index for one property.
 //!
-pub mod base;
 pub mod ro;
 pub mod rw;
 

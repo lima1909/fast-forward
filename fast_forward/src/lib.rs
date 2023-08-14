@@ -134,7 +134,7 @@ macro_rules! fast {
             $(
                 $store: $store_type,
             )+
-            _items_: $crate::collections::base::Retain<$item>,
+            _items_: $crate::collections::rw::Retain<$item>,
         }
 
         ///
@@ -199,7 +199,7 @@ macro_rules! fast {
             $(
                 /// Create and get a Filter for the Store
                 #[allow(dead_code)]
-                fn $store(&self) -> $crate::collections::Retriever<'_, $store_type, $crate::collections::base::Retain<$item>> {
+                fn $store(&self) -> $crate::collections::Retriever<'_, $store_type, $crate::collections::rw::Retain<$item>> {
                     $crate::collections::Retriever::new(&self.$store, &self._items_)
                 }
             )+

@@ -1,7 +1,10 @@
 //! Base module for `Collections`.
-use std::ops::Index;
+pub mod list;
 
 use crate::index::Indexable;
+use std::ops::Index;
+
+pub use list::IList;
 
 /// `Retain` is like a normal [`std::vec::Vec`] which store the given `Items`.
 /// If an `Item` was deleted, then is the `Position (Index)` of this `Item` is saved

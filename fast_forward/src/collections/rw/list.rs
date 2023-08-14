@@ -1,7 +1,7 @@
 //! read-write collections.
 //!
 use crate::{
-    collections::{base::Retain, Retriever},
+    collections::{rw::Retain, Retriever},
     index::{store::Store, Indexable},
 };
 
