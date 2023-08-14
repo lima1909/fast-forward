@@ -143,6 +143,15 @@ impl<T> Index<usize> for Retain<T> {
     }
 }
 
+impl<T> Default for Retain<T> {
+    fn default() -> Self {
+        Self {
+            items: vec![],
+            droped: vec![],
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

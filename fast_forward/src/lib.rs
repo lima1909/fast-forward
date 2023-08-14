@@ -134,14 +134,13 @@ macro_rules! fast {
             $(
                 $store: $store_type,
             )+
-            _items_: $crate::collections::list::List<$item>,
+            _items_: $crate::collections::base::Retain<$item>,
         }
 
         ///
         impl $fast {
 
             /// Insert the given item.
-            ///
             #[allow(dead_code)]
             fn insert(&mut self, item: $item) -> usize {
                 use $crate::index::store::Store;
@@ -158,55 +157,49 @@ macro_rules! fast {
             }
 
             /// Update the item on the given position.
-            ///
-            /// # Panics
-            ///
-            /// Panics if the pos is out of bound.
-            ///
             #[allow(dead_code)]
-            fn update<F>(&mut self, pos: usize, update_fn: F) -> bool where F: Fn(&$item)-> $item {
-                use $crate::index::store::Store;
+            fn update<U>(&mut self, pos: usize, update: U) -> bool
+            where
+                U: Fn(&mut $item)
+            {
+                use $crate::index::store::{Filterable, Store};
 
-                self._items_.update(pos, update_fn, |old: &$item, pos: usize, new: &$item| {
+                self._items_.get_mut(pos).map_or(false, |it| {
                     $(
-                        self.$store.update(
-                                    old.$item_field$(.$item_field_func())?,
-                                    pos,
-                                    new.$item_field$(.$item_field_func())?
-                                    );
+                    let $store: <$store_type as Filterable>::Key = it.$item_field$(.$item_field_func())?;
                     )+
+                    update(it);
+                    $(
+                    self.$store.update($store, pos, it.$item_field$(.$item_field_func())?);
+                    )+
+                    true
                 })
             }
 
             /// Delete the item on the given position.
-            ///
-            /// # Panics
-            ///
-            /// Panics if the pos is out of bound.
-            ///
             #[allow(dead_code)]
-            fn delete(&mut self, pos: usize) -> Option<&$item> {
+            fn remove(&mut self, pos: usize) -> Option<&$item> {
                 use $crate::index::store::Store;
 
-                self._items_.delete(pos, |it: &$item, pos: &usize| {
+                self._items_.drop(pos, |it: &$item| {
                     $(
                         self.$store.delete(
                                     it.$item_field$(.$item_field_func())?,
-                                    pos
+                                    &pos
                                     );
                     )+
                 })
             }
 
             #[allow(dead_code)]
-            fn iter(&self) -> $crate::collections::list::Iter<'_, $item> {
+            fn iter(&self) -> impl Iterator<Item = &'_ $item> {
                 self._items_.iter()
             }
 
             $(
                 /// Create and get a Filter for the Store
                 #[allow(dead_code)]
-                fn $store(&self) -> $crate::collections::Retriever<'_, $store_type, $crate::collections::list::List<$item>> {
+                fn $store(&self) -> $crate::collections::Retriever<'_, $store_type, $crate::collections::base::Retain<$item>> {
                     $crate::collections::Retriever::new(&self.$store, &self._items_)
                 }
             )+
@@ -253,7 +246,7 @@ mod tests {
             r
         );
 
-        cars.delete(3);
+        cars.remove(3);
 
         let r = cars.iter().collect::<Vec<_>>();
         assert_eq!(
@@ -303,13 +296,13 @@ mod tests {
 
         // update one Car
         assert_eq!(None, cars.id().get(&100).next());
-        cars.update(cars.id.get(&99)[0], |c: &Car| Car(c.0 + 1, c.1.clone()));
+        cars.update(cars.id.get(&99)[0], |c| c.0 += 1);
         let r = cars.id().get(&100).collect::<Vec<_>>();
         assert_eq!(vec![&Car(100, "Porsche".into())], r);
 
         // remove one Car
         assert!(cars.id().get(&100).next().is_some());
-        cars.delete(cars.id.get(&100)[0]);
+        cars.remove(cars.id.get(&100)[0]);
         assert_eq!(None, cars.id().get(&100).next());
     }
 

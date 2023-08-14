@@ -2,10 +2,7 @@
 //!
 //! This collections only support one Index for one property.
 //!
-#[doc(hidden)]
-pub(crate) mod base;
-#[doc(hidden)]
-pub(crate) mod list;
+pub mod base;
 pub mod ro;
 pub mod rw;
 

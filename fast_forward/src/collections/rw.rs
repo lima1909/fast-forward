@@ -62,7 +62,7 @@ where
     }
 
     /// The Item in the list will be marked as deleted.
-    pub fn drop(&mut self, pos: usize) -> Option<&I> {
+    pub fn remove(&mut self, pos: usize) -> Option<&I> {
         self.items.drop(pos, |item| {
             let key = (self.field)(item);
             self.store.delete(key, &pos);
@@ -86,18 +86,18 @@ where
     }
 
     /// Check, is the Item on `pos` (`Index`) deleted.
-    pub fn is_droped(&self, pos: usize) -> bool {
+    pub fn is_removed(&self, pos: usize) -> bool {
         self.items.is_droped(pos)
     }
 
     // Returns all removed `Indices`.
-    pub fn droped_indices(&self) -> &[usize] {
+    pub fn removed_indices(&self) -> &[usize] {
         self.items.droped_indices()
     }
 
     // Returns all removed `Items`.
-    pub fn droped_items(&self) -> impl Iterator<Item = &'_ I> {
-        self.droped_indices().iter().map(|i| &self.items[*i])
+    pub fn removed_items(&self) -> impl Iterator<Item = &'_ I> {
+        self.removed_indices().iter().map(|i| &self.items[*i])
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &'_ I> {
@@ -131,8 +131,8 @@ mod tests {
         s.insert(Person(1, "B"));
         assert!(s.idx().contains(&-1));
 
-        // drop
-        s.drop(0);
+        // remove
+        s.remove(0);
         assert!(!s.idx().contains(&-1));
 
         // update
@@ -155,8 +155,8 @@ mod tests {
         s.insert(Person(1, "B"));
         assert!(s.idx().contains(&"A"));
 
-        // drop
-        s.drop(0);
+        // remove
+        s.remove(0);
         assert!(!s.idx().contains(&"A"));
 
         // update
@@ -185,10 +185,10 @@ mod tests {
     }
 
     #[rstest]
-    fn iter_after_drop(cars: Vec<Car>) {
+    fn iter_after_remove(cars: Vec<Car>) {
         let mut cars = IList::<UIntIndex, Car, _>::from_iter(|c| c.0, cars.into_iter());
-        cars.drop(2);
-        cars.drop(0);
+        cars.remove(2);
+        cars.remove(0);
 
         let mut iter = cars.iter();
         assert_eq!(Some(&Car(5, "Audi".into())), iter.next());
@@ -279,7 +279,7 @@ mod tests {
     }
 
     #[rstest]
-    fn one_indexed_list_delete(cars: Vec<Car>) {
+    fn one_indexed_list_remove(cars: Vec<Car>) {
         let mut cars = IList::<UIntIndex, Car, _>::from_iter(|c| c.0, cars.into_iter());
 
         // before delete: 2 Cars
@@ -287,7 +287,7 @@ mod tests {
         assert_eq!(vec![&Car(2, "BMW".into()), &Car(2, "VW".into())], r);
         assert_eq!(4, cars.count());
 
-        let deleted_car = cars.drop(0);
+        let deleted_car = cars.remove(0);
         assert_eq!(Some(&Car(2, "BMW".into())), deleted_car);
         assert!(cars.get(0).is_none());
 
@@ -297,29 +297,29 @@ mod tests {
         assert_eq!(3, cars.count());
         assert_eq!(4, cars.len());
         assert!(!cars.is_empty());
-        assert!(cars.is_droped(0));
-        assert_eq!(&[0], cars.droped_indices());
+        assert!(cars.is_removed(0));
+        assert_eq!(&[0], cars.removed_indices());
         assert_eq!(
             vec![&Car(2, "BMW".into())],
-            cars.droped_items().collect::<Vec<_>>()
+            cars.removed_items().collect::<Vec<_>>()
         );
 
         // delete a second Car
-        let deleted_car = cars.drop(3);
+        let deleted_car = cars.remove(3);
         assert_eq!(Some(&Car(99, "Porsche".into())), deleted_car);
         assert_eq!(2, cars.count());
         assert_eq!(4, cars.len());
-        assert!(cars.is_droped(3));
-        assert_eq!(&[0, 3], cars.droped_indices());
+        assert!(cars.is_removed(3));
+        assert_eq!(&[0, 3], cars.removed_indices());
         assert_eq!(
             vec![&Car(2, "BMW".into()), &Car(99, "Porsche".into())],
-            cars.droped_items().collect::<Vec<_>>()
+            cars.removed_items().collect::<Vec<_>>()
         );
     }
 
     #[rstest]
     fn delete_wrong_id(cars: Vec<Car>) {
         let mut cars = IList::<UIntIndex, Car, _>::from_iter(|c| c.0, cars.into_iter());
-        assert_eq!(None, cars.drop(10_000));
+        assert_eq!(None, cars.remove(10_000));
     }
 }
