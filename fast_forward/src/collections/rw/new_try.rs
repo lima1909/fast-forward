@@ -21,6 +21,23 @@ where
         }
     }
 
+    pub fn from_iter<It>(field: F, iter: It) -> Self
+    where
+        It: IntoIterator<Item = I> + ExactSizeIterator,
+    {
+        let mut s = Self {
+            store: S::with_capacity(iter.len()),
+            field,
+            items: Vec::with_capacity(iter.len()),
+        };
+
+        iter.into_iter().for_each(|item| {
+            s.push(item);
+        });
+
+        s
+    }
+
     /// Append a new `Item` to the List.
     pub fn push(&mut self, item: I) {
         let idx = self.items.len();
@@ -41,6 +58,33 @@ where
         })
     }
 
+    /// The Item in the list will be removed.
+    pub fn remove(&mut self, pos: usize) -> Option<I> {
+        if self.items.is_empty() {
+            return None;
+        }
+
+        let last_idx = self.items.len() - 1;
+        if pos > last_idx {
+            return None;
+        }
+
+        if last_idx == pos {
+            let rm_item = self.items.remove(pos);
+            self.store.delete((self.field)(&rm_item), &pos);
+            return Some(rm_item);
+        }
+
+        let rm_item = self.items.swap_remove(pos);
+        self.store.delete((self.field)(&rm_item), &pos);
+
+        let curr_item = &self.items[pos];
+        self.store.delete((self.field)(curr_item), &last_idx);
+        self.store.insert((self.field)(curr_item), pos);
+
+        Some(rm_item)
+    }
+
     pub fn idx(&self) -> Retriever<'_, S, Vec<I>> {
         Retriever::new(&self.store, &self.items)
     }
@@ -56,9 +100,9 @@ impl<S, I, F> Deref for IList<S, I, F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::index::IntIndex;
-
     use super::*;
+    use crate::index::IntIndex;
+    use rstest::{fixture, rstest};
 
     #[derive(PartialEq, Debug)]
     struct Person {
@@ -118,5 +162,66 @@ mod tests {
 
         // update invalid
         assert_eq!(None, l.update(10_000, |p| p.id = 99));
+    }
+
+    #[fixture]
+    fn persons() -> Vec<Person> {
+        vec![
+            Person::new(0, "Paul"),
+            Person::new(-2, "Mario"),
+            Person::new(2, "Jasmin"),
+        ]
+    }
+
+    #[rstest]
+    fn remove_0(persons: Vec<Person>) {
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, persons.into_iter());
+        assert_eq!(&Person::new(0, "Paul"), &l[0]);
+        assert_eq!(3, l.len());
+
+        assert_eq!(Some(Person::new(0, "Paul")), l.remove(0));
+
+        assert_eq!(&Person::new(2, "Jasmin"), &l[0]);
+        assert_eq!(2, l.len());
+        assert_eq!(None, l.idx().get(&0).next());
+    }
+
+    #[rstest]
+    fn remove_1(persons: Vec<Person>) {
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, persons.into_iter());
+        assert_eq!(&Person::new(-2, "Mario"), &l[1]);
+        assert_eq!(3, l.len());
+
+        assert_eq!(Some(Person::new(-2, "Mario")), l.remove(1));
+
+        assert_eq!(&Person::new(2, "Jasmin"), &l[1]);
+        assert_eq!(2, l.len());
+        assert_eq!(None, l.idx().get(&-2).next());
+    }
+
+    #[rstest]
+    fn remove_last_2(persons: Vec<Person>) {
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, persons.into_iter());
+        assert_eq!(&Person::new(2, "Jasmin"), &l[2]);
+        assert_eq!(3, l.len());
+
+        assert_eq!(Some(Person::new(2, "Jasmin")), l.remove(2));
+
+        assert_eq!(2, l.len());
+        assert_eq!(None, l.idx().get(&2).next());
+    }
+
+    #[rstest]
+    fn remove_invalid(persons: Vec<Person>) {
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, persons.into_iter());
+        assert_eq!(None, l.remove(10_000));
+
+        assert_eq!(3, l.len());
+    }
+
+    #[test]
+    fn remove_empty() {
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, vec![].into_iter());
+        assert_eq!(None, l.remove(0));
     }
 }
