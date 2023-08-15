@@ -15,8 +15,8 @@ where
 {
     pub fn new(field: F) -> Self {
         Self {
-            store: S::with_capacity(0),
             field,
+            store: S::with_capacity(0),
             items: vec![],
         }
     }
@@ -26,8 +26,8 @@ where
         It: IntoIterator<Item = I> + ExactSizeIterator,
     {
         let mut s = Self {
-            store: S::with_capacity(iter.len()),
             field,
+            store: S::with_capacity(iter.len()),
             items: Vec::with_capacity(iter.len()),
         };
 
@@ -65,21 +65,25 @@ where
         }
 
         let last_idx = self.items.len() - 1;
+        // index out of bound
         if pos > last_idx {
             return None;
         }
 
-        if last_idx == pos {
+        // last item in the list
+        if pos == last_idx {
             let rm_item = self.items.remove(pos);
             self.store.delete((self.field)(&rm_item), &pos);
             return Some(rm_item);
         }
 
+        // remove item and entry in store and swap with last item
         let rm_item = self.items.swap_remove(pos);
         self.store.delete((self.field)(&rm_item), &pos);
 
+        // formerly last item, now item on pos
         let curr_item = &self.items[pos];
-        self.store.delete((self.field)(curr_item), &last_idx);
+        self.store.delete((self.field)(curr_item), &last_idx); // remove formerly entry in store
         self.store.insert((self.field)(curr_item), pos);
 
         Some(rm_item)
@@ -100,11 +104,91 @@ impl<S, I, F> Deref for IList<S, I, F> {
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
     use crate::index::IntIndex;
     use rstest::{fixture, rstest};
 
-    #[derive(PartialEq, Debug)]
+    fn check_key_idx<S, I, F>(l: &mut IList<S, I, F>)
+    where
+        S: Store<Index = usize>,
+        F: Fn(&I) -> S::Key,
+    {
+        l.items.iter().enumerate().for_each(|(pos, item)| {
+            let key = (l.field)(item);
+            assert_eq!([pos], l.store.get(&key));
+        });
+    }
+
+    #[test]
+    fn check_key_idx_intindex() {
+        let v = vec![
+            Person::new(0, "Paul"),
+            Person::new(-2, "Mario"),
+            Person::new(2, "Jasmin"),
+        ];
+        check_key_idx(&mut IList::<IntIndex, Person, _>::from_iter(
+            |p| p.id,
+            v.clone().into_iter(),
+        ));
+
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.clone().into_iter());
+        l.remove(0);
+        check_key_idx(&mut l);
+
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.clone().into_iter());
+        l.remove(1);
+        check_key_idx(&mut l);
+
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.clone().into_iter());
+        l.remove(2);
+        check_key_idx(&mut l);
+
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.clone().into_iter());
+        l.remove(100);
+        check_key_idx(&mut l);
+
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.clone().into_iter());
+        l.remove(0);
+        check_key_idx(&mut l);
+        l.remove(0);
+        check_key_idx(&mut l);
+        l.remove(0);
+        check_key_idx(&mut l);
+        l.remove(0);
+        check_key_idx(&mut l);
+
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.clone().into_iter());
+        l.remove(1);
+        check_key_idx(&mut l);
+        l.remove(1);
+        check_key_idx(&mut l);
+        l.remove(1);
+        check_key_idx(&mut l);
+        l.remove(0);
+        check_key_idx(&mut l);
+        assert_eq!(0, l.len());
+    }
+
+    #[test]
+    fn check_key_with_many_idx_intindex() {
+        let v = vec![
+            Person::new(-2, "Paul"),
+            Person::new(-2, "Mario"),
+            Person::new(2, "Jasmin"),
+        ];
+
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.clone().into_iter());
+        l.remove(0);
+        check_key_idx(&mut l);
+
+        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.clone().into_iter());
+        l.remove(1);
+        check_key_idx(&mut l);
+    }
+
+    #[derive(PartialEq, Debug, Clone)]
     struct Person {
         id: i32,
         name: String,
