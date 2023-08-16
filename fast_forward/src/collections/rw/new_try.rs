@@ -1,11 +1,14 @@
 use std::ops::Deref;
 
-use crate::{collections::Retriever, index::store::Store};
+use crate::{
+    collections::{rw::base::List, Retriever},
+    index::store::Store,
+};
 
 pub struct IList<S, I, F> {
     store: S,
     field: F,
-    items: Vec<I>,
+    items: List<I>,
 }
 
 impl<S, I, F> IList<S, I, F>
@@ -17,7 +20,7 @@ where
         Self {
             field,
             store: S::with_capacity(0),
-            items: vec![],
+            items: List::with_capacity(0),
         }
     }
 
@@ -28,7 +31,7 @@ where
         let mut s = Self {
             field,
             store: S::with_capacity(iter.len()),
-            items: Vec::with_capacity(iter.len()),
+            items: List::with_capacity(iter.len()),
         };
 
         iter.into_iter().for_each(|item| {
@@ -40,9 +43,9 @@ where
 
     /// Append a new `Item` to the List.
     pub fn push(&mut self, item: I) {
-        let idx = self.items.len();
-        self.store.insert((self.field)(&item), idx);
-        self.items.push(item);
+        self.items.push(item, |i, idx| {
+            self.store.insert((self.field)(i), idx);
+        });
     }
 
     /// Update the item on the given position.
@@ -60,36 +63,15 @@ where
 
     /// The Item in the list will be removed.
     pub fn remove(&mut self, pos: usize) -> Option<I> {
-        if self.items.is_empty() {
-            return None;
-        }
+        use super::base::RemoveTrigger::*;
 
-        let last_idx = self.items.len() - 1;
-        // index out of bound
-        if pos > last_idx {
-            return None;
-        }
-
-        // last item in the list
-        if pos == last_idx {
-            let rm_item = self.items.remove(pos);
-            self.store.delete((self.field)(&rm_item), &pos);
-            return Some(rm_item);
-        }
-
-        // remove item and entry in store and swap with last item
-        let rm_item = self.items.swap_remove(pos);
-        self.store.delete((self.field)(&rm_item), &pos);
-
-        // formerly last item, now item on pos
-        let curr_item = &self.items[pos];
-        self.store.delete((self.field)(curr_item), &last_idx); // remove formerly entry in store
-        self.store.insert((self.field)(curr_item), pos);
-
-        Some(rm_item)
+        self.items.remove(pos, |trigger, i, idx| match trigger {
+            Delete => self.store.delete((self.field)(i), &idx),
+            Insert => self.store.insert((self.field)(i), idx),
+        })
     }
 
-    pub fn idx(&self) -> Retriever<'_, S, Vec<I>> {
+    pub fn idx(&self) -> Retriever<'_, S, List<I>> {
         Retriever::new(&self.store, &self.items)
     }
 }
