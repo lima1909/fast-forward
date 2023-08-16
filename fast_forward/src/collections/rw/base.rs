@@ -29,14 +29,21 @@ impl<I> List<I> {
 
     /// Update the item on the given position.
     #[inline]
-    pub fn update<U, Triger>(&mut self, pos: usize, mut update: U, mut before: Triger) -> Option<&I>
+    pub fn update<U, Triger, After, Keys>(
+        &mut self,
+        pos: usize,
+        mut update: U,
+        mut before: Triger,
+    ) -> Option<&I>
     where
         U: FnMut(&mut I),
-        Triger: FnMut(&I),
+        Triger: FnMut(&I) -> (Keys, After),
+        After: FnMut(Keys, &I),
     {
         self.items.get_mut(pos).map(|item| {
-            before(item);
+            let (keys, mut after) = before(item);
             update(item);
+            after(keys, item);
             &*item
         })
     }
@@ -104,7 +111,18 @@ mod tests {
             assert_eq!(0, x);
         });
 
-        let i = l.update(0, |i| *i = "B", |_i| {});
+        let i = l.update(
+            0,
+            |i| *i = "B", // update
+            |i| {
+                assert_eq!(&"A", i); // before trigger
+                ((1, String::from("XYZ")), |keys, i| {
+                    // after trigger, with Keys: 1 and "XYZ"
+                    assert_eq!((1, String::from("XYZ")), keys);
+                    assert_eq!(&"B", i);
+                })
+            },
+        );
         assert_eq!(&"B", i.unwrap());
         assert_eq!(1, l.len());
 
