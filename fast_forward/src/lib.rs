@@ -93,8 +93,6 @@
 //! - [`crate::collections`]: the implementations of indexed collections (e.g. read only: IList, IRefList, IMap).
 //!
 
-#![doc = include_str!("../../README.md")]
-
 pub mod collections;
 pub mod index;
 
