@@ -42,10 +42,10 @@ where
     }
 
     /// Append a new `Item` to the List.
-    pub fn push(&mut self, item: I) {
+    pub fn push(&mut self, item: I) -> usize {
         self.items.push(item, |i, idx| {
             self.store.insert((self.field)(i), idx);
-        });
+        })
     }
 
     /// Update the item on the given position.
@@ -63,7 +63,7 @@ where
 
     /// The Item in the list will be removed.
     pub fn remove(&mut self, pos: usize) -> Option<I> {
-        use super::base::RemoveTrigger::*;
+        use super::base::RemoveTriggerKind::*;
 
         self.items.remove(pos, |trigger, i, idx| match trigger {
             Delete => self.store.delete((self.field)(i), &idx),
@@ -188,9 +188,9 @@ mod tests {
     #[test]
     fn check() {
         let mut l = IList::<IntIndex, Person, _>::new(|p| p.id);
-        l.push(Person::new(0, "Paul"));
-        l.push(Person::new(-2, "Mario"));
-        l.push(Person::new(2, "Jasmin"));
+        assert_eq!(0, l.push(Person::new(0, "Paul")));
+        assert_eq!(1, l.push(Person::new(-2, "Mario")));
+        assert_eq!(2, l.push(Person::new(2, "Jasmin")));
 
         // retrieve GET
         {
