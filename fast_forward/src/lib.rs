@@ -134,7 +134,7 @@ macro_rules! fast {
             $(
                 $store: $store_type,
             )+
-            _items_: $crate::collections::rw::Retain<$item>,
+            _items_: $crate::collections::rw::base::List<$item>,
         }
 
         ///
@@ -145,7 +145,7 @@ macro_rules! fast {
             fn insert(&mut self, item: $item) -> usize {
                 use $crate::index::store::Store;
 
-                self._items_.insert(item, |it: &$item, pos: usize| {
+                self._items_.push(item, |it: &$item, pos: usize| {
                     $(
                         self.$store.insert(
                                     it.$item_field$(.$item_field_func())?,
@@ -178,16 +178,13 @@ macro_rules! fast {
 
             /// Delete the item on the given position.
             #[allow(dead_code)]
-            fn remove(&mut self, pos: usize) -> Option<&$item> {
+            fn remove(&mut self, pos: usize) -> Option<$item> {
                 use $crate::index::store::Store;
+                use $crate::collections::rw::base::RemoveTriggerKind::*;
 
-                self._items_.drop(pos, |it: &$item| {
-                    $(
-                        self.$store.delete(
-                                    it.$item_field$(.$item_field_func())?,
-                                    &pos
-                                    );
-                    )+
+                self._items_.remove(pos, |trigger, it, idx| match trigger {
+                    Delete => { $( self.$store.delete(it.$item_field$(.$item_field_func())?, &idx); )+ }
+                    Insert => { $( self.$store.insert(it.$item_field$(.$item_field_func())?, idx);  )+ }
                 })
             }
 
@@ -199,7 +196,7 @@ macro_rules! fast {
             $(
                 /// Create and get a Filter for the Store
                 #[allow(dead_code)]
-                fn $store(&self) -> $crate::collections::Retriever<'_, $store_type, $crate::collections::rw::Retain<$item>> {
+                fn $store(&self) -> $crate::collections::Retriever<'_, $store_type, $crate::collections::rw::base::List<$item>> {
                     $crate::collections::Retriever::new(&self.$store, &self._items_)
                 }
             )+
@@ -246,7 +243,7 @@ mod tests {
             r
         );
 
-        cars.remove(3);
+        assert_eq!(Car(3, "Audi".into()), cars.remove(3).unwrap());
 
         let r = cars.iter().collect::<Vec<_>>();
         assert_eq!(
@@ -254,8 +251,8 @@ mod tests {
                 &Car(0, "Porsche".into()),
                 &Car(1, "BMW".into()),
                 &Car(2, "Porsche".into()),
-                &Car(4, "VW".into()),
-                &Car(5, "VW".into())
+                &Car(5, "VW".into()),
+                &Car(4, "VW".into())
             ],
             r
         );

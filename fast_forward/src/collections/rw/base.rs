@@ -2,7 +2,6 @@
 //!
 use std::ops::Deref;
 
-#[derive(Default)]
 #[repr(transparent)]
 pub struct List<I> {
     items: Vec<I>,
@@ -90,6 +89,12 @@ impl<I> crate::index::Indexable<usize> for List<I> {
 
     fn item(&self, idx: &usize) -> &Self::Output {
         &self.items[*idx]
+    }
+}
+
+impl<I> Default for List<I> {
+    fn default() -> Self {
+        Self { items: Vec::new() }
     }
 }
 
