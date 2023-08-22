@@ -1,6 +1,6 @@
 //! Base-List for indexed read-write lists.
 //!
-use std::ops::Deref;
+use std::{fmt::Debug, ops::Deref};
 
 #[repr(transparent)]
 pub struct List<I> {
@@ -95,6 +95,15 @@ impl<I> crate::index::Indexable<usize> for List<I> {
 impl<I> Default for List<I> {
     fn default() -> Self {
         Self { items: Vec::new() }
+    }
+}
+
+impl<I> Debug for List<I>
+where
+    I: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IList").field("items", &self.items).finish()
     }
 }
 
