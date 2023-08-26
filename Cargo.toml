@@ -3,3 +3,5 @@ members = [
     "fast_forward",
     "fast_forward_macros",
 ]
+
+resolver = "1"
