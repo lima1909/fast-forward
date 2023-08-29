@@ -81,6 +81,23 @@ where
         })
     }
 
+    /// Remove all items by a given `Key`.
+    pub fn remove_by_key(&mut self, key: &S::Key) -> Option<Vec<I>> {
+        let mut removed = Vec::new();
+
+        while let Some(idx) = self.store.get(key).iter().next() {
+            if let Some(item) = self.remove(*idx) {
+                removed.push(item);
+            }
+        }
+
+        if removed.is_empty() {
+            None
+        } else {
+            Some(removed)
+        }
+    }
+
     pub fn idx(&self) -> Retriever<'_, S, List<I>> {
         Retriever::new(&self.store, &self.items)
     }
@@ -308,6 +325,52 @@ mod tests {
     fn remove_empty() {
         let mut l = IList::<IntIndex, Person, _>::from_vec(|p| p.id, vec![]);
         assert_eq!(None, l.remove(0));
+    }
+
+    #[test]
+    fn remove_by_key_int() {
+        let v = vec![
+            Person::new(2, "Mario"),
+            Person::new(0, "Paul"),
+            Person::new(2, "Peter"),
+            Person::new(2, "Jasmin"),
+            Person::new(1, "Inge"),
+        ];
+
+        let mut l = IList::<IntIndex, Person, _>::from_vec(|p| p.id, v);
+        assert_eq!(
+            Some(vec![
+                Person::new(2, "Mario"),
+                Person::new(2, "Peter"),
+                Person::new(2, "Jasmin"),
+            ]),
+            l.remove_by_key(&2)
+        );
+        assert_eq!(2, l.len());
+
+        // key not exist
+        assert_eq!(None, l.remove_by_key(&99));
+    }
+
+    #[test]
+    fn remove_by_key_string() {
+        let v = vec![
+            Person::new(2, "Mario"),
+            Person::new(0, "Paul"),
+            Person::new(2, "Paul"),
+            Person::new(2, "Jasmin"),
+            Person::new(1, "Inge"),
+        ];
+
+        let mut l = IList::<MapIndex, Person, _>::from_vec(|p| p.name.clone(), v);
+        assert_eq!(
+            Some(vec![Person::new(0, "Paul"), Person::new(2, "Paul"),]),
+            l.remove_by_key(&"Paul".into())
+        );
+        assert_eq!(3, l.len());
+
+        // key not exist
+        assert_eq!(None, l.remove_by_key(&"Noooo".into()));
     }
 
     #[test]
