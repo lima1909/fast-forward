@@ -71,7 +71,9 @@ where
     }
 
     /// The Item in the list will be removed.
-    /// The remove is an swap_remove ([`std::vec::Vec::swap_remove`])
+    ///
+    /// ## Hint:
+    /// The remove is a swap_remove ([`std::vec::Vec::swap_remove`])
     pub fn remove(&mut self, pos: usize) -> Option<I> {
         use super::base::RemoveTriggerKind::*;
 
@@ -82,7 +84,7 @@ where
     }
 
     /// Remove all items by a given `Key`.
-    pub fn remove_by_key(&mut self, key: &S::Key) -> Option<Vec<I>> {
+    pub fn remove_by_key(&mut self, key: &S::Key) -> Vec<I> {
         let mut removed = Vec::new();
 
         while let Some(idx) = self.store.get(key).iter().next() {
@@ -90,12 +92,7 @@ where
                 removed.push(item);
             }
         }
-
-        if removed.is_empty() {
-            None
-        } else {
-            Some(removed)
-        }
+        removed
     }
 
     pub fn idx(&self) -> Retriever<'_, S, List<I>> {
@@ -339,17 +336,17 @@ mod tests {
 
         let mut l = IList::<IntIndex, Person, _>::from_vec(|p| p.id, v);
         assert_eq!(
-            Some(vec![
+            vec![
                 Person::new(2, "Mario"),
                 Person::new(2, "Peter"),
                 Person::new(2, "Jasmin"),
-            ]),
+            ],
             l.remove_by_key(&2)
         );
         assert_eq!(2, l.len());
 
         // key not exist
-        assert_eq!(None, l.remove_by_key(&99));
+        assert!(l.remove_by_key(&99).is_empty());
     }
 
     #[test]
@@ -364,13 +361,13 @@ mod tests {
 
         let mut l = IList::<MapIndex, Person, _>::from_vec(|p| p.name.clone(), v);
         assert_eq!(
-            Some(vec![Person::new(0, "Paul"), Person::new(2, "Paul"),]),
+            vec![Person::new(0, "Paul"), Person::new(2, "Paul"),],
             l.remove_by_key(&"Paul".into())
         );
         assert_eq!(3, l.len());
 
         // key not exist
-        assert_eq!(None, l.remove_by_key(&"Noooo".into()));
+        assert!(l.remove_by_key(&"Noooo".into()).is_empty());
     }
 
     #[test]
