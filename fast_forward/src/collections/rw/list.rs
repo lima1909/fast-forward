@@ -4,7 +4,7 @@ use std::{fmt::Debug, ops::Deref};
 
 use crate::{
     collections::{rw::base::List, Retriever},
-    index::store::Store,
+    index::{store::Store, Indexable},
 };
 
 /// [`IList`] is a read write indexed `List` which owned the given items.
@@ -68,6 +68,19 @@ where
             self.store.update(key, pos, (self.field)(item));
             &*item
         })
+    }
+
+    /// Call `update`-function of all items by a given `Key`.
+    pub fn update_by_key<U>(&mut self, key: &S::Key, mut update: U) -> impl Iterator<Item = &'_ I>
+    where
+        U: FnMut(&mut I),
+    {
+        let idxs = self.store.get(key).to_vec();
+        for i in idxs {
+            self.update(i, &mut update).unwrap();
+        }
+
+        self.items.items(self.store.get(key).iter())
     }
 
     /// The Item in the list will be removed.
@@ -565,5 +578,33 @@ mod tests {
     fn delete_wrong_id(cars: Vec<Car>) {
         let mut cars = IList::<UIntIndex, _, _>::from_vec(|c| c.0, cars);
         assert_eq!(None, cars.remove(10_000));
+    }
+
+    #[rstest]
+    fn update_by_key(cars: Vec<Car>) {
+        let mut cars = IList::<UIntIndex, _, _>::from_vec(|c| c.0, cars);
+        // update many
+        let updated = cars.update_by_key(&2, |c| {
+            c.1.push_str("_NEW");
+        });
+        assert_eq!(
+            vec![&Car(2, "BMW_NEW".into()), &Car(2, "VW_NEW".into())],
+            updated.collect::<Vec<_>>()
+        );
+
+        // update one
+        let updated = cars.update_by_key(&99, |c| {
+            c.1.push_str("_NEW");
+        });
+        assert_eq!(
+            vec![&Car(99, "Porsche_NEW".into())],
+            updated.collect::<Vec<_>>()
+        );
+
+        // update not found
+        let mut updated = cars.update_by_key(&10_000, |c| {
+            c.1.push_str("_NEW");
+        });
+        assert!(updated.next().is_none());
     }
 }
