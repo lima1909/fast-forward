@@ -267,7 +267,8 @@ mod tests {
         #[derive(Debug, PartialEq)]
         pub struct Person(i32, &'static str);
 
-        let mut s = IList::<IntIndex, _, _>::from_vec(|p| p.0, vec![Person(-1, "A")]);
+        #[allow(clippy::useless_conversion)]
+        let mut s = IList::<IntIndex, _, _>::from_iter(|p| p.0, vec![Person(-1, "A")].into_iter());
         assert_eq!(1, s.push(Person(1, "B")));
         assert!(s.idx().contains(&-1));
 
@@ -289,9 +290,10 @@ mod tests {
         #[derive(Debug, PartialEq)]
         pub struct Person(i32, &'static str);
 
-        let mut s = IList::<MapIndex<&'static str, usize>, _, _>::from_vec(
+        #[allow(clippy::useless_conversion)]
+        let mut s = IList::<MapIndex<&'static str, usize>, _, _>::from_iter(
             |p| p.1.clone(),
-            vec![Person(-1, "A")],
+            vec![Person(-1, "A")].into_iter(),
         );
         assert_eq!(1, s.push(Person(1, "B")));
         assert!(s.idx().contains(&"A"));
@@ -324,7 +326,8 @@ mod tests {
 
     #[rstest]
     fn item_from_idx(cars: Vec<Car>) {
-        let cars = IList::<UIntIndex, _, _>::from_vec(|c| c.0, cars);
+        #[allow(clippy::useless_conversion)]
+        let cars = IList::<UIntIndex, _, _>::from_iter(|c| c.0, cars.into_iter());
         assert_eq!(&Car(5, "Audi".into()), cars.get(1).unwrap());
     }
 
