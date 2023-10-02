@@ -7,28 +7,28 @@ pub mod rw;
 
 use crate::index::{
     indices::Indices,
-    store::{Filterable, MetaData, Store},
+    store::{Filterable, MetaData},
     view::{Filter, Keys, View},
     Indexable,
 };
 
 /// A `Retriever` is the main interface for get Items by an given query.
 #[repr(transparent)]
-pub struct Retriever<'a, S, I>(Filter<'a, S, I>);
+pub struct Retriever<'a, F, I>(Filter<'a, F, I>);
 
-impl<'a, S, I> Retriever<'a, S, I>
+impl<'a, F, I> Retriever<'a, F, I>
 where
-    S: Store,
+    F: Filterable,
 {
     /// Create a new instance of an [`Retriever`].
-    pub const fn new(store: &'a S, items: &'a I) -> Self {
-        Self(Filter::new(store, items))
+    pub const fn new(filter: &'a F, items: &'a I) -> Self {
+        Self(Filter::new(filter, items))
     }
 
     #[inline]
-    pub fn eq(&self, key: &S::Key) -> Indices<'a, S::Index>
+    pub fn eq(&self, key: &F::Key) -> Indices<'a, F::Index>
     where
-        S::Index: Clone,
+        F::Index: Clone,
     {
         self.0.eq(key)
     }
@@ -52,7 +52,7 @@ where
     /// assert!(!l.idx().contains(&99));
     /// ```
     #[inline]
-    pub fn contains(&self, key: &S::Key) -> bool {
+    pub fn contains(&self, key: &F::Key) -> bool {
         self.0.filter.contains(key)
     }
 
@@ -78,9 +78,9 @@ where
     /// assert_eq!(Some(&Car(2, "BMW".into())), l.idx().get(&2).next());
     /// ```
     #[inline]
-    pub fn get(&self, key: &S::Key) -> impl Iterator<Item = &'a <I as Indexable<S::Index>>::Output>
+    pub fn get(&self, key: &F::Key) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output>
     where
-        I: Indexable<S::Index>,
+        I: Indexable<F::Index>,
     {
         self.0.items.items(self.0.filter.get(key).iter())
     }
@@ -122,11 +122,11 @@ where
     pub fn get_many<II>(
         &self,
         keys: II,
-    ) -> impl Iterator<Item = &'a <I as Indexable<S::Index>>::Output>
+    ) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output>
     where
-        II: IntoIterator<Item = S::Key> + 'a,
-        I: Indexable<S::Index>,
-        <I as Indexable<S::Index>>::Output: Sized,
+        II: IntoIterator<Item = F::Key> + 'a,
+        I: Indexable<F::Index>,
+        <I as Indexable<F::Index>>::Output: Sized,
     {
         self.0.filter.get_many(keys).items(self.0.items)
     }
@@ -159,11 +159,11 @@ where
     pub fn filter<P>(
         &self,
         predicate: P,
-    ) -> impl Iterator<Item = &'a <I as Indexable<S::Index>>::Output>
+    ) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output>
     where
-        P: Fn(&Filter<'a, S, I>) -> Indices<'a, S::Index>,
-        I: Indexable<S::Index>,
-        S::Index: Clone,
+        P: Fn(&Filter<'a, F, I>) -> Indices<'a, F::Index>,
+        I: Indexable<F::Index>,
+        F::Index: Clone,
     {
         predicate(&self.0).items(self.0.items)
     }
@@ -199,20 +199,20 @@ where
     /// assert_eq!(None, view.get(&-5).next());
     /// ```
     #[inline]
-    pub fn create_view<It>(&self, keys: It) -> View<'a, S, S, I>
+    pub fn create_view<It>(&self, keys: It) -> View<'a, F, F, I>
     where
-        It: IntoIterator<Item = <S as Keys>::Key>,
-        S: Keys<Key = <S as Filterable>::Key>,
-        I: Indexable<S::Index>,
+        It: IntoIterator<Item = <F as Keys>::Key>,
+        F: Keys<Key = <F as Filterable>::Key>,
+        I: Indexable<F::Index>,
     {
-        View::new(S::from_iter(keys), self.0.filter, self.0.items)
+        View::new(F::from_iter(keys), self.0.filter, self.0.items)
     }
 
     /// Returns Meta data, if the [`crate::index::store::Store`] supports any.
     #[inline]
-    pub fn meta(&self) -> S::Meta<'_>
+    pub fn meta(&self) -> F::Meta<'_>
     where
-        S: MetaData,
+        F: MetaData,
     {
         self.0.filter.meta()
     }

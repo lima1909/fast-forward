@@ -63,7 +63,7 @@ pub trait Keys {
 /// that can be only use (read only) for [`crate::index::store::Filterable`] operations.
 pub struct View<'a, K, F, I> {
     keys: K,
-    store: &'a F,
+    filter: &'a F,
     items: &'a I,
 }
 
@@ -73,8 +73,12 @@ where
     F: Filterable,
     I: Indexable<F::Index>,
 {
-    pub const fn new(keys: K, store: &'a F, items: &'a I) -> Self {
-        Self { keys, store, items }
+    pub const fn new(keys: K, filter: &'a F, items: &'a I) -> Self {
+        Self {
+            keys,
+            filter,
+            items,
+        }
     }
 
     #[inline]
@@ -82,7 +86,7 @@ where
     where
         F::Index: Clone,
     {
-        Indices::from_sorted_slice(self.store.get_with_check(key, |k| self.keys.exist(k)))
+        Indices::from_sorted_slice(self.filter.get_with_check(key, |k| self.keys.exist(k)))
     }
 
     #[inline]
@@ -96,7 +100,7 @@ where
         key: &'a F::Key,
     ) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output> {
         self.items.items(
-            self.store
+            self.filter
                 .get_with_check(key, |k| self.keys.exist(k))
                 .iter(),
         )
@@ -111,7 +115,7 @@ where
         II: IntoIterator<Item = F::Key> + 'a,
     {
         let keys = keys.into_iter().filter(|key| self.keys.exist(key));
-        self.store.get_many(keys).items(self.items)
+        self.filter.get_many(keys).items(self.items)
     }
 
     #[inline]
@@ -131,7 +135,7 @@ where
     where
         <F as Filterable>::Key: Clone,
     {
-        Items::new(self.store, self.keys.iter()).items(self.items)
+        Items::new(self.filter, self.keys.iter()).items(self.items)
     }
 }
 
@@ -148,7 +152,7 @@ where
     }
 
     fn get(&self, key: &Self::Key) -> &[F::Index] {
-        self.store.get_with_check(key, |k| self.keys.exist(k))
+        self.filter.get_with_check(key, |k| self.keys.exist(k))
     }
 }
 

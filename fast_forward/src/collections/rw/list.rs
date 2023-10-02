@@ -3,16 +3,16 @@
 use std::{fmt::Debug, ops::Deref};
 
 use crate::{
-    collections::{rw::base::List, Retriever},
-    index::{store::Store, Indexable},
+    collections::{rw::Editable, Retriever},
+    index::store::Store,
 };
 
+use super::{base::List, Editor};
+
 /// [`IList`] is a read write indexed `List` which owned the given items.
-pub struct IList<S, I, F> {
-    store: S,
-    field: F,
-    items: List<I>,
-}
+#[repr(transparent)]
+#[derive(Debug)]
+pub struct IList<S, I, F>(List<S, I, F>);
 
 impl<S, I, F> IList<S, I, F>
 where
@@ -20,67 +20,31 @@ where
     F: Fn(&I) -> S::Key,
 {
     pub fn new(field: F) -> Self {
-        Self {
-            field,
-            store: S::with_capacity(0),
-            items: List::with_capacity(0),
-        }
+        Self(List::new(field))
     }
 
     pub fn from_vec(field: F, v: Vec<I>) -> Self {
-        #[allow(clippy::useless_conversion)]
-        // call into_iter is is necessary, because Vec not impl: ExactSizeIterator
-        Self::from_iter(field, v.into_iter())
+        Self(List::from_vec(field, v))
     }
 
     pub fn from_iter<It>(field: F, iter: It) -> Self
     where
         It: IntoIterator<Item = I> + ExactSizeIterator,
     {
-        let mut s = Self {
-            field,
-            store: S::with_capacity(iter.len()),
-            items: List::with_capacity(iter.len()),
-        };
-
-        iter.into_iter().for_each(|item| {
-            s.push(item);
-        });
-
-        s
+        Self(List::from_iter(field, iter))
     }
 
     /// Append a new `Item` to the List.
     pub fn push(&mut self, item: I) -> usize {
-        self.items.push(item, |i, idx| {
-            self.store.insert((self.field)(i), idx);
-        })
+        self.0.push(item)
     }
 
     /// Update the item on the given position.
-    pub fn update<U>(&mut self, pos: usize, mut update: U) -> Option<&I>
+    pub fn update<U>(&mut self, pos: usize, update: U) -> Option<&I>
     where
         U: FnMut(&mut I),
     {
-        self.items.get_mut(pos).map(|item| {
-            let key = (self.field)(item);
-            update(item);
-            self.store.update(key, pos, (self.field)(item));
-            &*item
-        })
-    }
-
-    /// Call `update`-function of all items by a given `Key`.
-    pub fn update_by_key<U>(&mut self, key: &S::Key, mut update: U) -> impl Iterator<Item = &'_ I>
-    where
-        U: FnMut(&mut I),
-    {
-        let idxs = self.store.get(key).to_vec();
-        for i in idxs {
-            self.update(i, &mut update).unwrap();
-        }
-
-        self.items.items(self.store.get(key).iter())
+        self.0.update(pos, update)
     }
 
     /// The Item in the list will be removed.
@@ -88,28 +52,15 @@ where
     /// ## Hint:
     /// The remove is a swap_remove ([`std::vec::Vec::swap_remove`])
     pub fn remove(&mut self, pos: usize) -> Option<I> {
-        use super::base::RemoveTriggerKind::*;
-
-        self.items.remove(pos, |trigger, i, idx| match trigger {
-            Delete => self.store.delete((self.field)(i), &idx),
-            Insert => self.store.insert((self.field)(i), idx),
-        })
+        self.0.remove(pos)
     }
 
-    /// Remove all items by a given `Key`.
-    pub fn remove_by_key(&mut self, key: &S::Key) -> Vec<I> {
-        let mut removed = Vec::new();
-
-        while let Some(idx) = self.store.get(key).iter().next() {
-            if let Some(item) = self.remove(*idx) {
-                removed.push(item);
-            }
-        }
-        removed
+    pub fn idx(&self) -> Retriever<'_, S, Vec<I>> {
+        self.0.idx()
     }
 
-    pub fn idx(&self) -> Retriever<'_, S, List<I>> {
-        Retriever::new(&self.store, &self.items)
+    pub fn idx_mut(&mut self) -> Editor<'_, I, List<S, I, F>> {
+        Editor::new(&mut self.0)
     }
 }
 
@@ -117,104 +68,15 @@ impl<S, I, F> Deref for IList<S, I, F> {
     type Target = [I];
 
     fn deref(&self) -> &Self::Target {
-        &self.items
-    }
-}
-
-impl<S, I, F> Debug for IList<S, I, F>
-where
-    I: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("IList").field("items", &self.items).finish()
+        self.0.deref()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::vec;
-
     use super::*;
     use crate::index::{IntIndex, MapIndex, UIntIndex};
     use rstest::{fixture, rstest};
-
-    fn check_key_idx<S, I, F>(l: &mut IList<S, I, F>)
-    where
-        S: Store<Index = usize>,
-        F: Fn(&I) -> S::Key,
-    {
-        l.items.iter().enumerate().for_each(|(pos, item)| {
-            let key = (l.field)(item);
-            assert_eq!([pos], l.store.get(&key));
-        });
-    }
-
-    #[test]
-    fn check_key_idx_intindex() {
-        let v = vec![
-            Person::new(0, "Paul"),
-            Person::new(-2, "Mario"),
-            Person::new(2, "Jasmin"),
-        ];
-        check_key_idx(&mut IList::<IntIndex, Person, _>::from_iter(
-            |p| p.id,
-            v.iter().cloned(),
-        ));
-
-        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
-        l.remove(0);
-        check_key_idx(&mut l);
-
-        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
-        l.remove(1);
-        check_key_idx(&mut l);
-
-        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
-        l.remove(2);
-        check_key_idx(&mut l);
-
-        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
-        l.remove(100);
-        check_key_idx(&mut l);
-
-        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
-        l.remove(0);
-        check_key_idx(&mut l);
-        l.remove(0);
-        check_key_idx(&mut l);
-        l.remove(0);
-        check_key_idx(&mut l);
-        l.remove(0);
-        check_key_idx(&mut l);
-
-        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
-        l.remove(1);
-        check_key_idx(&mut l);
-        l.remove(1);
-        check_key_idx(&mut l);
-        l.remove(1);
-        check_key_idx(&mut l);
-        l.remove(0);
-        check_key_idx(&mut l);
-        assert_eq!(0, l.len());
-    }
-
-    #[test]
-    fn check_key_with_many_idx_intindex() {
-        let v = vec![
-            Person::new(-2, "Paul"),
-            Person::new(-2, "Mario"),
-            Person::new(2, "Jasmin"),
-        ];
-
-        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
-        l.remove(0);
-        check_key_idx(&mut l);
-
-        let mut l = IList::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
-        l.remove(1);
-        check_key_idx(&mut l);
-    }
 
     #[derive(PartialEq, Debug, Clone)]
     struct Person {
@@ -244,6 +106,7 @@ mod tests {
             assert_eq!(Some(&Person::new(-2, "Mario")), it.next());
             assert_eq!(None, it.next());
         }
+
         // deref
         assert_eq!(3, l.len());
         assert_eq!(Some(&Person::new(-2, "Mario")), l.get(1));
@@ -348,18 +211,27 @@ mod tests {
         ];
 
         let mut l = IList::<IntIndex, Person, _>::from_vec(|p| p.id, v);
+        let mut removed = Vec::new();
+        l.idx_mut().remove_by_key_with_cb(&2, |i| removed.push(i));
+
         assert_eq!(
             vec![
                 Person::new(2, "Mario"),
                 Person::new(2, "Peter"),
                 Person::new(2, "Jasmin"),
             ],
-            l.remove_by_key(&2)
+            removed
         );
         assert_eq!(2, l.len());
 
+        assert_eq!(Some(&Person::new(1, "Inge")), l.idx().get(&1).next());
+        l.idx_mut().remove_by_key(&1);
+        assert_eq!(None, l.idx().get(&1).next());
+
         // key not exist
-        assert!(l.remove_by_key(&99).is_empty());
+        removed.clear();
+        l.idx_mut().remove_by_key_with_cb(&99, |i| removed.push(i));
+        assert!(removed.is_empty());
     }
 
     #[test]
@@ -373,14 +245,21 @@ mod tests {
         ];
 
         let mut l = IList::<MapIndex, Person, _>::from_vec(|p| p.name.clone(), v);
+        let mut removed = Vec::new();
+        l.idx_mut()
+            .remove_by_key_with_cb(&"Paul".into(), |i| removed.push(i));
+
         assert_eq!(
             vec![Person::new(0, "Paul"), Person::new(2, "Paul"),],
-            l.remove_by_key(&"Paul".into())
+            removed
         );
         assert_eq!(3, l.len());
 
         // key not exist
-        assert!(l.remove_by_key(&"Noooo".into()).is_empty());
+        removed.clear();
+        l.idx_mut()
+            .remove_by_key_with_cb(&"Noooo".into(), |i| removed.push(i));
+        assert!(removed.is_empty());
     }
 
     #[test]
@@ -583,28 +462,39 @@ mod tests {
     #[rstest]
     fn update_by_key(cars: Vec<Car>) {
         let mut cars = IList::<UIntIndex, _, _>::from_vec(|c| c.0, cars);
+        let mut updated = Vec::new();
+        cars.idx_mut().update_by_key_with_cb(
+            &2,
+            |c| {
+                c.1.push_str("_NEW");
+            },
+            |c| updated.push(c.1.clone()),
+        );
+
         // update many
-        let updated = cars.update_by_key(&2, |c| {
-            c.1.push_str("_NEW");
-        });
         assert_eq!(
-            vec![&Car(2, "BMW_NEW".into()), &Car(2, "VW_NEW".into())],
-            updated.collect::<Vec<_>>()
+            vec![String::from("BMW_NEW"), String::from("VW_NEW")],
+            updated
         );
 
         // update one
-        let updated = cars.update_by_key(&99, |c| {
+        cars.idx_mut().update_by_key(&99, |c| {
             c.1.push_str("_NEW");
         });
         assert_eq!(
-            vec![&Car(99, "Porsche_NEW".into())],
-            updated.collect::<Vec<_>>()
+            Some(&Car(99, "Porsche_NEW".into())),
+            cars.idx().get(&99).next()
         );
 
         // update not found
-        let mut updated = cars.update_by_key(&10_000, |c| {
-            c.1.push_str("_NEW");
-        });
-        assert!(updated.next().is_none());
+        updated.clear();
+        cars.idx_mut().update_by_key_with_cb(
+            &10_000,
+            |c| {
+                c.1.push_str("_NEW");
+            },
+            |c| updated.push(c.1.clone()),
+        );
+        assert!(updated.is_empty());
     }
 }

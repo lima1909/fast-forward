@@ -134,7 +134,7 @@ macro_rules! fast {
             $(
                 $store: $store_type,
             )+
-            _items_: $crate::collections::rw::base::List<$item>,
+            _items_: $crate::collections::rw::base::TriggerList<$item>,
         }
 
         ///
@@ -180,11 +180,11 @@ macro_rules! fast {
             #[allow(dead_code)]
             fn remove(&mut self, pos: usize) -> Option<$item> {
                 use $crate::index::store::Store;
-                use $crate::collections::rw::base::RemoveTriggerKind::*;
+                use $crate::collections::rw::base::StoreOp;
 
                 self._items_.remove(pos, |trigger, it, idx| match trigger {
-                    Delete => { $( self.$store.delete(it.$item_field$(.$item_field_func())?, &idx); )+ }
-                    Insert => { $( self.$store.insert(it.$item_field$(.$item_field_func())?, idx);  )+ }
+                    StoreOp::Delete => { $( self.$store.delete(it.$item_field$(.$item_field_func())?, &idx); )+ }
+                    StoreOp::Insert => { $( self.$store.insert(it.$item_field$(.$item_field_func())?, idx);  )+ }
                 })
             }
 
@@ -196,7 +196,7 @@ macro_rules! fast {
             $(
                 /// Create and get a Filter for the Store
                 #[allow(dead_code)]
-                fn $store(&self) -> $crate::collections::Retriever<'_, $store_type, $crate::collections::rw::base::List<$item>> {
+                fn $store(&self) -> $crate::collections::Retriever<'_, $store_type, Vec<$item>> {
                     $crate::collections::Retriever::new(&self.$store, &self._items_)
                 }
             )+
