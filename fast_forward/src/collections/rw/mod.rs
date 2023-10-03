@@ -1,4 +1,5 @@
-//! Base module for `Collections`.
+//! read-write collections.
+//!
 pub mod base;
 pub mod list;
 
@@ -38,11 +39,14 @@ where
     }
 
     /// Call `update`-function of all items by a given `Key`.
-    pub fn update_by_key<U>(&mut self, key: &E::Key, update: U)
+    pub fn update_by_key<U>(&mut self, key: &E::Key, mut update: U)
     where
         U: FnMut(&mut I),
     {
-        self.update_by_key_with_cb(key, update, |_item| {});
+        #[allow(clippy::unnecessary_to_owned)]
+        for idx in self.editor.get(key).to_vec() {
+            self.editor.update(idx, &mut update);
+        }
     }
 
     /// Call `update`-function of all items by a given `Key`,
@@ -62,7 +66,9 @@ where
 
     /// Remove all items by a given `Key`.
     pub fn remove_by_key(&mut self, key: &E::Key) {
-        self.remove_by_key_with_cb(key, |_item| {});
+        while let Some(idx) = self.editor.get(key).iter().next() {
+            self.editor.remove(*idx);
+        }
     }
 
     /// Remove all items by a given `Key`, with a given callback for getting the removed `Item(s)`.

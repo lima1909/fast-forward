@@ -1,3 +1,4 @@
+#![doc(hidden)]
 //! Base-List for indexed read-write lists.
 //!
 use std::{fmt::Debug, ops::Deref};
@@ -173,7 +174,7 @@ where
     /// ## Hint:
     /// The remove is a swap_remove ([`std::vec::Vec::swap_remove`])
     fn remove(&mut self, pos: usize) -> Option<I> {
-        self.items.remove(pos, |trigger, i, idx| match trigger {
+        self.items.remove(pos, |ops, i, idx| match ops {
             StoreOp::Delete => self.store.delete((self.field)(i), &idx),
             StoreOp::Insert => self.store.insert((self.field)(i), idx),
         })

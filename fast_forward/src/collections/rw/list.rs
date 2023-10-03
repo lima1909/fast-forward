@@ -1,15 +1,52 @@
-//! read-write collections.
+//! read-write list ([`Vec`]).
 //!
 use std::{fmt::Debug, ops::Deref};
 
 use crate::{
-    collections::{rw::Editable, Retriever},
+    collections::{
+        rw::{base::List, Editable, Editor},
+        Retriever,
+    },
     index::store::Store,
 };
 
-use super::{base::List, Editor};
-
 /// [`IList`] is a read write indexed `List` which owned the given items.
+///
+/// # Example
+///
+/// ```
+/// use fast_forward::index::int::IntIndex;
+/// use fast_forward::collections::rw::IList;
+///
+/// #[derive(PartialEq, Debug, Clone)]
+/// struct Person {
+///     id: i32,
+///     name: String,
+/// }
+///
+/// impl Person {
+///     fn new(id: i32, name: &str) -> Self {
+///         Self {
+///             id,
+///             name: name.into(),
+///         }
+///     }
+/// }
+///
+/// let mut l = IList::<IntIndex, _, _>::from_vec(|p| p.id, vec![
+///                                                         Person::new(0, "Paul"),
+///                                                         Person::new(-2, "Mario"),
+///                                                         Person::new(2, "Jasmin"),
+///                                                         ]);
+///
+/// assert_eq!(&Person::new(-2, "Mario"), l.idx().get(&-2).next().unwrap());
+///
+/// l.idx_mut().update_by_key(&-2, |p| { p.id = 99; });
+/// assert_eq!(&Person::new(99, "Mario"), l.idx().get(&99).next().unwrap());
+///
+/// l.idx_mut().remove_by_key(&99);
+/// assert_eq!(None, l.idx().get(&99).next());
+/// ```
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct IList<S, I, F>(List<S, I, F>);

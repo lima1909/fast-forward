@@ -88,10 +88,6 @@
 //! assert!(l.idx().contains(&String::from("VW")));
 //! ```
 //!
-//! This library consists of the following parts (modules):
-//! - [`crate::index`]: to store Indices and the Indices themself
-//! - [`crate::collections`]: the implementations of indexed collections (e.g. read only: IList, IRefList, IMap).
-//!
 
 pub mod collections;
 pub mod index;
