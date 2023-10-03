@@ -15,8 +15,7 @@ use crate::{
 /// # Example
 ///
 /// ```
-/// use fast_forward::index::int::IntIndex;
-/// use fast_forward::collections::rw::IList;
+/// use fast_forward::{index::int::IntIndex, collections::rw::IList};
 ///
 /// #[derive(PartialEq, Debug, Clone)]
 /// struct Person {

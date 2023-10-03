@@ -19,3 +19,7 @@ watch filter="":
 # run cargo test and clippy
 clippy: test
   @cargo clippy --tests --workspace -- -D warnings
+
+# run cargo doc --no-deps
+doc:
+  @cargo doc --no-deps

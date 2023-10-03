@@ -64,7 +64,6 @@ use fast_forward::index::store::MetaData;
 
 assert_eq!(1, l.idx().meta().min_key());
 assert_eq!(2, l.idx().meta().max_key());
-
 ```
 
 All supported options for retrieve Items can you find by the [`crate::collections::Retriever`] struct.
@@ -103,10 +102,6 @@ assert_eq!(
 // the original list contains of course the Car with ID "VW"
 assert!(l.idx().contains(&String::from("VW")));
 ```
-
-This library consists of the following parts (modules):
-- [`crate::index`]: to store Indices and the Indices themself
-- [`crate::collections`]: the implementations of indexed collections (e.g. read only: IList, IRefList, IMap).
 
 
 <hr>

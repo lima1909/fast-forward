@@ -11,6 +11,42 @@ use crate::{
 };
 
 /// [`IList`] is a read only indexed `List` (Vec, Array, ..., default is a Vec) which owned the given items.
+///
+/// # Example
+///
+/// ```
+/// use fast_forward::{index::int::IntIndex, collections::ro::IList};
+///
+/// #[derive(PartialEq, Debug, Clone)]
+/// struct Person {
+///     id: i32,
+///     name: String,
+/// }
+///
+/// impl Person {
+///     fn new(id: i32, name: &str) -> Self {
+///         Self {
+///             id,
+///             name: name.into(),
+///         }
+///     }
+/// }
+///
+/// let mut l = IList::<IntIndex, _>::new(|p| p.id, vec![
+///                                                 Person::new(0, "Paul"),
+///                                                 Person::new(-2, "Mario"),
+///                                                 Person::new(2, "Jasmin"),
+///                                                 ]);
+///
+/// assert!(l.idx().contains(&2));
+/// assert_eq!(&Person::new(-2, "Mario"), l.idx().get(&-2).next().unwrap());
+///
+/// assert_eq!(
+///     l.idx().get_many([0, 2]).collect::<Vec<_>>(),
+///     vec![&Person::new(0, "Paul"), &Person::new(2, "Jasmin")],
+/// );
+/// ```
+
 pub struct IList<S, T, L = Vec<T>> {
     store: S,
     items: L,
@@ -49,6 +85,43 @@ impl<S, T, L> Deref for IList<S, T, L> {
 }
 
 /// [`IRefList`] is a read only indexed `List` which borrowed the given items.
+///
+/// # Example
+///
+/// ```
+/// use fast_forward::{index::int::IntIndex, collections::ro::IRefList};
+///
+/// #[derive(PartialEq, Debug, Clone)]
+/// struct Person {
+///     id: i32,
+///     name: String,
+/// }
+///
+/// impl Person {
+///     fn new(id: i32, name: &str) -> Self {
+///         Self {
+///             id,
+///             name: name.into(),
+///         }
+///     }
+/// }
+///
+/// let persons = vec![
+///                Person::new(0, "Paul"),
+///                Person::new(-2, "Mario"),
+///                Person::new(2, "Jasmin"),
+///               ];
+///
+/// let mut l = IRefList::<IntIndex, _>::new(|p| p.id, &persons);
+///
+/// assert!(l.idx().contains(&2));
+/// assert_eq!(&Person::new(-2, "Mario"), l.idx().get(&-2).next().unwrap());
+///
+/// assert_eq!(
+///     l.idx().get_many([0, 2]).collect::<Vec<_>>(),
+///     vec![&Person::new(0, "Paul"), &Person::new(2, "Jasmin")],
+/// );
+/// ```
 pub struct IRefList<'l, S, T> {
     store: S,
     items: &'l [T],
@@ -83,6 +156,44 @@ impl<S, T> Deref for IRefList<'_, S, T> {
 }
 
 /// [`IMap`] is a read only indexed `Key-Value Map` which owned the given items.
+///
+/// # Example
+///
+/// ```
+/// use std::collections::HashMap;
+/// use fast_forward::{index::int::IntIndex, collections::ro::IMap};
+///
+/// #[derive(PartialEq, Debug, Clone)]
+/// struct Person {
+///     id: i32,
+///     name: String,
+/// }
+///
+/// impl Person {
+///     fn new(id: i32, name: &str) -> Self {
+///         Self {
+///             id,
+///             name: name.into(),
+///         }
+///     }
+/// }
+///
+///
+/// let mut m = HashMap::new();
+/// m.insert("Paul", Person::new(0, "Paul"));
+/// m.insert("Mario", Person::new(-2, "Mario"));
+/// m.insert("Jasmin", Person::new(2, "Jasmin"));
+///
+/// let l: IMap<IntIndex<i32, &'static str>, _, Person> = IMap::new(|p| p.id, m);
+///
+/// assert!(l.idx().contains(&2));
+/// assert_eq!(&Person::new(-2, "Mario"), l.idx().get(&-2).next().unwrap());
+///
+/// assert_eq!(
+///     l.idx().get_many([0, 2]).collect::<Vec<_>>(),
+///     vec![&Person::new(0, "Paul"), &Person::new(2, "Jasmin")],
+/// );
+/// ```
 pub struct IMap<S, X, T, M = HashMap<X, T>> {
     store: S,
     items: M,
