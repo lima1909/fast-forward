@@ -23,3 +23,7 @@ clippy: test
 # run cargo doc --no-deps
 doc:
   @cargo doc --no-deps
+
+tag:
+  @git tag -a v0.0.1 -m "first release of fast-forward with version 0.0.1"
+  @git push origin --tags
