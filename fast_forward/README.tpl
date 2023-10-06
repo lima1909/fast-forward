@@ -1,9 +1,10 @@
-# Fast-Forward [![Build Status]][Build Action] [![Coverage Status]][Coverage Action]
+# Fast-Forward [![Build Status]][Build Action] [![Coverage Status]][Coverage Action][crates.io] 
 
 [Build Status]: https://github.com/lima1909/fast-forward/actions/workflows/continuous_integration.yml/badge.svg
 [Build Action]: https://github.com/lima1909/fast-forward/actions
 [Coverage Status]: https://codecov.io/gh/lima1909/fast-forward/branch/main/graph/badge.svg?token=VO3VV8BFLN
 [Coverage Action]: https://codecov.io/gh/lima1909/fast-forward
+[crates.io]: https://crates.io/crates/fast_forward
 
 
 ⏩ Quering lists blazing fast.

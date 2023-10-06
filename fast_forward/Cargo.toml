@@ -7,15 +7,8 @@ description = "Quering collections blazing fast."
 license = "MIT"
 documentation = "https://docs.rs/fast-forward/"
 repository = "https://github.com/lima1909/fast-forward"
-keywords = ["filter", "query", "index", "search", "inmemory", "database", "embedded"]
+keywords = ["filter", "query", "index", "search", "collection"]
 categories = ["data-structures ", "caching ", "embedded"]
-
-include = [
-    "src/*.rs",
-    "Cargo.toml",
-    "README.md",
-    "LICENSE",
-]
 
 [dependencies]
 hashbrown = { version = "0.14.0", optional = true }
