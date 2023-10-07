@@ -25,5 +25,5 @@ doc:
   @cargo doc --no-deps
 
 tag:
-  @git tag -a v0.0.1 -m "first release of fast-forward with version 0.0.1"
+  @git tag -a v0.0.2 -m "second release of fast-forward with version 0.0.2"
   @git push origin --tags
