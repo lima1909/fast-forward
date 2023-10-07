@@ -5,10 +5,10 @@ edition = "2021"
 authors = ["Mario Linke"]
 description = "Quering collections blazing fast."
 license = "MIT"
-documentation = "https://docs.rs/fast-forward/"
+documentation = "https://docs.rs/fast_forward/"
 repository = "https://github.com/lima1909/fast-forward"
 keywords = ["filter", "query", "index", "search", "collection"]
-categories = ["data-structures ", "caching ", "embedded"]
+categories = ["data-structures", "caching"]
 
 [dependencies]
 hashbrown = { version = "0.14.0", optional = true }

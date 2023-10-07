@@ -6,6 +6,7 @@ default:
 # generate the README.md from the README.tpl + src/lib.rs
 readme:
   cargo readme -o ../README.md 
+  cargo readme -o ./README.md 
 
 publish:
   cargo publish -v

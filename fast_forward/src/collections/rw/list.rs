@@ -328,7 +328,7 @@ mod tests {
 
         #[allow(clippy::useless_conversion)]
         let mut s = IList::<MapIndex<&'static str, usize>, _, _>::from_iter(
-            |p| p.1.clone(),
+            |p| p.1,
             vec![Person(-1, "A")].into_iter(),
         );
         assert_eq!(1, s.push(Person(1, "B")));
