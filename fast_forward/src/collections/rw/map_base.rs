@@ -218,18 +218,21 @@ mod tests {
     fn check_map(v: HashMap<&'static str, Person>) {
         let mut m =
             Map::<IntIndex<i32, &'static str>, Person, _, _>::from_iter(|p| p.id, v.into_iter());
-        m.insert("Mrs X", Person::new(-3, "Mrs X"));
+        assert!(m.insert("Mrs X", Person::new(-3, "Mrs X")));
 
         assert!(m.idx().contains(&-2));
         assert!(m.contains(&-3));
 
         assert!(!m.idx().contains(&-1));
 
+        // remove
+        assert_eq!(4, m.len());
         assert_eq!(Person::new(-3, "Mrs X"), m.remove("Mrs X").unwrap());
         assert!(!m.contains(&-3));
-
+        assert_eq!(3, m.len());
         assert_eq!(Some(&Person::new(2, "Jasmin")), m.idx().get(&2).next());
 
+        // update
         assert_eq!(
             Some(&Person::new(2, "Jasmin 2")),
             m.update("Jasmin", |p| {
@@ -238,5 +241,14 @@ mod tests {
         );
         assert_eq!(Some(&Person::new(2, "Jasmin 2")), m.idx().get(&2).next());
         assert_eq!(["Jasmin"], m.get(&2));
+    }
+
+    #[test]
+    fn invalid_insert() {
+        let mut m = Map::<IntIndex<i32, &'static str>, Person, _, _>::new(|p| p.id);
+        assert!(m.insert("Mrs X", Person::new(-3, "Mrs X")));
+        // invalid insert, same index
+        assert!(!m.insert("Mrs X", Person::new(-3, "Mrs X")));
+        assert_eq!(1, m.len());
     }
 }
