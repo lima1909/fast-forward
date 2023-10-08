@@ -97,7 +97,7 @@ where
     type Output = T;
 
     fn item(&self, idx: &X) -> &Self::Output {
-        self.get(idx).expect("no entry found for key")
+        &self[idx]
     }
 }
 
@@ -108,7 +108,19 @@ where
     type Output = T;
 
     fn item(&self, idx: &X) -> &Self::Output {
-        self.get(idx).expect("no entry found for key")
+        &self[idx]
+    }
+}
+
+#[cfg(feature = "hashbrown")]
+impl<X, T> Indexable<X> for hashbrown::HashMap<X, T>
+where
+    X: Eq + Hash + Clone + Borrow<X>,
+{
+    type Output = T;
+
+    fn item(&self, idx: &X) -> &Self::Output {
+        &self[idx]
     }
 }
 

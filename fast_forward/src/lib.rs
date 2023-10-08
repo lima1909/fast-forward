@@ -130,7 +130,7 @@ macro_rules! fast {
             $(
                 $store: $store_type,
             )+
-            _items_: $crate::collections::rw::base::TriggerList<$item>,
+            _items_: $crate::collections::rw::list_base::TriggerList<$item>,
         }
 
         ///
@@ -176,7 +176,7 @@ macro_rules! fast {
             #[allow(dead_code)]
             fn remove(&mut self, pos: usize) -> Option<$item> {
                 use $crate::index::store::Store;
-                use $crate::collections::rw::base::StoreOp;
+                use $crate::collections::rw::list_base::StoreOp;
 
                 self._items_.remove(pos, |trigger, it, idx| match trigger {
                     StoreOp::Delete => { $( self.$store.delete(it.$item_field$(.$item_field_func())?, &idx); )+ }

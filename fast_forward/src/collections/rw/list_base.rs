@@ -139,6 +139,13 @@ where
         s
     }
 
+    /// Append a new `Item` to the List.
+    pub fn push(&mut self, item: I) -> usize {
+        self.items.push(item, |i, idx| {
+            self.store.insert((self.field)(i), idx);
+        })
+    }
+
     pub fn idx(&self) -> Retriever<'_, S, Vec<I>> {
         Retriever::new(&self.store, &self.items)
     }
@@ -149,12 +156,7 @@ where
     S: Store<Index = usize>,
     F: Fn(&I) -> S::Key,
 {
-    /// Append a new `Item` to the List.
-    fn push(&mut self, item: I) -> usize {
-        self.items.push(item, |i, idx| {
-            self.store.insert((self.field)(i), idx);
-        })
-    }
+    type Index = usize;
 
     /// Update the item on the given position.
     fn update<U>(&mut self, pos: usize, mut update: U) -> Option<&I>

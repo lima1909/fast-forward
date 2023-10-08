@@ -1,25 +1,26 @@
 //! read-write collections.
 //!
-pub mod base;
 pub mod list;
+pub mod list_base;
+pub mod map_base;
 
 pub use list::IList;
 
 use crate::index::store::Filterable;
 use std::marker::PhantomData;
 
-/// `Editable` describe the operations for changing `Items` in a list.
+/// `Editable` describe the operations for changing `Items` in a list,
+/// where the `Index` is necessary.
 pub trait Editable<I> {
-    /// Append a new `Item` to the List.
-    fn push(&mut self, item: I) -> usize;
+    type Index;
 
     /// Update the item on the given position.
-    fn update<U>(&mut self, pos: usize, update: U) -> Option<&I>
+    fn update<U>(&mut self, index: Self::Index, update: U) -> Option<&I>
     where
         U: FnMut(&mut I);
 
     /// The Item on the given position will be removed from the list.
-    fn remove(&mut self, pos: usize) -> Option<I>;
+    fn remove(&mut self, index: Self::Index) -> Option<I>;
 }
 
 pub struct Editor<'a, I, E> {
@@ -29,7 +30,7 @@ pub struct Editor<'a, I, E> {
 
 impl<'a, I, E> Editor<'a, I, E>
 where
-    E: Editable<I> + Filterable<Index = usize>,
+    E: Editable<I, Index = usize> + Filterable<Index = usize>,
 {
     pub fn new(editor: &'a mut E) -> Self {
         Self {

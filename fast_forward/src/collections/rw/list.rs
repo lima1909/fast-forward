@@ -4,7 +4,7 @@ use std::{fmt::Debug, ops::Deref};
 
 use crate::{
     collections::{
-        rw::{base::List, Editable, Editor},
+        rw::{list_base::List, Editable, Editor},
         Retriever,
     },
     index::store::Store,
