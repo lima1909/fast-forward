@@ -9,8 +9,7 @@ pub use list::IList;
 use crate::index::store::Filterable;
 use std::marker::PhantomData;
 
-/// `Editable` describe the operations for changing `Items` in a list,
-/// where the `Index` is necessary.
+/// `Editable` describe the operations for changing (update and remove) `Items` in a collection.
 pub trait Editable<I> {
     type Index;
 
@@ -23,6 +22,7 @@ pub trait Editable<I> {
     fn remove(&mut self, index: Self::Index) -> Option<I>;
 }
 
+/// `Editor` used a given`Editable` to execute change operation by `Key` instead of an `Index`.
 pub struct Editor<'a, I, E> {
     editor: &'a mut E,
     _items: PhantomData<I>,

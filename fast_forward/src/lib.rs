@@ -1,5 +1,5 @@
 //! __Fast-Forward__ is a library for finding or filtering items in a (large) collection (Vec, Slice, Map, ...).
-//! This means faster than an `Iterator` or a search algorithm.
+//! This means faster than an `iterator` or a `search algorithm`.
 //! It is a wrapper, which extends the given collection with very fast find operations.
 //! This wrapper is just as easy to use as the given (original) collection.
 //!

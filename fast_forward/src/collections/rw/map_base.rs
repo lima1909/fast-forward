@@ -14,7 +14,7 @@ use crate::{
     index::store::{Filterable, Store},
 };
 
-/// Is a Wrapper for an [`Hashtable`], which has trigger functions for insert and remove operations
+/// Is a Wrapper for an [`std::collections::HashMap`], which has trigger functions for insert and remove operations
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct TriggerMap<I, X>(HashMap<X, I>);
