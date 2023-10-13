@@ -16,8 +16,3 @@ and want anyone use it. The API can change a lot! Please, try it out and give me
 # Overview
 
 {{readme}}
-
-<hr>
-Current version: {{version}}
-
-License: {{license}}

@@ -1,6 +1,6 @@
 [package]
 name = "fast_forward"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 authors = ["Mario Linke"]
 description = "Quering collections blazing fast."

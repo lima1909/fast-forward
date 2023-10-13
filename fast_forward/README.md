@@ -16,7 +16,7 @@ and want anyone use it. The API can change a lot! Please, try it out and give me
 # Overview
 
 __Fast-Forward__ is a library for finding or filtering items in a (large) collection (Vec, Slice, Map, ...).
-This means faster than an `Iterator` or a search algorithm.
+This means faster than an `iterator` or a `search algorithm`.
 It is a wrapper, which extends the given collection with very fast find operations.
 This wrapper is just as easy to use as the given (original) collection.
 
@@ -38,7 +38,8 @@ let l = IList::<UIntIndex, _>::new(|c: &Car| c.0, vec![
                             Car(2, "VW".into())]);
 
 // idx method pointed to the Car.0 property Index and
-// gives access to the `Retriever` object to handle queries, like: contains, get, filter.
+// gives access to the `Retriever` object to handle queries,
+// like: contains, get, filter.
 assert!(l.idx().contains(&2));
 assert!(!l.idx().contains(&2000));
 
@@ -90,7 +91,8 @@ let l = IList::<MapIndex, _>::new(|c: &Car| c.1.clone(), vec![
                             Car(3, "Audi".into())]);
 
 // create a view: only for Car Name = "BMW" 0r "Audi"
-let view = l.idx().create_view([String::from("BMW"), String::from("Audi")]);
+let view = l.idx().create_view(
+      [String::from("BMW"), String::from("Audi")]);
 
 // Car with Name "VW" is NOT in the view
 assert!(!view.contains(&String::from("VW")));
@@ -105,8 +107,3 @@ assert_eq!(
 assert!(l.idx().contains(&String::from("VW")));
 ```
 
-
-<hr>
-Current version: 0.0.1
-
-License: MIT

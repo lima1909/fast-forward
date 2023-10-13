@@ -21,7 +21,8 @@
 //!                             Car(2, "VW".into())]);
 //!
 //! // idx method pointed to the Car.0 property Index and
-//! // gives access to the `Retriever` object to handle queries, like: contains, get, filter.
+//! // gives access to the `Retriever` object to handle queries,
+//! // like: contains, get, filter.
 //! assert!(l.idx().contains(&2));
 //! assert!(!l.idx().contains(&2000));
 //!
@@ -73,7 +74,8 @@
 //!                             Car(3, "Audi".into())]);
 //!
 //! // create a view: only for Car Name = "BMW" 0r "Audi"
-//! let view = l.idx().create_view([String::from("BMW"), String::from("Audi")]);
+//! let view = l.idx().create_view(
+//!       [String::from("BMW"), String::from("Audi")]);
 //!
 //! // Car with Name "VW" is NOT in the view
 //! assert!(!view.contains(&String::from("VW")));
