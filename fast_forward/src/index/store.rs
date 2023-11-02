@@ -314,26 +314,26 @@ where
 mod tests {
     use super::{super::filter::Filter, *};
     use crate::index::{
-        indices::{Indices, KeyIndices},
+        indices::{Indices, KeyIndex, MultiKeyIndex},
         map::MapIndex,
     };
     use rstest::rstest;
     use std::collections::HashMap;
 
     struct StrIndex {
-        idx: HashMap<&'static str, KeyIndices>,
+        idx: HashMap<&'static str, MultiKeyIndex>,
     }
 
     impl StrIndex {
         fn new() -> Self {
-            let mut double_a = KeyIndices::new(0);
+            let mut double_a = MultiKeyIndex::new(0);
             double_a.add(3);
 
             let mut idx = HashMap::new();
             idx.insert("a", double_a);
-            idx.insert("b", KeyIndices::new(1));
-            idx.insert("c", KeyIndices::new(2));
-            idx.insert("s", KeyIndices::new(4));
+            idx.insert("b", MultiKeyIndex::new(1));
+            idx.insert("c", MultiKeyIndex::new(2));
+            idx.insert("s", MultiKeyIndex::new(4));
             Self { idx }
         }
     }

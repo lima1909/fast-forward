@@ -12,32 +12,83 @@ use crate::index::{
     Indexable,
 };
 
+/// `KeyIndex` is the interface for `unique` and `multi` key indices.
+/// It contains all indices for a given `Key`.
+pub trait KeyIndex<X> {
+    /// Create a new `KeyIndex` with the initial value `idx`.
+    fn new(idx: X) -> Self;
+    /// Add a new `idx`.
+    fn add(&mut self, idx: X);
+    /// Remove a `idx`.
+    fn remove(&mut self, idx: &X) -> &[X];
+    /// Returns all saved `idx` as slice.
+    fn as_slice(&self) -> &[X];
+}
+
+#[derive(Debug, Clone)]
+#[repr(transparent)]
+pub struct UniqueKeyIndex<X>(Option<[X; 1]>);
+
+impl<X> KeyIndex<X> for UniqueKeyIndex<X> {
+    /// Create a new Index.
+    fn new(idx: X) -> Self {
+        Self(Some([idx]))
+    }
+
+    /// ## Panics
+    /// Panics, the Index must be unique, so you can not add a further `idx`.
+    fn add(&mut self, _: X) {
+        panic!("unique index can not add a new index")
+    }
+
+    /// Remove the only `idx`.
+    fn remove(&mut self, _: &X) -> &[X] {
+        self.0 = None;
+        &[]
+    }
+
+    /// Returns all saved `idx` as slice.
+    fn as_slice(&self) -> &[X] {
+        self.0
+            .as_ref()
+            .map_or_else(|| [].as_slice(), |idx| idx.as_slice())
+    }
+}
+
+impl<X> From<[X; 1]> for UniqueKeyIndex<X> {
+    fn from(index: [X; 1]) -> Self {
+        Self(Some(index))
+    }
+}
+
 /// `KeyIndices` contains all indices for a given `Key`.
 /// Important: the collection must be sorted!
 #[derive(Debug, Clone, PartialEq)]
 #[repr(transparent)]
-pub struct KeyIndices<I = usize>(Vec<I>);
+pub struct MultiKeyIndex<I = usize>(Vec<I>);
 
-impl<I> KeyIndices<I> {
+impl<I> MultiKeyIndex<I> {
     /// Create a new empty KeyIndices.
     #[inline]
     pub const fn empty() -> Self {
         Self(vec![])
     }
+}
 
+impl<X> KeyIndex<X> for MultiKeyIndex<X>
+where
+    X: Ord + PartialEq,
+{
     /// Create a new Indices collection with the initial Index.
     #[inline]
-    pub fn new(idx: I) -> Self {
+    fn new(idx: X) -> Self {
         Self(vec![idx])
     }
 
     /// Add new Index to a sorted collection.
     /// The collection is unique.
     #[inline]
-    pub fn add(&mut self, idx: I)
-    where
-        I: Ord,
-    {
+    fn add(&mut self, idx: X) {
         if let Err(pos) = self.0.binary_search(&idx) {
             self.0.insert(pos, idx);
         }
@@ -45,16 +96,13 @@ impl<I> KeyIndices<I> {
 
     /// Remove one Index and return left free Indices.
     #[inline]
-    pub fn remove(&mut self, idx: &I) -> &[I]
-    where
-        I: PartialEq,
-    {
+    fn remove(&mut self, idx: &X) -> &[X] {
         self.0.retain(|v| v != idx);
         self.0.as_ref()
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[I] {
+    fn as_slice(&self) -> &[X] {
         self.0.as_ref()
     }
 }
@@ -149,17 +197,17 @@ mod tests {
         #[test]
         fn empty() {
             let empty: [usize; 0] = [];
-            assert_eq!(empty, KeyIndices::<usize>::empty().as_slice());
+            assert_eq!(empty, MultiKeyIndex::<usize>::empty().as_slice());
         }
 
         #[test]
         fn unique() {
-            assert_eq!([0], KeyIndices::new(0).as_slice());
+            assert_eq!([0], MultiKeyIndex::new(0).as_slice());
         }
 
         #[test]
         fn multi() {
-            let mut m = KeyIndices::new(2);
+            let mut m = MultiKeyIndex::new(2);
             assert_eq!([2], m.as_slice());
 
             m.add(1);
@@ -168,7 +216,7 @@ mod tests {
 
         #[test]
         fn multi_duplicate() {
-            let mut m = KeyIndices::new(1);
+            let mut m = MultiKeyIndex::new(1);
             assert_eq!([1], m.as_slice());
 
             // ignore add: 1, 1 exists already
@@ -178,7 +226,7 @@ mod tests {
 
         #[test]
         fn multi_ordered() {
-            let mut m = KeyIndices::new(5);
+            let mut m = MultiKeyIndex::new(5);
             assert_eq!([5], m.as_slice());
 
             m.add(3);
@@ -190,12 +238,12 @@ mod tests {
 
         #[test]
         fn container_multi() {
-            let mut lhs = KeyIndices::new(5);
+            let mut lhs = MultiKeyIndex::new(5);
             lhs.add(3);
             lhs.add(2);
             lhs.add(4);
 
-            let mut rhs = KeyIndices::new(5);
+            let mut rhs = MultiKeyIndex::new(5);
             rhs.add(2);
             rhs.add(9);
 
@@ -206,8 +254,8 @@ mod tests {
 
         #[test]
         fn container_unique() {
-            let mut lhs = KeyIndices::new(5);
-            let rhs = KeyIndices::new(5);
+            let mut lhs = MultiKeyIndex::new(5);
+            let rhs = MultiKeyIndex::new(5);
 
             let r: Indices = Indices::from_sorted_slice(rhs.as_slice());
             {
@@ -223,7 +271,7 @@ mod tests {
 
         #[test]
         fn remove() {
-            let mut pos = KeyIndices::new(5);
+            let mut pos = MultiKeyIndex::new(5);
             let p: Indices = Indices::from_sorted_slice(pos.as_slice());
             assert_eq!([5], p);
 
@@ -231,11 +279,11 @@ mod tests {
             // double remove
             assert!(pos.remove(&5).is_empty());
 
-            let mut pos = KeyIndices::new(5);
+            let mut pos = MultiKeyIndex::new(5);
             pos.add(2);
             assert_eq!([2], pos.remove(&5));
 
-            let mut pos = KeyIndices::new(5);
+            let mut pos = MultiKeyIndex::new(5);
             pos.add(2);
             assert_eq!([5], pos.remove(&2));
         }

@@ -2,7 +2,7 @@
 //! to find the Indices for a given `Key`.
 //!
 use crate::index::{
-    indices::KeyIndices,
+    indices::{KeyIndex, MultiKeyIndex},
     store::{Filterable, Store},
     view::Keys,
 };
@@ -17,7 +17,7 @@ use std::collections::HashMap;
 /// `Key` default type is [`String`] and use [`std::collections::HashMap`] for the Index implementation.
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct MapIndex<K = String, X = usize>(HashMap<K, KeyIndices<X>>);
+pub struct MapIndex<K = String, X = usize>(HashMap<K, MultiKeyIndex<X>>);
 
 impl<K, X> Default for MapIndex<K, X> {
     fn default() -> Self {
@@ -28,6 +28,7 @@ impl<K, X> Default for MapIndex<K, X> {
 impl<K, X> Filterable for MapIndex<K, X>
 where
     K: Hash + Eq,
+    X: Ord + PartialEq,
 {
     type Key = K;
     type Index = X;
@@ -54,7 +55,7 @@ where
         match self.0.get_mut(&key) {
             Some(v) => v.add(i),
             None => {
-                self.0.insert(key, KeyIndices::new(i));
+                self.0.insert(key, MultiKeyIndex::new(i));
             }
         }
     }
@@ -93,7 +94,7 @@ where
         let v = Vec::from_iter(it);
         let mut view = Self::with_capacity(v.len());
         v.into_iter().for_each(|key| {
-            view.0.insert(key, KeyIndices::empty());
+            view.0.insert(key, MultiKeyIndex::empty());
         });
         view
     }

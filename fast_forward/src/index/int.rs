@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 
 use super::{
-    indices::KeyIndices,
+    indices::{KeyIndex, MultiKeyIndex},
     ops::MinMax,
     store::{Filterable, MetaData, Store},
     view::Keys,
@@ -12,8 +12,8 @@ use super::{
 /// `Key` is from type Into: [`i32`].
 #[derive(Debug)]
 pub struct IntIndex<K = i32, X = usize> {
-    pos_data: Vec<Option<(K, KeyIndices<X>)>>,
-    neg_data: Vec<Option<(K, KeyIndices<X>)>>,
+    pos_data: Vec<Option<(K, MultiKeyIndex<X>)>>,
+    neg_data: Vec<Option<(K, MultiKeyIndex<X>)>>,
     min_max_cache: MinMax<K>,
     _key: PhantomData<K>,
 }
@@ -21,6 +21,7 @@ pub struct IntIndex<K = i32, X = usize> {
 impl<K, X> Filterable for IntIndex<K, X>
 where
     K: Into<i32> + TryInto<usize> + Copy,
+    X: Ord + PartialEq,
 {
     type Key = K;
     type Index = X;
@@ -58,7 +59,7 @@ where
 
         match data[pos].as_mut() {
             Some((_, idx)) => idx.add(x),
-            None => data[pos] = Some((orig_key, KeyIndices::new(x))),
+            None => data[pos] = Some((orig_key, MultiKeyIndex::new(x))),
         }
 
         self.min_max_cache.new_value(orig_key);
@@ -96,7 +97,7 @@ where
 
 impl<K, X> IntIndex<K, X> {
     #[inline]
-    fn data(&self, key: i32) -> &[Option<(K, KeyIndices<X>)>] {
+    fn data(&self, key: i32) -> &[Option<(K, MultiKeyIndex<X>)>] {
         if key < 0 {
             return &self.neg_data;
         }
@@ -104,7 +105,7 @@ impl<K, X> IntIndex<K, X> {
     }
 
     #[inline]
-    fn data_mut(&mut self, key: i32) -> &mut Vec<Option<(K, KeyIndices<X>)>> {
+    fn data_mut(&mut self, key: i32) -> &mut Vec<Option<(K, MultiKeyIndex<X>)>> {
         if key < 0 {
             return &mut self.neg_data;
         }
@@ -143,7 +144,7 @@ where
                 data.resize(pos + 1, None);
             }
 
-            data[pos] = Some((key, KeyIndices::empty()))
+            data[pos] = Some((key, MultiKeyIndex::empty()))
         }
 
         let v = Vec::from_iter(it);
@@ -165,13 +166,13 @@ fn pos(key: i32) -> usize {
 }
 
 struct KeyIntIter<'a, K> {
-    pos: &'a [Option<(K, KeyIndices)>],
-    iter: std::slice::Iter<'a, Option<(K, KeyIndices)>>,
+    pos: &'a [Option<(K, MultiKeyIndex)>],
+    iter: std::slice::Iter<'a, Option<(K, MultiKeyIndex)>>,
     is_neg: bool,
 }
 
 impl<'a, K> KeyIntIter<'a, K> {
-    fn new(neg: &'a [Option<(K, KeyIndices)>], pos: &'a [Option<(K, KeyIndices)>]) -> Self {
+    fn new(neg: &'a [Option<(K, MultiKeyIndex)>], pos: &'a [Option<(K, MultiKeyIndex)>]) -> Self {
         Self {
             pos,
             is_neg: true,

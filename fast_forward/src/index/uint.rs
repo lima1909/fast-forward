@@ -1,7 +1,7 @@
 //! This `Index` is well suitable for `IDs` with [`usize`] compatible data types (for example `Primary Keys`).
 //!
 use crate::index::{
-    indices::KeyIndices,
+    indices::{KeyIndex, MultiKeyIndex},
     ops::MinMax,
     store::{Filterable, MetaData, Store},
     view::Keys,
@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug)]
 pub struct UIntIndex<K = usize, X = usize> {
-    data: Vec<Option<(K, KeyIndices<X>)>>,
+    data: Vec<Option<(K, MultiKeyIndex<X>)>>,
     min_max_cache: MinMax<K>,
     _key: PhantomData<K>,
 }
@@ -32,6 +32,7 @@ where
 impl<K, X> Filterable for UIntIndex<K, X>
 where
     K: Into<usize> + Copy,
+    X: Ord + PartialEq,
 {
     type Key = K;
     type Index = X;
@@ -65,7 +66,7 @@ where
 
         match self.data[k].as_mut() {
             Some((_, idx)) => idx.add(i),
-            None => self.data[k] = Some((orig_key, KeyIndices::new(i))),
+            None => self.data[k] = Some((orig_key, MultiKeyIndex::new(i))),
         }
 
         self.min_max_cache.new_value(orig_key);
@@ -127,7 +128,7 @@ where
                 view.data.resize(pos + 1, None);
             }
 
-            view.data[pos] = Some((orig_key, KeyIndices::empty()))
+            view.data[pos] = Some((orig_key, MultiKeyIndex::empty()))
         }
 
         let v = Vec::from_iter(it);
