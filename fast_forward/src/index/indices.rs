@@ -47,7 +47,10 @@ where
     /// Remove the only `idx`.
     fn remove(&mut self, idx: &X) -> bool {
         match self.0.as_ref() {
-            Some(inner) if &inner[0] == idx => true,
+            Some(inner) if &inner[0] == idx => {
+                self.0 = None;
+                true
+            }
             Some(_) => false,
             None => true,
         }
@@ -425,11 +428,9 @@ mod tests {
 
             // 2, 5, 6, 10
             // 1, 2, 8, 9, 12
-            assert_eq!(
-                [2, 12],
-                Indices::borrowed(&[2, 5, 6, 10, 12, 13, 15])
-                    & Indices::borrowed(&[1, 2, 8, 9, 12])
-            );
+            let a: Indices = [2, 5, 6, 10, 12, 13, 15].into();
+            let b: Indices = [1, 2, 8, 9, 12].into();
+            assert_eq!([2, 12], a & b);
         }
     }
 
