@@ -77,7 +77,7 @@ where
         let k = key.into();
         if let Some(Some((_, rm_idx))) = self.data.get_mut(k) {
             // if the Index is the last, then remove complete Index
-            if rm_idx.remove(idx).is_empty() {
+            if rm_idx.remove(idx) {
                 self.data[k] = None
             }
         }

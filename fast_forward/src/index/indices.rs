@@ -19,17 +19,20 @@ pub trait KeyIndex<X> {
     fn new(idx: X) -> Self;
     /// Add a new `idx`.
     fn add(&mut self, idx: X);
-    /// Remove a `idx`.
-    fn remove(&mut self, idx: &X) -> &[X];
+    /// Remove a `idx`. I return value is true, than the last index was removed.
+    fn remove(&mut self, idx: &X) -> bool;
     /// Returns all saved `idx` as slice.
     fn as_slice(&self) -> &[X];
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[repr(transparent)]
 pub struct UniqueKeyIndex<X>(Option<[X; 1]>);
 
-impl<X> KeyIndex<X> for UniqueKeyIndex<X> {
+impl<X> KeyIndex<X> for UniqueKeyIndex<X>
+where
+    X: PartialEq,
+{
     /// Create a new Index.
     fn new(idx: X) -> Self {
         Self(Some([idx]))
@@ -42,9 +45,12 @@ impl<X> KeyIndex<X> for UniqueKeyIndex<X> {
     }
 
     /// Remove the only `idx`.
-    fn remove(&mut self, _: &X) -> &[X] {
-        self.0 = None;
-        &[]
+    fn remove(&mut self, idx: &X) -> bool {
+        match self.0.as_ref() {
+            Some(inner) if &inner[0] == idx => true,
+            Some(_) => false,
+            None => true,
+        }
     }
 
     /// Returns all saved `idx` as slice.
@@ -96,9 +102,9 @@ where
 
     /// Remove one Index and return left free Indices.
     #[inline]
-    fn remove(&mut self, idx: &X) -> &[X] {
+    fn remove(&mut self, idx: &X) -> bool {
         self.0.retain(|v| v != idx);
-        self.0.as_ref()
+        self.0.is_empty()
     }
 
     #[inline]
@@ -191,7 +197,38 @@ mod tests {
         }
     }
 
-    mod key_indices {
+    mod unique_key_indices {
+        use super::*;
+
+        #[test]
+        fn new_into() {
+            let key = [1; 1];
+            assert_eq!(UniqueKeyIndex::new(1), key.into());
+        }
+
+        #[test]
+        #[should_panic]
+        fn add() {
+            let mut x = UniqueKeyIndex::new(1);
+            x.add(2);
+        }
+
+        #[test]
+        fn as_slice() {
+            let key = [1; 1];
+            assert_eq!(UniqueKeyIndex::new(1).as_slice(), key.as_slice());
+        }
+
+        #[test]
+        fn remove() {
+            let mut x = UniqueKeyIndex::new(1);
+            assert!(!x.remove(&2));
+            assert!(x.remove(&1));
+            assert!(x.remove(&1));
+        }
+    }
+
+    mod multi_key_indices {
         use super::*;
 
         #[test]
@@ -275,17 +312,17 @@ mod tests {
             let p: Indices = Indices::from_sorted_slice(pos.as_slice());
             assert_eq!([5], p);
 
-            assert!(pos.remove(&5).is_empty());
+            assert!(pos.remove(&5));
             // double remove
-            assert!(pos.remove(&5).is_empty());
+            assert!(pos.remove(&5));
 
             let mut pos = MultiKeyIndex::new(5);
             pos.add(2);
-            assert_eq!([2], pos.remove(&5));
+            assert!(!pos.remove(&5));
 
             let mut pos = MultiKeyIndex::new(5);
             pos.add(2);
-            assert_eq!([5], pos.remove(&2));
+            assert!(!pos.remove(&2));
         }
     }
 

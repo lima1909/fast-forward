@@ -72,7 +72,7 @@ where
 
         if let Some(Some((_, rm_idx))) = data.get_mut(pos(i32key)) {
             // if the Index is the last, then remove complete Index
-            if rm_idx.remove(x).is_empty() {
+            if rm_idx.remove(x) {
                 data[pos(i32key)] = None
             }
         }

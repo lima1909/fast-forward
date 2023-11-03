@@ -62,7 +62,7 @@ where
 
     fn delete(&mut self, key: K, idx: &Self::Index) {
         if let Some(rm_idx) = self.0.get_mut(&key) {
-            if rm_idx.remove(idx).is_empty() {
+            if rm_idx.remove(idx) {
                 self.0.remove(&key);
             }
         }
