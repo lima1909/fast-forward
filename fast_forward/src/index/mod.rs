@@ -1,4 +1,5 @@
 //! The `index `module contains the structure for saving and accessing the `Index` implementations.
+// mod base;
 pub mod indices;
 pub mod int;
 pub mod map;
