@@ -27,7 +27,7 @@ pub trait KeyIndex<X> {
 
 #[derive(Debug, Clone, PartialEq)]
 #[repr(transparent)]
-pub struct UniqueKeyIndex<X>(Option<[X; 1]>);
+pub struct UniqueKeyIndex<X = usize>(Option<[X; 1]>);
 
 impl<X> KeyIndex<X> for UniqueKeyIndex<X>
 where
