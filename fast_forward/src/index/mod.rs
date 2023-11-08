@@ -1,7 +1,7 @@
 //! The `index `module contains the structure for saving and accessing the `Index` implementations.
-// mod base;
 pub mod indices;
 pub mod int;
+mod ivec;
 pub mod map;
 pub mod ops;
 pub mod store;

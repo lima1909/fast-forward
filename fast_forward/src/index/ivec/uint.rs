@@ -3,61 +3,51 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use crate::index::{
-    base::{
-        view::{View, ViewCreator},
-        IVec,
-    },
     indices::{KeyIndex, MultiKeyIndex, UniqueKeyIndex},
-    store::{Filterable, MetaData, Store},
+    ivec::IVec,
+    store::{Filterable, MetaData, Store, View, ViewCreator},
 };
 
-type UniqueUIntIndex<K = usize, X = usize> = UIntIndex<UniqueKeyIndex<X>, K, X>;
-type MultiUIntIndex<K = usize, X = usize> = UIntIndex<MultiKeyIndex<X>, K, X>;
+pub type UniqueUIntIndex<K = usize, X = usize> = UIntIndex<UniqueKeyIndex<X>, K, X>;
+pub type MultiUIntIndex<K = usize, X = usize> = UIntIndex<MultiKeyIndex<X>, K, X>;
 
 /// `Key` is from type [`usize`] and the information are saved in a List (Store).
 #[derive(Debug)]
-struct UIntIndex<I, K = usize, X = usize> {
-    vec: IVec<X, I, Option<I>>,
+#[repr(transparent)]
+pub struct UIntIndex<I, K = usize, X = usize> {
+    vec: IVec<I, X, Option<I>>,
     _key: PhantomData<K>,
-    _index: PhantomData<X>,
 }
 
 impl<I, K, X> Filterable for UIntIndex<I, K, X>
 where
-    I: KeyIndex<X> + Clone,
+    I: KeyIndex<X>,
     K: Into<usize> + Copy,
 {
     type Key = K;
     type Index = X;
 
     fn contains(&self, key: &Self::Key) -> bool {
-        self.vec.contains((*key).into())
+        self.vec.contains_key((*key).into())
     }
 
     fn get(&self, key: &Self::Key) -> &[Self::Index] {
-        self.vec.get((*key).into())
+        self.vec.get_indeces_by_key((*key).into())
     }
 }
 
-impl<'a, K, X> ViewCreator<'a, Vec<Option<&'a MultiKeyIndex<X>>>>
-    for UIntIndex<MultiKeyIndex<X>, K, X>
+impl<'a, I, K, X> ViewCreator<'a, IVec<I, X, Option<&'a I>>> for UIntIndex<I, K, X>
 where
-    K: Into<usize> + Copy,
-    X: Ord + PartialEq,
+    I: KeyIndex<X>,
 {
-    fn create_view<It>(&'a self, keys: It) -> View<Vec<Option<&'a MultiKeyIndex<X>>>>
+    fn create_view<It, Keys>(&'a self, keys: It) -> View<IVec<I, X, Option<&'a I>>>
     where
-        It: IntoIterator<Item = usize>,
+        It: IntoIterator<Item = Keys>,
+        Keys: Into<usize>,
     {
-        let mut v = Vec::<Option<&MultiKeyIndex<X>>>::new();
-        v.resize(self.vec.len(), None);
-
-        for key in keys {
-            if let Some(Some(idxs)) = self.vec.get(key) {
-                v[key] = Some(idxs);
-            }
-        }
-
+        let v = self
+            .vec
+            .create_view(keys.into_iter().map(|k| k.into().into()));
         View(v)
     }
 }
@@ -79,20 +69,18 @@ where
         Self {
             vec: IVec::with_capacity(capacity),
             _key: PhantomData,
-            _index: PhantomData,
         }
     }
 }
 
 impl<I, K, X> Default for UIntIndex<I, K, X>
 where
-    I: KeyIndex<X> + Clone,
+    I: KeyIndex<X>,
 {
     fn default() -> Self {
         Self {
             vec: IVec::new(),
             _key: PhantomData,
-            _index: PhantomData,
         }
     }
 }
@@ -105,11 +93,11 @@ impl<I, K, X> MetaData for UIntIndex<I, K, X> {
     }
 }
 
-pub struct UIntMeta<'a, I: 'a, X: 'a>(&'a IVec<X, I, Option<I>>);
+pub struct UIntMeta<'a, I: 'a, X: 'a>(&'a IVec<I, X, Option<I>>);
 
 impl<'s, I, X> UIntMeta<'s, I, X>
 where
-    I: KeyIndex<X> + Clone,
+    I: KeyIndex<X>,
 {
     /// Get the smallest (`min`) `Key-Index` which is stored in `UIntIndex`.
     pub fn min_key_index(&self) -> Option<usize> {
@@ -125,7 +113,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        super::super::{filter::Filter, store::Store},
+        super::super::{
+            filter::Filter,
+            store::{Store, ViewCreator},
+        },
         *,
     };
 
@@ -146,7 +137,7 @@ mod tests {
         i.insert(4, 9);
         i.insert(5, 10);
 
-        let view = i.create_view([1, 2, 4]);
+        let view = i.create_view([1usize, 2, 4]);
         assert!(view.contains(&1));
         assert!(view.contains(&4));
         assert!(!view.contains(&100));
@@ -165,7 +156,7 @@ mod tests {
         i.update(2, 5, 4);
         i.update(4, 99, 4);
 
-        let view = i.create_view([1, 2, 4, 100]);
+        let view = i.create_view([1usize, 2, 4, 100]);
         assert_eq!(view.get(&2), &[4]);
         assert_eq!(view.get(&4), &[5, 8, 9, 99]);
     }
@@ -361,7 +352,7 @@ mod tests {
 
         #[test]
         fn min_rm() {
-            let mut idx = MultiUIntIndex::<u16, _>::with_capacity(100);
+            let mut idx = UniqueUIntIndex::<u16, _>::with_capacity(100);
             idx.insert(4, 4);
             assert_eq!(Some(4), idx.meta().min_key_index());
 
@@ -375,7 +366,7 @@ mod tests {
 
         #[test]
         fn max() {
-            let mut idx = MultiUIntIndex::<u8, _>::with_capacity(100);
+            let mut idx = UniqueUIntIndex::<u8, _>::with_capacity(100);
             assert_eq!(None, idx.meta().max_key_index());
 
             idx.insert(4, 4);
@@ -390,7 +381,7 @@ mod tests {
 
         #[test]
         fn update() {
-            let mut idx = MultiUIntIndex::<usize, usize>::default();
+            let mut idx = UniqueUIntIndex::<usize, usize>::default();
             idx.insert(2, 4);
 
             assert_eq!(Some(2), idx.meta().min_key_index());
@@ -402,8 +393,8 @@ mod tests {
             assert_eq!([4], idx.get(&100));
 
             // (old) Key 2 exist, but not with Index: 8, insert known Key: 2 with add new Index 8
-            idx.update(2, 8, 2);
-            assert_eq!([4, 8], idx.get(&2));
+            // idx.update(2, 8, 2);
+            // assert_eq!([4, 8], idx.get(&2));
 
             // old Key 2 with Index 8 was removed and (new) Key 4 was added with Index 8
             idx.update(2, 8, 4);
@@ -416,9 +407,8 @@ mod tests {
 
         #[test]
         fn delete() {
-            let mut idx = UIntIndex::new();
+            let mut idx = UniqueUIntIndex::<usize, _>::default();
             idx.insert(2, 4);
-            idx.insert(2, 3);
             idx.insert(3, 1);
 
             assert_eq!(2, idx.meta().min_key_index().unwrap());
@@ -426,17 +416,11 @@ mod tests {
 
             // delete correct Key with wrong Index, nothing happens
             idx.delete(2, &100);
-            assert_eq!([3, 4], idx.get(&2));
+            assert_eq!([4], idx.get(&2));
 
             // delete correct Key with correct Index
-            idx.delete(2, &3);
-            assert_eq!([4], idx.get(&2));
-            assert_eq!(2, idx.meta().min_key_index().unwrap());
-            assert_eq!(3, idx.meta().max_key_index().unwrap());
-
-            // delete correct Key with last correct Index, Key now longer exist
             idx.delete(2, &4);
-            assert!(idx.get(&2).is_empty());
+            assert_eq!(None, idx.get(&2).iter().next());
             assert_eq!(3, idx.meta().min_key_index().unwrap());
             assert_eq!(3, idx.meta().max_key_index().unwrap());
 
@@ -447,58 +431,90 @@ mod tests {
         }
     }
 
-    //     mod multi {
-    //         use super::*;
+    mod multi {
+        use super::*;
 
-    //         #[test]
-    //         fn empty() {
-    //             let i = UIntIndex::<u8>::default();
-    //             assert_eq!(0, i.get(&2).len());
-    //             assert!(i.data.is_empty());
-    //         }
+        #[test]
+        fn empty() {
+            let i = MultiUIntIndex::<u8, u8>::default();
+            assert_eq!(0, i.get(&2).len());
+            assert!(i.vec.is_empty());
+        }
 
-    //         #[test]
-    //         fn find_idx_2() {
-    //             let mut i = UIntIndex::<u8>::default();
-    //             i.insert(2, 2);
+        #[test]
+        fn find_idx_2() {
+            let mut i = MultiUIntIndex::<u8, _>::default();
+            i.insert(2, 2);
 
-    //             assert_eq!(i.get(&2), [2]);
-    //             assert_eq!(3, i.data.len());
-    //         }
+            assert_eq!(i.get(&2), [2]);
+            assert_eq!(4, i.vec.len());
+        }
 
-    //         #[test]
-    //         fn double_index() {
-    //             let mut i = UIntIndex::<u8>::default();
-    //             i.insert(2, 2);
-    //             i.insert(2, 1);
+        #[test]
+        fn double_index() {
+            let mut i = MultiUIntIndex::<u8, _>::default();
+            i.insert(2, 2);
+            i.insert(2, 1);
 
-    //             assert_eq!(i.get(&2), [1, 2]);
-    //         }
+            assert_eq!(i.get(&2), [1, 2]);
+        }
 
-    //         #[test]
-    //         fn find_eq_many_unique() {
-    //             let l = [0, 2, 2, 3, 4, 5, 6];
-    //             let i = UIntIndex::<u8>::from_list(l);
+        #[test]
+        fn find_eq_many_unique() {
+            let l = [0, 2, 2, 3, 4, 5, 6];
+            let i = MultiUIntIndex::<u8, _>::from_list(l);
 
-    //             assert_eq!(0, i.get_many([]).items_vec(&l).len());
-    //             assert_eq!(0, i.get_many([9]).items_vec(&l).len());
+            assert_eq!(0, i.get_many([]).items_vec(&l).len());
+            assert_eq!(0, i.get_many([9]).items_vec(&l).len());
 
-    //             assert_eq!(vec![&2, &2], i.get_many([2]).items_vec(&l));
-    //             assert_eq!(vec![&6, &2, &2], i.get_many([6, 2]).items_vec(&l));
-    //             assert_eq!(vec![&6, &2, &2], i.get_many([9, 6, 2]).items_vec(&l));
-    //             assert_eq!(vec![&5, &6, &2, &2], i.get_many([5, 9, 6, 2]).items_vec(&l));
-    //         }
+            assert_eq!(vec![&2, &2], i.get_many([2]).items_vec(&l));
+            assert_eq!(vec![&6, &2, &2], i.get_many([6, 2]).items_vec(&l));
+            assert_eq!(vec![&6, &2, &2], i.get_many([9, 6, 2]).items_vec(&l));
+            assert_eq!(vec![&5, &6, &2, &2], i.get_many([5, 9, 6, 2]).items_vec(&l));
+        }
 
-    //         #[test]
-    //         fn contains() {
-    //             let mut i = UIntIndex::<u8>::default();
-    //             i.insert(2, 2);
-    //             i.insert(2, 1);
+        #[test]
+        fn contains() {
+            let mut i = MultiUIntIndex::<u8, _>::default();
+            i.insert(2, 2);
+            i.insert(2, 1);
 
-    //             assert!(i.contains(&2));
-    //             assert!(!i.contains(&55));
-    //         }
-    //     }
+            assert!(i.contains(&2));
+            assert!(!i.contains(&55));
+        }
+
+        #[test]
+        fn delete() {
+            let mut idx = MultiUIntIndex::default();
+            idx.insert(2usize, 4);
+            idx.insert(2, 3);
+            idx.insert(3, 1);
+
+            assert_eq!(Some(2), idx.meta().min_key_index());
+            assert_eq!(Some(3), idx.meta().max_key_index());
+
+            // delete correct Key with wrong Index, nothing happens
+            idx.delete(2, &100);
+            assert_eq!([3, 4], idx.get(&2));
+
+            // delete correct Key with correct Index
+            idx.delete(2, &3);
+            assert_eq!([4], idx.get(&2));
+            assert_eq!(Some(2), idx.meta().min_key_index());
+            assert_eq!(Some(3), idx.meta().max_key_index());
+
+            // delete correct Key with last correct Index, Key now longer exist
+            idx.delete(2, &4);
+            assert!(idx.get(&2).is_empty());
+            assert_eq!(Some(3), idx.meta().min_key_index());
+            assert_eq!(Some(3), idx.meta().max_key_index());
+
+            idx.insert(2, 4);
+            // remove max key
+            idx.delete(3, &1);
+            assert_eq!(Some(2), idx.meta().max_key_index());
+        }
+    }
 
     //     mod keys {
     //         // use super::*;
@@ -528,5 +544,5 @@ mod tests {
     //         //     let keys = UIntIndex::from_iter([true, false, true]);
     //         //     assert_eq!(keys.iter().collect::<Vec<_>>(), vec![&false, &true]);
     //         // }
-    //     }
+    // }
 }
