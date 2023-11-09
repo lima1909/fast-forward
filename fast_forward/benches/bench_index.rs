@@ -1,9 +1,9 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use fast_forward::collections::ro::IList;
-use fast_forward::index::map::MapIndex;
+use fast_forward::index::imap::MapIndex;
 use fast_forward::index::store::Store;
-use fast_forward::index::view::Filter;
+use fast_forward::index::Filter;
 use fast_forward::index::UniqueUIntIndex;
 
 const HOW_MUCH_PERSON: usize = 100_000;

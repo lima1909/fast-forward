@@ -213,7 +213,7 @@ macro_rules! fast {
 mod tests {
     use crate::{
         fast,
-        index::{filter::Filter, ivec::uint::MultiUIntIndex, map::MapIndex, store::Filterable},
+        index::{filter::Filter, imap::MapIndex, ivec::uint::MultiUIntIndex, store::Filterable},
     };
 
     #[derive(Debug, Eq, PartialEq)]

@@ -3,7 +3,7 @@ use std::{fmt::Debug, marker::PhantomData};
 use crate::index::{
     indices::{KeyIndex, MultiKeyIndex, UniqueKeyIndex},
     ivec::IVec,
-    store::{Filterable, MetaData, Store},
+    store::{Filterable, MetaData, Store, View, ViewCreator},
 };
 
 pub type UniqueIntIndex<K = i32, X = usize> = IntIndex<UniqueKeyIndex<X>, K, X>;
@@ -12,7 +12,7 @@ pub type MultiIntIndex<K = i32, X = usize> = IntIndex<MultiKeyIndex<X>, K, X>;
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct IntIndex<I, K = i32, X = usize> {
-    vec: IVec<I, X, (Option<I>, Option<I>)>,
+    vec: IVec<I, K, X, (Option<I>, Option<I>)>,
     _key: PhantomData<K>,
 }
 
@@ -33,21 +33,22 @@ where
     }
 }
 
-// impl<'a, I, K, X> ViewCreator<'a> for IntIndex<I, K, X>
-// where
-//     I: KeyIndex<X> + 'a,
-// {
-//     type Key = i32;
-//     type Filter = IVec<I, X, Option<&'a I>>;
+impl<'a, I, K, X> ViewCreator<'a> for IntIndex<I, K, X>
+where
+    I: KeyIndex<X> + 'a,
+    K: Into<i32>,
+{
+    type Key = K;
+    type Filter = IVec<I, i32, X, Option<&'a I>>;
 
-//     fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
-//     where
-//         It: IntoIterator<Item = Self::Key>,
-//     {
-//         let v = self.vec.create_view(keys.into_iter().map(|k| k.into()));
-//         View(v)
-//     }
-// }
+    fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
+    where
+        It: IntoIterator<Item = Self::Key>,
+    {
+        let v = self.vec.create_view(keys.into_iter().map(|k| k.into()));
+        View(v)
+    }
+}
 
 impl<I, K, X> Store for IntIndex<I, K, X>
 where
@@ -82,16 +83,16 @@ where
 }
 
 impl<I, K, X> MetaData for IntIndex<I, K, X> {
-    type Meta<'m> = IntMeta<'m,I,X> where I: 'm, K:'m,X:'m;
+    type Meta<'m> = IntMeta<'m,I, K, X> where I: 'm, K:'m,X:'m;
 
     fn meta(&self) -> Self::Meta<'_> {
         IntMeta(&self.vec)
     }
 }
 
-pub struct IntMeta<'a, I: 'a, X: 'a>(&'a IVec<I, X, (Option<I>, Option<I>)>);
+pub struct IntMeta<'a, I: 'a, K, X: 'a>(&'a IVec<I, K, X, (Option<I>, Option<I>)>);
 
-impl<'s, I, X> IntMeta<'s, I, X>
+impl<'s, I, K, X> IntMeta<'s, I, K, X>
 where
     I: KeyIndex<X>,
 {
@@ -192,37 +193,54 @@ mod tests {
         assert_eq!([3, 4], (f.eq(&2) | f.eq(&1)));
     }
 
-    // #[test]
-    // fn create_view() {
-    //     let mut i = MultiIntIndex::<i32, u8>::default();
-    //     i.insert(1, 2);
-    //     i.insert(2, 4);
-    //     i.insert(2, 5);
-    //     i.insert(-3, 6);
-    //     i.insert(4, 8);
-    //     i.insert(4, 9);
-    //     i.insert(-5, 10);
+    #[test]
+    fn create_view() {
+        let mut i = MultiIntIndex::<i8, u8>::default();
+        i.insert(1, 2);
+        i.insert(2, 4);
+        i.insert(2, 5);
+        i.insert(-3, 6);
+        i.insert(4, 8);
+        i.insert(4, 9);
+        i.insert(-5, 10);
 
-    //     let view = i.create_view([1, 2, -3]);
-    //     assert!(view.contains(&1));
-    //     assert!(view.contains(&-3));
-    //     assert!(!view.contains(&100));
+        let view = i.create_view([1, 2, -3]);
+        assert!(view.contains(&1));
+        assert!(view.contains(&-3));
+        assert!(!view.contains(&100));
 
-    //     assert_eq!(view.get(&2), &[4, 5]);
-    //     // assert_eq!(view.get(&4), &[8, 9]);
-    //     assert_eq!(view.get(&100), &[]);
+        assert_eq!(view.get(&2), &[4, 5]);
+        assert_eq!(view.get(&100), &[]);
 
-    //     assert_eq!(view.get_many([2, -3]).collect::<Vec<_>>(), vec![&4, &5, &6]);
+        assert_eq!(view.get_many([2, -3]).collect::<Vec<_>>(), vec![&4, &5, &6]);
 
-    //     assert!(!view.contains(&5));
+        assert!(!view.contains(&-5));
 
-    //     i.update(2, 5, 4);
-    //     i.update(4, 99, 4);
+        i.update(2, 5, 4);
+        i.update(4, 99, 4);
 
-    //     let view = i.create_view([1usize, 2, 4, 100]);
-    //     assert_eq!(view.get(&2), &[4]);
-    //     assert_eq!(view.get(&4), &[5, 8, 9, 99]);
-    // }
+        let view = i.create_view([1, 2, 4, 100]);
+        assert_eq!(view.get(&2), &[4]);
+        assert_eq!(view.get(&4), &[5, 8, 9, 99]);
+    }
+
+    #[test]
+    fn create_view_range() {
+        let mut i = UniqueIntIndex::<i8, u8>::default();
+        i.insert(1, 1);
+        i.insert(2, 2);
+        i.insert(-3, 3);
+        i.insert(5, 5);
+
+        assert!(i.contains(&-3));
+
+        let view = i.create_view(-3..=3);
+        // assert!(view.contains(&-3));
+        assert!(view.contains(&1));
+        assert_eq!(None, view.get(&5).iter().next());
+        // assert_eq!(Some(&3u8), view.get(&-3).iter().next());
+        assert_eq!(None, view.get(&-3).iter().next());
+    }
 
     #[test]
     fn meta() {

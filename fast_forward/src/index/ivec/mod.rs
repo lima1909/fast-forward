@@ -17,20 +17,22 @@ pub mod uint;
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct IVec<I, X, Opt> {
+pub struct IVec<I, K, X, Opt> {
     vec: Vec<Opt>,
-    _x: PhantomData<X>,
+    _key: PhantomData<K>,
+    _index: PhantomData<X>,
     _key_index: PhantomData<I>,
 }
 
-impl<I, X, Opt> IVec<I, X, Opt>
+impl<I, K, X, Opt> IVec<I, K, X, Opt>
 where
     I: KeyIndex<X>,
 {
     pub(crate) const fn new() -> Self {
         Self {
             vec: Vec::new(),
-            _x: PhantomData,
+            _key: PhantomData,
+            _index: PhantomData,
             _key_index: PhantomData,
         }
     }
@@ -38,13 +40,14 @@ where
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
             vec: Vec::with_capacity(capacity),
-            _x: PhantomData,
+            _key: PhantomData,
+            _index: PhantomData,
             _key_index: PhantomData,
         }
     }
 
     #[inline]
-    pub(crate) fn contains_key<K: Into<Key>>(&self, key: K) -> bool
+    pub(crate) fn contains_key<Ky: Into<Key>>(&self, key: Ky) -> bool
     where
         Opt: KeyIndexOptionRead<I, X>,
     {
@@ -55,7 +58,7 @@ where
     }
 
     #[inline]
-    pub(crate) fn get_indeces_by_key<K: Into<Key>>(&self, key: K) -> &[X]
+    pub(crate) fn get_indeces_by_key<Ky: Into<Key>>(&self, key: Ky) -> &[X]
     where
         Opt: KeyIndexOptionRead<I, X>,
     {
@@ -66,7 +69,7 @@ where
     }
 
     #[inline]
-    pub(crate) fn insert<K: Into<Key>>(&mut self, key: K, index: X)
+    pub(crate) fn insert<Ky: Into<Key>>(&mut self, key: Ky, index: X)
     where
         Opt: KeyIndexOptionWrite<I, X>,
     {
@@ -79,7 +82,7 @@ where
     }
 
     #[inline]
-    pub(crate) fn delete<K: Into<Key>>(&mut self, key: K, index: &X)
+    pub(crate) fn delete<Ky: Into<Key>>(&mut self, key: Ky, index: &X)
     where
         Opt: KeyIndexOptionWrite<I, X>,
     {
@@ -89,15 +92,17 @@ where
         }
     }
 
-    fn create_view<It>(&self, keys: It) -> IVec<I, X, Option<&I>>
+    fn create_view<It, Ky>(&self, keys: It) -> IVec<I, Ky, X, Option<&I>>
     where
-        It: IntoIterator<Item = Key>,
+        It: IntoIterator<Item = Ky>,
+        Ky: Into<Key>,
         Opt: KeyIndexOptionRead<I, X>,
     {
         let mut view = IVec::new();
         view.vec.resize(self.vec.len(), None);
 
         for key in keys {
+            let key = key.into();
             if let Some(opt) = self.vec.get(key.value) {
                 view[key.value] = opt.get_opt(key.is_negative).as_ref();
             }
@@ -128,7 +133,7 @@ where
     }
 }
 
-impl<X, I, Opt> Deref for IVec<X, I, Opt> {
+impl<I, K, X, Opt> Deref for IVec<I, K, X, Opt> {
     type Target = Vec<Opt>;
 
     fn deref(&self) -> &Self::Target {
@@ -136,18 +141,19 @@ impl<X, I, Opt> Deref for IVec<X, I, Opt> {
     }
 }
 
-impl<X, I, Opt> DerefMut for IVec<X, I, Opt> {
+impl<I, K, X, Opt> DerefMut for IVec<I, K, X, Opt> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.vec
     }
 }
 
-impl<I, X, Opt> Filterable for IVec<I, X, Opt>
+impl<I, K, X, Opt> Filterable for IVec<I, K, X, Opt>
 where
     I: KeyIndex<X>,
     Opt: KeyIndexOptionRead<I, X>,
+    K: Into<Key> + Copy,
 {
-    type Key = i32;
+    type Key = K;
     type Index = X;
 
     fn contains(&self, key: &Self::Key) -> bool {
@@ -191,21 +197,23 @@ mod tests {
     use super::*;
     use crate::index::indices::MultiKeyIndex;
 
-    impl<X> IVec<MultiKeyIndex<X>, X, Option<MultiKeyIndex<X>>> {
+    impl<X> IVec<MultiKeyIndex<X>, usize, X, Option<MultiKeyIndex<X>>> {
         pub(crate) const fn new_uint() -> Self {
             Self {
                 vec: Vec::new(),
-                _x: PhantomData,
+                _key: PhantomData,
+                _index: PhantomData,
                 _key_index: PhantomData,
             }
         }
     }
 
-    impl<X> IVec<MultiKeyIndex<X>, X, (Option<MultiKeyIndex<X>>, Option<MultiKeyIndex<X>>)> {
+    impl<X> IVec<MultiKeyIndex<X>, usize, X, (Option<MultiKeyIndex<X>>, Option<MultiKeyIndex<X>>)> {
         pub(crate) const fn new_int() -> Self {
             Self {
                 vec: Vec::new(),
-                _x: PhantomData,
+                _key: PhantomData,
+                _index: PhantomData,
                 _key_index: PhantomData,
             }
         }

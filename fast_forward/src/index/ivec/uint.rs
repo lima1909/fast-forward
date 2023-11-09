@@ -15,7 +15,7 @@ pub type MultiUIntIndex<K = usize, X = usize> = UIntIndex<MultiKeyIndex<X>, K, X
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct UIntIndex<I, K = usize, X = usize> {
-    vec: IVec<I, X, Option<I>>,
+    vec: IVec<I, K, X, Option<I>>,
     _key: PhantomData<K>,
 }
 
@@ -39,9 +39,10 @@ where
 impl<'a, I, K, X> ViewCreator<'a> for UIntIndex<I, K, X>
 where
     I: KeyIndex<X> + 'a,
+    K: Into<usize>,
 {
-    type Key = usize;
-    type Filter = IVec<I, X, Option<&'a I>>;
+    type Key = K;
+    type Filter = IVec<I, usize, X, Option<&'a I>>;
 
     fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
     where
@@ -86,16 +87,16 @@ where
 }
 
 impl<I, K, X> MetaData for UIntIndex<I, K, X> {
-    type Meta<'m> = UIntMeta<'m, I,X> where I:'m,K:'m,X:'m;
+    type Meta<'m> = UIntMeta<'m, I,K,X> where I:'m,K:'m,X:'m;
 
     fn meta(&self) -> Self::Meta<'_> {
         UIntMeta(&self.vec)
     }
 }
 
-pub struct UIntMeta<'a, I: 'a, X: 'a>(&'a IVec<I, X, Option<I>>);
+pub struct UIntMeta<'a, I: 'a, K, X: 'a>(&'a IVec<I, K, X, Option<I>>);
 
-impl<'s, I, X> UIntMeta<'s, I, X>
+impl<'s, I, K, X> UIntMeta<'s, I, K, X>
 where
     I: KeyIndex<X>,
 {
@@ -137,7 +138,7 @@ mod tests {
         i.insert(4, 9);
         i.insert(5, 10);
 
-        let view = i.create_view([1usize, 2, 4]);
+        let view = i.create_view([1, 2, 4]);
         assert!(view.contains(&1));
         assert!(view.contains(&4));
         assert!(!view.contains(&100));
@@ -156,7 +157,7 @@ mod tests {
         i.update(2, 5, 4);
         i.update(4, 99, 4);
 
-        let view = i.create_view([1usize, 2, 4, 100]);
+        let view = i.create_view([1, 2, 4, 100]);
         assert_eq!(view.get(&2), &[4]);
         assert_eq!(view.get(&4), &[5, 8, 9, 99]);
     }

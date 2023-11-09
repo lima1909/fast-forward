@@ -239,7 +239,7 @@ mod tests {
     use std::collections::VecDeque;
 
     use super::*;
-    use crate::index::{ivec::uint::MultiUIntIndex, map::MapIndex};
+    use crate::index::{imap::MapIndex, ivec::uint::MultiUIntIndex};
     use rstest::{fixture, rstest};
 
     #[derive(Debug, PartialEq)]

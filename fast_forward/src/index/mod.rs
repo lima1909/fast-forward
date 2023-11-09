@@ -1,13 +1,13 @@
 //! The `index `module contains the structure for saving and accessing the `Index` implementations.
+pub mod imap;
 pub mod indices;
 pub mod ivec;
-pub mod map;
 pub mod ops;
 pub mod store;
 
+pub use imap::MapIndex;
 pub use ivec::int::{MultiIntIndex, UniqueIntIndex};
 pub use ivec::uint::{MultiUIntIndex, UniqueUIntIndex};
-pub use map::MapIndex;
 
 use crate::index::{indices::Indices, store::Filterable};
 

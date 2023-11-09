@@ -343,8 +343,8 @@ where
 mod tests {
     use super::{super::filter::Filter, *};
     use crate::index::{
+        imap::MapIndex,
         indices::{Indices, KeyIndex, MultiKeyIndex},
-        map::MapIndex,
     };
     use rstest::rstest;
     use std::collections::HashMap;

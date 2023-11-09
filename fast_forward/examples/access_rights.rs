@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-use fast_forward::{collections::ro, index::map::MapIndex};
+use fast_forward::{collections::ro, index::imap::MapIndex};
 
 #[derive(Debug, PartialEq)]
 pub struct Car {

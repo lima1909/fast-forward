@@ -174,27 +174,27 @@ where
     /// # Example
     ///
     /// ```
-    /// use fast_forward::index::{store::Store, UniqueUIntIndex};
+    /// use fast_forward::index::{store::Store, UniqueIntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, PartialEq)]
-    /// pub struct Car(usize, String);
+    /// pub struct Car(i32, String);
     ///
-    /// let l = IList::<UniqueUIntIndex, _>::new(|c| c.0, vec![
+    /// let l = IList::<UniqueIntIndex, _>::new(|c| c.0, vec![
     ///                                 Car(1, "BMW".into()),
     ///                                 Car(2, "Porsche".into()),
-    ///                                 Car(3, "Mercedes".into()),
+    ///                                 Car(-3, "Mercedes".into()),
     ///                                 Car(5, "Audi".into())]);
     ///
-    /// let view = l.idx().create_view([1, 2, 3], |view| {
-    ///     assert!(view.contains(&3));
+    /// let view = l.idx().create_view([1, 2, -3], |view| {
+    ///     assert!(view.contains(&-3));
     ///     assert!(view.contains(&1));
     ///     assert_eq!(None, view.get(&5).next());
     /// });
     ///
     /// // or by using a `Range`
-    /// let view = l.idx().create_view(0..=3, |view| {
-    ///     assert!(view.contains(&3));
+    /// let view = l.idx().create_view(-3..=1, |view| {
+    ///     assert!(view.contains(&-3));
     ///     assert!(view.contains(&1));
     ///     assert_eq!(None, view.get(&5).next());
     /// });
