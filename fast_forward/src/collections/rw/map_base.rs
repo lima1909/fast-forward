@@ -186,7 +186,7 @@ impl<S, I, X, F> Deref for Map<S, I, X, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::IntIndex;
+    use crate::index::MultiIntIndex;
     use rstest::{fixture, rstest};
 
     #[derive(PartialEq, Debug, Clone)]
@@ -216,8 +216,10 @@ mod tests {
 
     #[rstest]
     fn check_map(v: HashMap<&'static str, Person>) {
-        let mut m =
-            Map::<IntIndex<i32, &'static str>, Person, _, _>::from_iter(|p| p.id, v.into_iter());
+        let mut m = Map::<MultiIntIndex<i32, &'static str>, Person, _, _>::from_iter(
+            |p| p.id,
+            v.into_iter(),
+        );
         assert!(m.insert("Mrs X", Person::new(-3, "Mrs X")));
 
         assert!(m.idx().contains(&-2));
@@ -245,7 +247,7 @@ mod tests {
 
     #[test]
     fn invalid_insert() {
-        let mut m = Map::<IntIndex<i32, &'static str>, Person, _, _>::new(|p| p.id);
+        let mut m = Map::<MultiIntIndex<i32, &'static str>, Person, _, _>::new(|p| p.id);
         assert!(m.insert("Mrs X", Person::new(-3, "Mrs X")));
         // invalid insert, same index
         assert!(!m.insert("Mrs X", Person::new(-3, "Mrs X")));

@@ -1,8 +1,6 @@
 //! A `Store` is saving `Indices` for a given `Key`,
 //! with the goal, to get the `Indices` as fast as possible.
 
-use std::ops::Deref;
-
 use crate::index::Indexable;
 
 /// A Store is a mapping from a given `Key` to one or many `Indices`.
@@ -156,22 +154,30 @@ pub trait Filterable {
 
 /// The Idea of a `View` is like by databases.
 /// Show a subset of `Indices` which a saved in the [`crate::index::store::Store`].
-pub trait ViewCreator<'a, F: Filterable> {
-    fn create_view<It, K>(&'a self, keys: It) -> View<F>
+pub trait ViewCreator<'a> {
+    type Key;
+    type Filter;
+
+    fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
     where
-        It: IntoIterator<Item = K>,
-        K: Into<F::Key>;
+        <Self as ViewCreator<'a>>::Filter: Filterable,
+        It: IntoIterator<Item = Self::Key>;
 }
 
 /// A wrapper for a `Filterable` implementation
 #[repr(transparent)]
 pub struct View<F: Filterable>(pub(crate) F);
 
-impl<F: Filterable> Deref for View<F> {
-    type Target = F;
+impl<F: Filterable> Filterable for View<F> {
+    type Key = F::Key;
+    type Index = F::Index;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn contains(&self, key: &Self::Key) -> bool {
+        self.0.contains(key)
+    }
+
+    fn get(&self, key: &Self::Key) -> &[Self::Index] {
+        self.0.get(key)
     }
 }
 

@@ -1,10 +1,10 @@
 //! ```text
-//! id:    UIntIndex => 0
+//! id:    MultiUIntIndex => 0
 //! name   Store        field
 //!
 //! Index {
 //!     name:  Ident(id)
-//!     store: Type(UIntIndex),
+//!     store: Type(MultiUIntIndex),
 //!     field: Ident(pk),
 //! }
 //! ```
@@ -56,7 +56,7 @@ impl Indices {
 }
 
 ///
-/// id:    UIntIndex => 0[.clone]
+/// id:    MultiUIntIndex => 0[.clone]
 /// name   store        field[.method]
 ///
 #[derive(Debug, Clone, PartialEq)]
@@ -158,17 +158,17 @@ mod tests {
 
     #[test]
     fn to_field_declare_tokens() {
-        let idx = syn::parse_str::<Index>("id: UIntIndex => 0").unwrap();
+        let idx = syn::parse_str::<Index>("id: MultiUIntIndex => 0").unwrap();
 
         let ts = idx.to_declare_struct_field_tokens();
-        let ts2: TokenStream = parse_quote!(id: UIntIndex,);
+        let ts2: TokenStream = parse_quote!(id: MultiUIntIndex,);
 
         assert_eq!(ts.to_string(), ts2.to_string());
     }
 
     #[test]
     fn to_init_struct_field_tokens() {
-        let idx = syn::parse_str::<Index>("id: UIntIndex => 0").unwrap();
+        let idx = syn::parse_str::<Index>("id: MultiUIntIndex => 0").unwrap();
         let on = syn::parse_str::<TypePath>("Car").unwrap();
 
         let ts = idx.to_init_struct_field_tokens(&on);
@@ -182,14 +182,14 @@ mod tests {
         assert_eq!(
             Index {
                 name: Ident::new("id", proc_macro2::Span::call_site()),
-                store: syn::parse_str::<TypePath>("UIntIndex").unwrap(),
+                store: syn::parse_str::<TypePath>("MultiUIntIndex").unwrap(),
                 field: Member::Unnamed(SynIndex {
                     index: 0,
                     span: proc_macro2::Span::call_site()
                 }),
                 method: None,
             },
-            syn::parse_str::<Index>("id: UIntIndex => 0").unwrap()
+            syn::parse_str::<Index>("id: MultiUIntIndex => 0").unwrap()
         );
     }
 
@@ -214,11 +214,11 @@ mod tests {
         assert_eq!(
             Index {
                 name: Ident::new("id", proc_macro2::Span::call_site()),
-                store: syn::parse_str::<TypePath>("fast_forward::uint::UIntIndex").unwrap(),
+                store: syn::parse_str::<TypePath>("fast_forward::index::MultiUIntIndex").unwrap(),
                 field: Member::Named(Ident::new("pk", proc_macro2::Span::call_site())),
                 method: None,
             },
-            syn::parse_str::<Index>("id: fast_forward::uint::UIntIndex => pk").unwrap()
+            syn::parse_str::<Index>("id: fast_forward::index::MultiUIntIndex => pk").unwrap()
         );
     }
 
@@ -226,7 +226,7 @@ mod tests {
     fn index_err_colon() {
         assert_eq!(
             "expected `:`",
-            syn::parse_str::<Index>("id UIntIndex => pk")
+            syn::parse_str::<Index>("id MultiUIntIndex => pk")
                 .unwrap_err()
                 .to_string()
         );
@@ -234,14 +234,15 @@ mod tests {
 
     #[test]
     fn indices() {
-        let l = syn::parse_str::<Indices>("id: UIntIndex => 0, name: MapIndex => 1, ").unwrap();
+        let l =
+            syn::parse_str::<Indices>("id: MultiUIntIndex => 0, name: MapIndex => 1, ").unwrap();
 
         assert_eq!(2, l.0.len());
         assert_eq!(
             Indices(vec![
                 Index {
                     name: Ident::new("id", proc_macro2::Span::call_site()),
-                    store: syn::parse_str::<TypePath>("UIntIndex").unwrap(),
+                    store: syn::parse_str::<TypePath>("MultiUIntIndex").unwrap(),
                     field: Member::Unnamed(SynIndex {
                         index: 0,
                         span: proc_macro2::Span::call_site()

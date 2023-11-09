@@ -36,18 +36,18 @@ where
     }
 }
 
-impl<'a, I, K, X> ViewCreator<'a, IVec<I, X, Option<&'a I>>> for UIntIndex<I, K, X>
+impl<'a, I, K, X> ViewCreator<'a> for UIntIndex<I, K, X>
 where
-    I: KeyIndex<X>,
+    I: KeyIndex<X> + 'a,
 {
-    fn create_view<It, Keys>(&'a self, keys: It) -> View<IVec<I, X, Option<&'a I>>>
+    type Key = usize;
+    type Filter = IVec<I, X, Option<&'a I>>;
+
+    fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
     where
-        It: IntoIterator<Item = Keys>,
-        Keys: Into<usize>,
+        It: IntoIterator<Item = Self::Key>,
     {
-        let v = self
-            .vec
-            .create_view(keys.into_iter().map(|k| k.into().into()));
+        let v = self.vec.create_view(keys.into_iter().map(|k| k.into()));
         View(v)
     }
 }

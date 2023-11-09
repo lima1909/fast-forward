@@ -17,7 +17,7 @@ pub mod uint;
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub(crate) struct IVec<I, X, Opt> {
+pub struct IVec<I, X, Opt> {
     vec: Vec<Opt>,
     _x: PhantomData<X>,
     _key_index: PhantomData<I>,
@@ -89,13 +89,13 @@ where
         }
     }
 
-    fn create_view<It>(&self, keys: It) -> IVec<I, X, Option<&'_ I>>
+    fn create_view<It>(&self, keys: It) -> IVec<I, X, Option<&I>>
     where
         It: IntoIterator<Item = Key>,
         Opt: KeyIndexOptionRead<I, X>,
     {
         let mut view = IVec::new();
-        view.resize(self.vec.len(), None);
+        view.vec.resize(self.vec.len(), None);
 
         for key in keys {
             if let Some(opt) = self.vec.get(key.value) {
@@ -147,7 +147,7 @@ where
     I: KeyIndex<X>,
     Opt: KeyIndexOptionRead<I, X>,
 {
-    type Key = usize;
+    type Key = i32;
     type Index = X;
 
     fn contains(&self, key: &Self::Key) -> bool {

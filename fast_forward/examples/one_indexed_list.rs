@@ -1,6 +1,6 @@
 use fast_forward::{
     collections::rw::IList,
-    index::{MapIndex, UIntIndex},
+    index::{MapIndex, UniqueUIntIndex},
 };
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -29,7 +29,7 @@ fn main() {
         Car::new(99, "Porsche"),
     ];
 
-    let cars = IList::<UIntIndex, _, _>::from_iter(|c: &Car| c.id, cars.clone().into_iter());
+    let cars = IList::<UniqueUIntIndex, _, _>::from_iter(|c: &Car| c.id, cars.clone().into_iter());
 
     let r = cars.idx().get(&2).collect::<Vec<_>>();
     assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
@@ -41,8 +41,8 @@ fn main() {
 
     assert_eq!(vec![&Car::new(2, "BMW"), &Car::new(2, "VW")], r);
 
-    assert_eq!(2, cars.idx().meta().min_key());
-    assert_eq!(99, cars.idx().meta().max_key());
+    assert_eq!(Some(2), cars.idx().meta().min_key_index());
+    assert_eq!(Some(99), cars.idx().meta().max_key_index());
 
     // ------------------------------
     // With `Name` Index: StrMapIndex

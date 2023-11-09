@@ -210,7 +210,7 @@ impl<S, I, F> Deref for List<S, I, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::IntIndex;
+    use crate::index::MultiIntIndex;
     use rstest::{fixture, rstest};
 
     impl<T> From<Vec<T>> for TriggerList<T> {
@@ -371,28 +371,28 @@ mod tests {
             Person::new(-2, "Mario"),
             Person::new(2, "Jasmin"),
         ];
-        check_key_idx(&mut List::<IntIndex, Person, _>::from_iter(
+        check_key_idx(&mut List::<MultiIntIndex, Person, _>::from_iter(
             |p| p.id,
             v.iter().cloned(),
         ));
 
-        let mut l = List::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
+        let mut l = List::<MultiIntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
         l.remove(0);
         check_key_idx(&mut l);
 
-        let mut l = List::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
+        let mut l = List::<MultiIntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
         l.remove(1);
         check_key_idx(&mut l);
 
-        let mut l = List::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
+        let mut l = List::<MultiIntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
         l.remove(2);
         check_key_idx(&mut l);
 
-        let mut l = List::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
+        let mut l = List::<MultiIntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
         l.remove(100);
         check_key_idx(&mut l);
 
-        let mut l = List::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
+        let mut l = List::<MultiIntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
         l.remove(0);
         check_key_idx(&mut l);
         l.remove(0);
@@ -402,7 +402,7 @@ mod tests {
         l.remove(0);
         check_key_idx(&mut l);
 
-        let mut l = List::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
+        let mut l = List::<MultiIntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
         l.remove(1);
         check_key_idx(&mut l);
         l.remove(1);
@@ -422,11 +422,11 @@ mod tests {
             Person::new(2, "Jasmin"),
         ];
 
-        let mut l = List::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
+        let mut l = List::<MultiIntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
         l.remove(0);
         check_key_idx(&mut l);
 
-        let mut l = List::<IntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
+        let mut l = List::<MultiIntIndex, Person, _>::from_iter(|p| p.id, v.iter().cloned());
         l.remove(1);
         check_key_idx(&mut l);
     }

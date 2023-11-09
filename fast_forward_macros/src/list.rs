@@ -395,7 +395,7 @@ mod tests {
 
     #[test]
     fn list() {
-        let idx = syn::parse_str::<Index>("id: UIntIndex => 0").unwrap();
+        let idx = syn::parse_str::<Index>("id: MultiUIntIndex => 0").unwrap();
 
         assert_eq!(
             IndexedList {
@@ -407,7 +407,7 @@ mod tests {
             },
             syn::parse_str::<IndexedList>(
                 "create rw ref_list Cars on Car using {
-                id: UIntIndex => 0,
+                id: MultiUIntIndex => 0,
             }"
             )
             .unwrap()

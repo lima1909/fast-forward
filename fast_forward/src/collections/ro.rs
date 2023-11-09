@@ -15,7 +15,7 @@ use crate::{
 /// # Example
 ///
 /// ```
-/// use fast_forward::{index::int::IntIndex, collections::ro::IList};
+/// use fast_forward::{index::MultiIntIndex, collections::ro::IList};
 ///
 /// #[derive(PartialEq, Debug, Clone)]
 /// struct Person {
@@ -32,7 +32,7 @@ use crate::{
 ///     }
 /// }
 ///
-/// let mut l = IList::<IntIndex, _>::new(|p| p.id, vec![
+/// let mut l = IList::<MultiIntIndex, _>::new(|p| p.id, vec![
 ///                                                 Person::new(0, "Paul"),
 ///                                                 Person::new(-2, "Mario"),
 ///                                                 Person::new(2, "Jasmin"),
@@ -89,7 +89,7 @@ impl<S, T, L> Deref for IList<S, T, L> {
 /// # Example
 ///
 /// ```
-/// use fast_forward::{index::int::IntIndex, collections::ro::IRefList};
+/// use fast_forward::{index::MultiIntIndex, collections::ro::IRefList};
 ///
 /// #[derive(PartialEq, Debug, Clone)]
 /// struct Person {
@@ -112,7 +112,7 @@ impl<S, T, L> Deref for IList<S, T, L> {
 ///                Person::new(2, "Jasmin"),
 ///               ];
 ///
-/// let mut l = IRefList::<IntIndex, _>::new(|p| p.id, &persons);
+/// let mut l = IRefList::<MultiIntIndex, _>::new(|p| p.id, &persons);
 ///
 /// assert!(l.idx().contains(&2));
 /// assert_eq!(&Person::new(-2, "Mario"), l.idx().get(&-2).next().unwrap());
@@ -161,7 +161,7 @@ impl<S, T> Deref for IRefList<'_, S, T> {
 ///
 /// ```
 /// use std::collections::HashMap;
-/// use fast_forward::{index::int::IntIndex, collections::ro::IMap};
+/// use fast_forward::{index::UniqueIntIndex, collections::ro::IMap};
 ///
 /// #[derive(PartialEq, Debug, Clone)]
 /// struct Person {
@@ -184,7 +184,7 @@ impl<S, T> Deref for IRefList<'_, S, T> {
 /// m.insert("Mario", Person::new(-2, "Mario"));
 /// m.insert("Jasmin", Person::new(2, "Jasmin"));
 ///
-/// let l: IMap<IntIndex<i32, &'static str>, _, Person> = IMap::new(|p| p.id, m);
+/// let l: IMap<UniqueIntIndex<i32, &'static str>, _, Person> = IMap::new(|p| p.id, m);
 ///
 /// assert!(l.idx().contains(&2));
 /// assert_eq!(&Person::new(-2, "Mario"), l.idx().get(&-2).next().unwrap());
@@ -239,7 +239,7 @@ mod tests {
     use std::collections::VecDeque;
 
     use super::*;
-    use crate::index::{map::MapIndex, uint::UIntIndex};
+    use crate::index::{ivec::uint::MultiUIntIndex, map::MapIndex};
     use rstest::{fixture, rstest};
 
     #[derive(Debug, PartialEq)]
@@ -263,7 +263,7 @@ mod tests {
 
     #[rstest]
     fn ilist_vec(cars: Vec<Car>) {
-        let l = IList::<UIntIndex, _>::new(Car::id, cars);
+        let l = IList::<MultiUIntIndex, _>::new(Car::id, cars);
 
         // deref
         assert_eq!(4, l.len());
@@ -298,14 +298,14 @@ mod tests {
         assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
         assert_eq!(None, it.next());
 
-        assert_eq!(2, l.idx().meta().min_key());
-        assert_eq!(99, l.idx().meta().max_key());
+        assert_eq!(Some(2), l.idx().meta().min_key_index());
+        assert_eq!(Some(99), l.idx().meta().max_key_index());
     }
 
     #[rstest]
     fn ilist_vecdeque(cars: Vec<Car>) {
         let cars = VecDeque::from_iter(cars.into_iter());
-        let l = IList::<UIntIndex, _, VecDeque<_>>::new(Car::id, cars);
+        let l = IList::<MultiUIntIndex, _, VecDeque<_>>::new(Car::id, cars);
 
         // deref
         assert_eq!(4, l.len());
@@ -325,7 +325,7 @@ mod tests {
     #[rstest]
     fn ilist_array(cars: Vec<Car>) {
         let cars: [Car; 4] = cars.try_into().unwrap();
-        let l = IList::<UIntIndex, _, [Car; 4]>::new(Car::id, cars);
+        let l = IList::<MultiUIntIndex, _, [Car; 4]>::new(Car::id, cars);
 
         // deref
         assert_eq!(4, l.len());
@@ -351,7 +351,7 @@ mod tests {
         m.insert("VW", Car(2, "VW".into()));
         m.insert("Porsche", Car(99, "Porsche".into()));
 
-        let l: IMap<UIntIndex<usize, &'static str>, _, Car> = IMap::new(Car::id, m);
+        let l: IMap<MultiUIntIndex<usize, &'static str>, _, Car> = IMap::new(Car::id, m);
 
         assert_eq!(4, l.len());
         assert_eq!(Car(2, "BMW".into()), l["BMW"]);
@@ -384,8 +384,8 @@ mod tests {
         assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
         assert_eq!(None, it.next());
 
-        assert_eq!(2, l.idx().meta().min_key());
-        assert_eq!(99, l.idx().meta().max_key());
+        assert_eq!(Some(2), l.idx().meta().min_key_index());
+        assert_eq!(Some(99), l.idx().meta().max_key_index());
     }
 
     #[test]
@@ -398,7 +398,7 @@ mod tests {
         m.insert(3, Car(3, "VW".into()));
         m.insert(99, Car(99, "Porsche".into()));
 
-        let l: IMap<UIntIndex<usize>, _, Car> = IMap::new(Car::id, m);
+        let l: IMap<MultiUIntIndex<usize, _>, _, Car> = IMap::new(Car::id, m);
 
         assert_eq!(4, l.len());
         assert_eq!(Car(2, "BMW".into()), l[&2]);
@@ -430,8 +430,8 @@ mod tests {
         assert_eq!(Some(&Car(99, "Porsche".into())), it.next());
         assert_eq!(None, it.next());
 
-        assert_eq!(2, l.idx().meta().min_key());
-        assert_eq!(99, l.idx().meta().max_key());
+        assert_eq!(Some(2), l.idx().meta().min_key_index());
+        assert_eq!(Some(99), l.idx().meta().max_key_index());
     }
 
     #[test]
@@ -444,7 +444,8 @@ mod tests {
         m.insert("VW", Car(2, "VW".into()));
         m.insert("Porsche", Car(99, "Porsche".into()));
 
-        let l: IMap<UIntIndex<usize, &'static str>, _, Car, BTreeMap<_, _>> = IMap::new(Car::id, m);
+        let l: IMap<MultiUIntIndex<usize, &'static str>, _, Car, BTreeMap<_, _>> =
+            IMap::new(Car::id, m);
 
         // deref
         assert_eq!(4, l.len());
@@ -466,7 +467,8 @@ mod tests {
 
     #[rstest]
     fn read_only_index_list_from_array(cars: Vec<Car>) {
-        let l: IRefList<'_, UIntIndex, _> = IRefList::<'_, UIntIndex, _>::new(Car::id, &cars);
+        let l: IRefList<'_, MultiUIntIndex, _> =
+            IRefList::<'_, MultiUIntIndex, _>::new(Car::id, &cars);
 
         // deref
         assert_eq!(4, l.len());
@@ -500,13 +502,13 @@ mod tests {
     }
 
     struct Cars<'c> {
-        ids: IRefList<'c, UIntIndex, Car>,
+        ids: IRefList<'c, MultiUIntIndex, Car>,
         names: IRefList<'c, MapIndex, Car>,
     }
 
     #[rstest]
     fn read_only_double_index_list_from_vec(cars: Vec<Car>) {
-        let ids = IRefList::<'_, UIntIndex, _>::new(Car::id, &cars);
+        let ids = IRefList::<'_, MultiUIntIndex, _>::new(Car::id, &cars);
         let names = IRefList::<'_, MapIndex, _>::new(|c: &Car| c.1.clone(), &cars);
 
         let l = Cars { ids, names };

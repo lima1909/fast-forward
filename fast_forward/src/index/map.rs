@@ -3,8 +3,7 @@
 //!
 use crate::index::{
     indices::{KeyIndex, MultiKeyIndex},
-    store::{Filterable, Store},
-    view::Keys,
+    store::{Filterable, Store, View, ViewCreator},
 };
 use std::{fmt::Debug, hash::Hash};
 
@@ -46,6 +45,30 @@ where
     }
 }
 
+impl<'a, K, X> ViewCreator<'a> for MapIndex<K, X>
+where
+    K: Hash + Eq,
+    X: Ord + 'a,
+{
+    type Key = K;
+    type Filter = HashMap<K, &'a MultiKeyIndex<X>>;
+
+    fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
+    where
+        It: IntoIterator<Item = Self::Key>,
+    {
+        let mut map = HashMap::<K, &MultiKeyIndex<X>>::with_capacity(self.0.len());
+
+        for key in keys {
+            if let Some(idxs) = self.0.get(&key).as_ref() {
+                map.insert(key, *idxs);
+            }
+        }
+
+        View(map)
+    }
+}
+
 impl<K, X> Store for MapIndex<K, X>
 where
     K: Hash + Eq,
@@ -73,30 +96,24 @@ where
     }
 }
 
-impl<K> Keys for MapIndex<K>
+impl<K, X> Filterable for HashMap<K, &MultiKeyIndex<X>>
 where
     K: Hash + Eq,
+    X: Ord + PartialEq,
 {
     type Key = K;
+    type Index = X;
 
-    fn exist(&self, key: &K) -> bool {
-        self.0.contains_key(key)
+    #[inline]
+    fn get(&self, key: &Self::Key) -> &[Self::Index] {
+        match self.get(key) {
+            Some(i) => i.as_slice(),
+            None => &[],
+        }
     }
 
-    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &'a K> + 'a> {
-        Box::new(self.0.keys())
-    }
-
-    fn from_iter<I>(it: I) -> Self
-    where
-        I: IntoIterator<Item = K>,
-    {
-        let v = Vec::from_iter(it);
-        let mut view = Self::with_capacity(v.len());
-        v.into_iter().for_each(|key| {
-            view.0.insert(key, MultiKeyIndex::empty());
-        });
-        view
+    fn contains(&self, key: &Self::Key) -> bool {
+        self.contains_key(key)
     }
 }
 
@@ -347,31 +364,6 @@ mod tests {
 
             assert!(idx.contains(&"Jasmin"));
             assert!(!idx.contains(&"Paul"));
-        }
-    }
-
-    mod keys {
-        use super::*;
-
-        #[test]
-        fn empty() {
-            let keys = MapIndex::from_iter(Vec::<String>::new());
-            assert!(!keys.exist(&"Foo".into()));
-        }
-
-        #[test]
-        fn one() {
-            let keys = MapIndex::from_iter([String::from("Foo")]);
-            assert!(!keys.exist(&"Bar".into()));
-            assert!(keys.exist(&"Foo".into()));
-        }
-
-        #[test]
-        fn keys() {
-            let keys = MapIndex::from_iter([String::from("Foo"), String::from("Bar")]);
-            let r = keys.iter().collect::<Vec<_>>();
-            assert!(r.contains(&&String::from("Foo")));
-            assert!(r.contains(&&String::from("Bar")));
         }
     }
 }

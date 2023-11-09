@@ -1,7 +1,7 @@
 error[E0609]: no field `id` on type `&Car`
- --> tests/ui/fail_invalid_field.rs:8:53
+ --> tests/ui/fail_invalid_field.rs:8:52
   |
-8 |         id: fast_forward::index::uint::UIntIndex => id,
-  |                                                     ^^ unknown field
+8 |         id: fast_forward::index::MultiUIntIndex => id,
+  |                                                    ^^ unknown field
   |
   = note: available fields are: `0`, `1`

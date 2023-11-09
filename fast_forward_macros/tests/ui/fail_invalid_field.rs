@@ -5,7 +5,7 @@ pub struct Car(usize, String);
 
 fast!(
     create Cars on Car using {
-        id: fast_forward::index::uint::UIntIndex => id,
+        id: fast_forward::index::MultiUIntIndex => id,
     }
 );
 

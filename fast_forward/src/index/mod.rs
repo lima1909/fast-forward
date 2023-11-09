@@ -1,16 +1,54 @@
 //! The `index `module contains the structure for saving and accessing the `Index` implementations.
 pub mod indices;
-pub mod int;
-mod ivec;
+pub mod ivec;
 pub mod map;
 pub mod ops;
 pub mod store;
-pub mod uint;
-pub mod view;
 
-pub use int::IntIndex;
+pub use ivec::int::{MultiIntIndex, UniqueIntIndex};
+pub use ivec::uint::{MultiUIntIndex, UniqueUIntIndex};
 pub use map::MapIndex;
-pub use uint::UIntIndex;
+
+use crate::index::{indices::Indices, store::Filterable};
+
+/// [`Filter`] combines a given [`Filterable`] with the given list of items.
+pub struct Filter<'a, F, I> {
+    pub(crate) filter: &'a F,
+    pub(crate) items: &'a I,
+}
+
+impl<'a, F, I> Filter<'a, F, I>
+where
+    F: Filterable,
+{
+    pub const fn new(filter: &'a F, items: &'a I) -> Self {
+        Self { filter, items }
+    }
+
+    #[inline]
+    pub fn eq(&self, key: &F::Key) -> Indices<'a, F::Index>
+    where
+        F::Index: Clone,
+    {
+        Indices::from_sorted_slice(self.filter.get(key))
+    }
+
+    #[inline]
+    pub fn contains(&self, key: &F::Key) -> bool {
+        self.filter.contains(key)
+    }
+
+    #[inline]
+    pub fn items(
+        &'a self,
+        key: &F::Key,
+    ) -> impl Iterator<Item = &'a <I as Indexable<F::Index>>::Output>
+    where
+        I: Indexable<F::Index>,
+    {
+        self.items.items(self.filter.get(key).iter())
+    }
+}
 
 /// [`Indexable`] means a collection (Map, Vec, Array, ...)
 /// where Items are accessable via an Index.

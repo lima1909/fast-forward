@@ -7,9 +7,8 @@ pub mod rw;
 
 use crate::index::{
     indices::Indices,
-    store::{Filterable, MetaData},
-    view::{Filter, Keys, View},
-    Indexable,
+    store::{Filterable, MetaData, View, ViewCreator},
+    Filter, Indexable,
 };
 
 /// A `Retriever` is the main interface for get Items by an given query.
@@ -38,7 +37,7 @@ where
     /// # Example
     ///
     /// ```
-    /// use fast_forward::index::{store::Store, int::IntIndex};
+    /// use fast_forward::index::{store::Store, MultiIntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, PartialEq)]
@@ -46,7 +45,7 @@ where
     ///
     /// let cars = vec![Car(-2, "BMW".into()), Car(5, "Audi".into())];
     ///
-    /// let l = IList::<IntIndex, _>::new(|c| c.0, cars);
+    /// let l = IList::<MultiIntIndex, _>::new(|c| c.0, cars);
     ///
     /// assert!(l.idx().contains(&-2));
     /// assert!(!l.idx().contains(&99));
@@ -61,7 +60,7 @@ where
     /// # Example
     ///
     /// ```
-    /// use fast_forward::index::{store::Store, uint::UIntIndex};
+    /// use fast_forward::index::{store::Store, UniqueUIntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, PartialEq)]
@@ -73,7 +72,7 @@ where
     ///
     /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
     ///
-    /// let l = IList::<UIntIndex, _>::new(Car::id, cars);
+    /// let l = IList::<UniqueUIntIndex, _>::new(Car::id, cars);
     ///
     /// assert_eq!(Some(&Car(2, "BMW".into())), l.idx().get(&2).next());
     /// ```
@@ -95,7 +94,7 @@ where
     /// # Example:
     ///
     /// ```
-    /// use fast_forward::index::{store::Store, int::IntIndex};
+    /// use fast_forward::index::{store::Store, MultiIntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, PartialEq)]
@@ -108,7 +107,7 @@ where
     ///     Car(-99, "Porsche".into()),
     /// ];
     ///
-    /// let l = IList::<IntIndex, _>::new(|c| c.0, cars);
+    /// let l = IList::<MultiIntIndex, _>::new(|c| c.0, cars);
     ///
     /// let result = l.idx().get_many([-2, 5]).collect::<Vec<_>>();
     /// assert_eq!(vec![
@@ -136,7 +135,7 @@ where
     /// # Example
     ///
     /// ```
-    /// use fast_forward::index::{store::Store, uint::UIntIndex};
+    /// use fast_forward::index::{store::Store, MultiUIntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, PartialEq)]
@@ -144,7 +143,7 @@ where
     ///
     /// let cars = vec![Car(2, "BMW".into()), Car(5, "Audi".into())];
     ///
-    /// let l = IList::<UIntIndex, _>::new(|c| c.0, cars);
+    /// let l = IList::<MultiUIntIndex, _>::new(|c| c.0, cars);
     ///
     /// assert_eq!(
     ///     vec![&Car(2, "BMW".into()), &Car(5, "Audi".into())],
@@ -175,37 +174,43 @@ where
     /// # Example
     ///
     /// ```
-    /// use fast_forward::index::{store::Store, int::IntIndex};
+    /// use fast_forward::index::{store::Store, UniqueUIntIndex};
     /// use fast_forward::collections::ro::IList;
     ///
     /// #[derive(Debug, PartialEq)]
-    /// pub struct Car(i32, String);
+    /// pub struct Car(usize, String);
     ///
-    /// let l = IList::<IntIndex, _>::new(|c| c.0, vec![
+    /// let l = IList::<UniqueUIntIndex, _>::new(|c| c.0, vec![
     ///                                 Car(1, "BMW".into()),
     ///                                 Car(2, "Porsche".into()),
-    ///                                 Car(-3, "Mercedes".into()),
-    ///                                 Car(-5, "Audi".into())]);
+    ///                                 Car(3, "Mercedes".into()),
+    ///                                 Car(5, "Audi".into())]);
     ///
-    /// let view = l.idx().create_view([1, 2, -3]);
-    /// assert!(view.contains(&-3));
-    /// assert!(view.contains(&1));
-    /// assert_eq!(None, view.get(&-5).next());
+    /// let view = l.idx().create_view([1, 2, 3], |view| {
+    ///     assert!(view.contains(&3));
+    ///     assert!(view.contains(&1));
+    ///     assert_eq!(None, view.get(&5).next());
+    /// });
     ///
     /// // or by using a `Range`
-    /// let view = l.idx().create_view(-3..=3);
-    /// assert!(view.contains(&-3));
-    /// assert!(view.contains(&1));
-    /// assert_eq!(None, view.get(&-5).next());
+    /// let view = l.idx().create_view(0..=3, |view| {
+    ///     assert!(view.contains(&3));
+    ///     assert!(view.contains(&1));
+    ///     assert_eq!(None, view.get(&5).next());
+    /// });
     /// ```
     #[inline]
-    pub fn create_view<It>(&self, keys: It) -> View<'a, F, F, I>
+    pub fn create_view<It, V>(&self, keys: It, mut exec: V)
     where
-        It: IntoIterator<Item = <F as Keys>::Key>,
-        F: Keys<Key = <F as Filterable>::Key>,
+        <F as ViewCreator<'a>>::Filter: Filterable,
+        F: ViewCreator<'a> + 'a,
+        It: IntoIterator<Item = <F as ViewCreator<'a>>::Key>,
         I: Indexable<F::Index>,
+        V: FnMut(&Retriever<'_, View<F::Filter>, I>),
     {
-        View::new(F::from_iter(keys), self.0.filter, self.0.items)
+        let view = self.0.filter.create_view(keys);
+        let retriever = Retriever::new(&view, self.0.items);
+        exec(&retriever);
     }
 
     /// Returns Meta data, if the [`crate::index::store::Store`] supports any.

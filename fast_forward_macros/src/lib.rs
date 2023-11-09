@@ -34,8 +34,8 @@ use syn::parse_macro_input;
 ///
 /// fast!(
 ///     create ro ref_list Cars on Car using {
-///         id:   fast_forward::index::uint::UIntIndex => 0,
-///         name: fast_forward::index::map::MapIndex   => 1.clone,
+///         id:   fast_forward::index::MultiUIntIndex => 0,
+///         name: fast_forward::index::MapIndex   => 1.clone,
 ///     }
 /// );
 ///

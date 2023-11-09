@@ -3,8 +3,8 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use fast_forward::collections::ro::IList;
 use fast_forward::index::map::MapIndex;
 use fast_forward::index::store::Store;
-use fast_forward::index::uint::UIntIndex;
 use fast_forward::index::view::Filter;
+use fast_forward::index::UniqueUIntIndex;
 
 const HOW_MUCH_PERSON: usize = 100_000;
 const FIND_ID: usize = 1_001;
@@ -21,7 +21,7 @@ impl Person {
 }
 
 struct Indices {
-    pk: UIntIndex,
+    pk: UniqueUIntIndex,
     name: MapIndex,
 }
 
@@ -44,11 +44,11 @@ fn list_index(c: &mut Criterion) {
     let FIND_PERSON_3: Person = Person(FIND_ID_3, format!("Jasmin {FIND_ID_3}"));
 
     // read only index list
-    let ro_idx = IList::<UIntIndex, _>::new(Person::id, v.clone());
+    let ro_idx = IList::<UniqueUIntIndex, _>::new(Person::id, v.clone());
 
     // create search index
     let mut idx = Indices {
-        pk: UIntIndex::with_capacity(HOW_MUCH_PERSON),
+        pk: UniqueUIntIndex::with_capacity(HOW_MUCH_PERSON),
         name: MapIndex::with_capacity(HOW_MUCH_PERSON),
     };
 

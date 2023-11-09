@@ -10,13 +10,13 @@
 //! ## Example for an indexed read only List (ro::IList):
 //!
 //! ```
-//! use fast_forward::{index::UIntIndex, collections::ro::IList};
+//! use fast_forward::{index::UniqueUIntIndex, collections::ro::IList};
 //!
 //! #[derive(Debug, PartialEq)]
 //! pub struct Car(usize, String);
 //!
-//! // created an indexed List with the UIntIndex on the Car property 0.
-//! let l = IList::<UIntIndex, _>::new(|c: &Car| c.0, vec![
+//! // created an indexed List with the UniqueUIntIndex on the Car property 0.
+//! let l = IList::<UniqueUIntIndex, _>::new(|c: &Car| c.0, vec![
 //!                             Car(1, "BMW".into()),
 //!                             Car(2, "VW".into())]);
 //!
@@ -48,8 +48,8 @@
 //! // or you can get MetaData like min and max Key value
 //! use fast_forward::index::store::MetaData;
 //!
-//! assert_eq!(1, l.idx().meta().min_key());
-//! assert_eq!(2, l.idx().meta().max_key());
+//! assert_eq!(Some(1), l.idx().meta().min_key_index());
+//! assert_eq!(Some(2), l.idx().meta().max_key_index());
 //! ```
 //!
 //! All supported options for retrieve Items can you find by the [`crate::collections::Retriever`] struct.
@@ -75,16 +75,17 @@
 //!
 //! // create a view: only for Car Name = "BMW" 0r "Audi"
 //! let view = l.idx().create_view(
-//!       [String::from("BMW"), String::from("Audi")]);
+//!       [String::from("BMW"), String::from("Audi")],
+//!       |view| {
+//!             // Car with Name "VW" is NOT in the view
+//!             assert!(!view.contains(&String::from("VW")));
 //!
-//! // Car with Name "VW" is NOT in the view
-//! assert!(!view.contains(&String::from("VW")));
-//!
-//! // get the Care with the name "Audi"
-//! assert_eq!(
-//!     view.get(&String::from("Audi")).collect::<Vec<_>>(),
-//!     vec![&Car(3, "Audi".into())],
-//! );
+//!             // get the Care with the name "Audi"
+//!             assert_eq!(
+//!                 view.get(&String::from("Audi")).collect::<Vec<_>>(),
+//!                 vec![&Car(3, "Audi".into())],
+//!             );
+//!       });
 //!
 //! // the original list contains of course the Car with ID "VW"
 //! assert!(l.idx().contains(&String::from("VW")));
@@ -110,8 +111,8 @@ pub mod index;
 ///
 /// let fast_persons = fast!(
 ///     FastPersonList => Person {
-///         id:   UIntIndex => id,
-///         name: MapIndex  => name.clone,
+///         id:   UniqueUIntIndex => id,
+///         name: MapIndex        => name.clone,
 ///     }
 /// );
 /// ```
@@ -212,7 +213,7 @@ macro_rules! fast {
 mod tests {
     use crate::{
         fast,
-        index::{filter::Filter, map::MapIndex, store::Filterable, uint::UIntIndex},
+        index::{filter::Filter, ivec::uint::MultiUIntIndex, map::MapIndex, store::Filterable},
     };
 
     #[derive(Debug, Eq, PartialEq)]
@@ -220,7 +221,7 @@ mod tests {
 
     #[test]
     fn one_indexed_list_delete_item() {
-        let mut cars = fast!(Cars on Car {id: UIntIndex => 0});
+        let mut cars = fast!(Cars on Car {id: MultiUIntIndex => 0});
         cars.insert(Car(0, "Porsche".into()));
         cars.insert(Car(1, "BMW".into()));
         cars.insert(Car(2, "Porsche".into()));
@@ -263,7 +264,7 @@ mod tests {
 
     #[test]
     fn one_indexed_list_idx() {
-        let mut cars = fast!(Cars on Car {id: UIntIndex => 0});
+        let mut cars = fast!(Cars on Car {id: MultiUIntIndex => 0});
         cars.insert(Car(2, "BMW".into()));
         cars.insert(Car(5, "Audi".into()));
         cars.insert(Car(2, "VW".into()));
@@ -303,7 +304,7 @@ mod tests {
 
     #[test]
     fn one_indexed_list_idx_min_max() {
-        let mut cars = fast!(Cars on Car {id: UIntIndex => 0});
+        let mut cars = fast!(Cars on Car {id: MultiUIntIndex => 0});
         cars.insert(Car(2, "BMW".into()));
         cars.insert(Car(5, "Audi".into()));
         cars.insert(Car(2, "VW".into()));
@@ -315,15 +316,15 @@ mod tests {
 
         // min and max
         use crate::index::store::MetaData;
-        assert_eq!(2, cars.id.meta().min_key());
-        assert_eq!(99, cars.id.meta().max_key());
+        assert_eq!(Some(2), cars.id.meta().min_key_index());
+        assert_eq!(Some(99), cars.id.meta().max_key_index());
     }
 
     #[test]
     fn fast() {
         let mut fast_cars = fast!(
                 FastCars on Car {
-                    id:     UIntIndex       => 0,
+                    id:     MultiUIntIndex  => 0,
                     id_map: MapIndex<usize> => 0,
                     name:   MapIndex        => 1.clone,
                 }
@@ -338,7 +339,7 @@ mod tests {
         assert_eq!([1], fid.eq(&4) | fname.eq(&"Porsche".into()));
     }
 
-    #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Debug)]
     enum Gender {
         Male,
         Female,
@@ -381,10 +382,10 @@ mod tests {
         // CREATE INDEX index1 ON schema1.table1 (column1);
         let mut persons = fast!(
                 Persons on Person {
-                    pk:     UIntIndex         => pk,
-                    multi:  UIntIndex<u16>    => multi,
-                    name:   MapIndex          => name.clone,
-                    gender: UIntIndex<Gender> => gender.into,
+                    pk:     MultiUIntIndex                 => pk,
+                    multi:  MultiUIntIndex<u16, usize>     => multi,
+                    name:   MapIndex                       => name.clone,
+                    gender: MultiUIntIndex<Gender, usize> => gender.into,
                 }
         );
 
@@ -417,7 +418,7 @@ mod tests {
 
         let p = Person::new(0, 0, "Julia", Female);
 
-        let mut gender = UIntIndex::<Gender>::default();
+        let mut gender = MultiUIntIndex::<Gender, _>::default();
         gender.insert(p.gender, 1);
         gender.insert(Male, 2);
         gender.insert(None, 0);

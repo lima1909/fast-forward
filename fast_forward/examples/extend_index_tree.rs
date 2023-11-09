@@ -1,7 +1,7 @@
 use fast_forward::{
     collections::rw::IList,
-    index::uint::UIntIndex,
-    index::{indices::Indices, store::Filterable, view::Filter, Indexable},
+    index::ivec::uint::UniqueUIntIndex,
+    index::{indices::Indices, store::Filterable, Filter, Indexable},
 };
 
 trait Parents<'a> {
@@ -57,7 +57,7 @@ fn main() {
         Node::new(6, 5),
     ];
 
-    let n = IList::<UIntIndex, _, _>::from_iter(|n: &Node| n.id, nodes.into_iter());
+    let n = IList::<UniqueUIntIndex, _, _>::from_iter(|n: &Node| n.id, nodes.into_iter());
 
     // PARENTS: up to the root node
     assert_eq!(None, n.idx().filter(|f| f.parents(9, 0)).next());

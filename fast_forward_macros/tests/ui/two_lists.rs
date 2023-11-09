@@ -5,14 +5,14 @@ pub struct Car(usize, String);
 
 fast!(
     create ref_list CarsRef on Car using {
-        id: fast_forward::index::uint::UIntIndex => 0,
+        id: fast_forward::index::MultiUIntIndex => 0,
         name: fast_forward::index::map::MapIndex => 1.clone,
     }
 );
 
 fast!(
     create Cars on Car using {
-        id: fast_forward::index::uint::UIntIndex => 0,
+        id: fast_forward::index::MultiUIntIndex => 0,
         name: fast_forward::index::map::MapIndex => 1.clone,
     }
 );

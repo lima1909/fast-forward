@@ -5,7 +5,7 @@ pub struct Car(usize, String);
 
 fast!(
     create Cars on Car using {
-        name: fast_forward::index::map::MapIndex => 1.to_lowercase
+        name: fast_forward::index::MapIndex => 1.to_lowercase
     }
 );
 

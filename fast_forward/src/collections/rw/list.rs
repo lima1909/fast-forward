@@ -15,7 +15,7 @@ use crate::{
 /// # Example
 ///
 /// ```
-/// use fast_forward::{index::int::IntIndex, collections::rw::IList};
+/// use fast_forward::{index::UniqueIntIndex, collections::rw::IList};
 ///
 /// #[derive(PartialEq, Debug, Clone)]
 /// struct Person {
@@ -32,7 +32,7 @@ use crate::{
 ///     }
 /// }
 ///
-/// let mut l = IList::<IntIndex, _, _>::from_vec(|p| p.id, vec![
+/// let mut l = IList::<UniqueIntIndex, _, _>::from_vec(|p| p.id, vec![
 ///                                                         Person::new(0, "Paul"),
 ///                                                         Person::new(-2, "Mario"),
 ///                                                         Person::new(2, "Jasmin"),
@@ -111,7 +111,7 @@ impl<S, I, F> Deref for IList<S, I, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::{IntIndex, MapIndex, UIntIndex};
+    use crate::index::{MapIndex, MultiIntIndex, MultiUIntIndex};
     use rstest::{fixture, rstest};
 
     #[derive(PartialEq, Debug, Clone)]
@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn check() {
-        let mut l = IList::<IntIndex, Person, _>::new(|p| p.id);
+        let mut l = IList::<MultiIntIndex, Person, _>::new(|p| p.id);
         assert_eq!(0, l.push(Person::new(0, "Paul")));
         assert_eq!(1, l.push(Person::new(-2, "Mario")));
         assert_eq!(2, l.push(Person::new(2, "Jasmin")));
@@ -186,7 +186,7 @@ mod tests {
 
     #[rstest]
     fn remove_0(persons: Vec<Person>) {
-        let mut l = IList::<IntIndex, _, _>::from_vec(|p| p.id, persons);
+        let mut l = IList::<MultiIntIndex, _, _>::from_vec(|p| p.id, persons);
         assert_eq!(&Person::new(0, "Paul"), &l[0]);
         assert_eq!(3, l.len());
 
@@ -199,7 +199,7 @@ mod tests {
 
     #[rstest]
     fn remove_1(persons: Vec<Person>) {
-        let mut l = IList::<IntIndex, _, _>::from_vec(|p| p.id, persons);
+        let mut l = IList::<MultiIntIndex, _, _>::from_vec(|p| p.id, persons);
         assert_eq!(&Person::new(-2, "Mario"), &l[1]);
         assert_eq!(3, l.len());
 
@@ -212,7 +212,7 @@ mod tests {
 
     #[rstest]
     fn remove_last_2(persons: Vec<Person>) {
-        let mut l = IList::<IntIndex, _, _>::from_vec(|p| p.id, persons);
+        let mut l = IList::<MultiIntIndex, _, _>::from_vec(|p| p.id, persons);
         assert_eq!(&Person::new(2, "Jasmin"), &l[2]);
         assert_eq!(3, l.len());
 
@@ -224,7 +224,7 @@ mod tests {
 
     #[rstest]
     fn remove_invalid(persons: Vec<Person>) {
-        let mut l = IList::<IntIndex, _, _>::from_vec(|p| p.id, persons);
+        let mut l = IList::<MultiIntIndex, _, _>::from_vec(|p| p.id, persons);
         assert_eq!(None, l.remove(10_000));
 
         assert_eq!(3, l.len());
@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn remove_empty() {
-        let mut l = IList::<IntIndex, Person, _>::from_vec(|p| p.id, vec![]);
+        let mut l = IList::<MultiIntIndex, Person, _>::from_vec(|p| p.id, vec![]);
         assert_eq!(None, l.remove(0));
     }
 
@@ -246,7 +246,7 @@ mod tests {
             Person::new(1, "Inge"),
         ];
 
-        let mut l = IList::<IntIndex, Person, _>::from_vec(|p| p.id, v);
+        let mut l = IList::<MultiIntIndex, Person, _>::from_vec(|p| p.id, v);
         let mut removed = Vec::new();
         l.idx_mut().remove_by_key_with_cb(&2, |i| removed.push(i));
 
@@ -304,7 +304,8 @@ mod tests {
         pub struct Person(i32, &'static str);
 
         #[allow(clippy::useless_conversion)]
-        let mut s = IList::<IntIndex, _, _>::from_iter(|p| p.0, vec![Person(-1, "A")].into_iter());
+        let mut s =
+            IList::<MultiIntIndex, _, _>::from_iter(|p| p.0, vec![Person(-1, "A")].into_iter());
         assert_eq!(1, s.push(Person(1, "B")));
         assert!(s.idx().contains(&-1));
 
@@ -363,13 +364,13 @@ mod tests {
     #[rstest]
     fn item_from_idx(cars: Vec<Car>) {
         #[allow(clippy::useless_conversion)]
-        let cars = IList::<UIntIndex, _, _>::from_iter(|c| c.0, cars.into_iter());
+        let cars = IList::<MultiUIntIndex, _, _>::from_iter(|c| c.0, cars.into_iter());
         assert_eq!(&Car(5, "Audi".into()), cars.get(1).unwrap());
     }
 
     #[rstest]
     fn iter_after_remove(cars: Vec<Car>) {
-        let mut cars = IList::<UIntIndex, _, _>::from_vec(|c| c.0, cars);
+        let mut cars = IList::<MultiUIntIndex, _, _>::from_vec(|c| c.0, cars);
         cars.remove(2);
         cars.remove(0);
 
@@ -381,7 +382,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_filter_uint(cars: Vec<Car>) {
-        let cars = IList::<UIntIndex, _, _>::from_vec(|c| c.0, cars);
+        let cars = IList::<MultiUIntIndex, _, _>::from_vec(|c| c.0, cars);
 
         assert!(cars.idx().contains(&2));
         assert_eq!(Some(&Car(2, "VW".into())), cars.get(2));
@@ -400,8 +401,8 @@ mod tests {
         let mut it = cars.idx().get(&1000);
         assert_eq!(it.next(), None);
 
-        assert_eq!(2, cars.idx().meta().min_key());
-        assert_eq!(99, cars.idx().meta().max_key());
+        assert_eq!(Some(2), cars.idx().meta().min_key_index());
+        assert_eq!(Some(99), cars.idx().meta().max_key_index());
     }
 
     #[rstest]
@@ -426,7 +427,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_update(cars: Vec<Car>) {
-        let mut cars = IList::<UIntIndex, _, _>::from_vec(|c| c.0, cars);
+        let mut cars = IList::<MultiUIntIndex, _, _>::from_vec(|c| c.0, cars);
 
         // update name, where name is NOT a Index
         assert_eq!(
@@ -471,7 +472,7 @@ mod tests {
 
     #[rstest]
     fn one_indexed_list_remove(cars: Vec<Car>) {
-        let mut cars = IList::<UIntIndex, _, _>::from_vec(|c| c.0, cars);
+        let mut cars = IList::<MultiUIntIndex, _, _>::from_vec(|c| c.0, cars);
 
         // before delete: 2 Cars
         let r = cars.idx().get(&2).collect::<Vec<_>>();
@@ -494,13 +495,13 @@ mod tests {
 
     #[rstest]
     fn delete_wrong_id(cars: Vec<Car>) {
-        let mut cars = IList::<UIntIndex, _, _>::from_vec(|c| c.0, cars);
+        let mut cars = IList::<MultiUIntIndex, _, _>::from_vec(|c| c.0, cars);
         assert_eq!(None, cars.remove(10_000));
     }
 
     #[rstest]
     fn update_by_key(cars: Vec<Car>) {
-        let mut cars = IList::<UIntIndex, _, _>::from_vec(|c| c.0, cars);
+        let mut cars = IList::<MultiUIntIndex, _, _>::from_vec(|c| c.0, cars);
         let mut updated = Vec::new();
         cars.idx_mut().update_by_key_with_cb(
             &2,

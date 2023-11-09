@@ -5,7 +5,7 @@ pub struct Car(usize, String);
 
 fast!(
     create Cars on Car using {
-        id: fast_forward::index::uint::UIntIndex => 0
+        id: fast_forward::index::MultiUIntIndex => 0
     }
 );
 
@@ -33,6 +33,6 @@ fn main() {
     let mut it = cars.id().get(&1000);
     assert_eq!(it.next(), None);
 
-    assert_eq!(2, cars.id().meta().min_key());
-    assert_eq!(99, cars.id().meta().max_key());
+    assert_eq!(Some(2), cars.id().meta().min_key_index());
+    assert_eq!(Some(99), cars.id().meta().max_key_index());
 }
