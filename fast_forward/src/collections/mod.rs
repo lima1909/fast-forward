@@ -184,19 +184,19 @@ where
     ///                                 Car(1, "BMW".into()),
     ///                                 Car(2, "Porsche".into()),
     ///                                 Car(-3, "Mercedes".into()),
-    ///                                 Car(5, "Audi".into())]);
+    ///                                 Car(-5, "Audi".into())]);
     ///
     /// let view = l.idx().create_view([1, 2, -3], |view| {
     ///     assert!(view.contains(&-3));
     ///     assert!(view.contains(&1));
-    ///     assert_eq!(None, view.get(&5).next());
+    ///     assert_eq!(None, view.get(&-5).next());
     /// });
     ///
     /// // or by using a `Range`
-    /// let view = l.idx().create_view(-3..=1, |view| {
+    /// let view = l.idx().create_view(-3..=3, |view| {
     ///     assert!(view.contains(&-3));
     ///     assert!(view.contains(&1));
-    ///     assert_eq!(None, view.get(&5).next());
+    ///     assert_eq!(None, view.get(&-5).next());
     /// });
     /// ```
     #[inline]

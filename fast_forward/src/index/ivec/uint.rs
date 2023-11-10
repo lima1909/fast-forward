@@ -48,8 +48,17 @@ where
     where
         It: IntoIterator<Item = Self::Key>,
     {
-        let v = self.vec.create_view(keys.into_iter().map(|k| k.into()));
-        View(v)
+        let mut view = Self::Filter::new();
+        view.vec.resize(self.vec.len(), None);
+
+        for key in keys {
+            let idx: usize = key.into();
+            if let Some(opt) = self.vec.get(idx) {
+                view[idx] = opt.as_ref();
+            }
+        }
+
+        View(view)
     }
 }
 

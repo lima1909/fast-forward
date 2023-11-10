@@ -7,25 +7,14 @@ pub(crate) trait KeyIndexOptionRead<I, X>
 where
     I: KeyIndex<X>,
 {
-    type Output;
-
     fn contains(&self, is_negativ: bool) -> bool;
     fn get(&self, is_negativ: bool) -> &[X];
-
-    fn get_opt(&self, _: bool) -> &Option<I> {
-        &None
-    }
-    fn map_to_position(&self, _: usize) -> Option<Self::Output> {
-        None
-    }
 }
 
 impl<I, X> KeyIndexOptionRead<I, X> for Option<I>
 where
     I: KeyIndex<X>,
 {
-    type Output = usize;
-
     fn contains(&self, _: bool) -> bool {
         self.is_some()
     }
@@ -33,22 +22,12 @@ where
     fn get(&self, _: bool) -> &[X] {
         self.as_ref().map_or(&[], |i| i.as_slice())
     }
-
-    fn get_opt(&self, _: bool) -> &Option<I> {
-        self
-    }
-
-    fn map_to_position(&self, pos: usize) -> Option<Self::Output> {
-        self.as_ref().map(|_| pos)
-    }
 }
 
 impl<I, X> KeyIndexOptionRead<I, X> for Option<&I>
 where
     I: KeyIndex<X>,
 {
-    type Output = usize;
-
     fn contains(&self, _: bool) -> bool {
         self.is_some()
     }
@@ -62,30 +41,27 @@ impl<I, X> KeyIndexOptionRead<I, X> for (Option<I>, Option<I>)
 where
     I: KeyIndex<X>,
 {
-    type Output = (Option<usize>, Option<usize>);
-
     fn contains(&self, is_negativ: bool) -> bool {
-        self.get_opt(is_negativ).is_some()
+        if is_negativ { &self.0 } else { &self.1 }.is_some()
     }
 
     fn get(&self, is_negativ: bool) -> &[X] {
-        self.get_opt(is_negativ).get(is_negativ)
+        if is_negativ { &self.0 } else { &self.1 }.get(is_negativ)
+    }
+}
+
+impl<I, X> KeyIndexOptionRead<I, X> for (Option<&I>, Option<&I>)
+where
+    I: KeyIndex<X>,
+{
+    fn contains(&self, is_negativ: bool) -> bool {
+        if is_negativ { self.0 } else { self.1 }.is_some()
     }
 
-    fn get_opt(&self, is_negativ: bool) -> &Option<I> {
-        if is_negativ {
-            &self.0
-        } else {
-            &self.1
-        }
-    }
-
-    fn map_to_position(&self, pos: usize) -> Option<Self::Output> {
-        if self.0.is_none() && self.1.is_none() {
-            None
-        } else {
-            Some((self.0.map_to_position(pos), self.1.map_to_position(pos)))
-        }
+    fn get(&self, is_negativ: bool) -> &[X] {
+        if is_negativ { self.0 } else { self.1 }
+            .as_ref()
+            .map_or(&[], |i| (*i).as_slice())
     }
 }
 
@@ -98,8 +74,6 @@ where
 {
     fn set(&mut self, is_negativ: bool, index: X);
     fn delete(&mut self, is_negativ: bool, index: &X);
-
-    fn get_opt_mut(&mut self, _: bool) -> &mut Option<I>;
 }
 
 impl<I, X> KeyIndexOptionWrite<I, X> for Option<I>
@@ -120,10 +94,6 @@ where
             }
         }
     }
-
-    fn get_opt_mut(&mut self, _: bool) -> &mut Option<I> {
-        self
-    }
 }
 
 impl<I, X> KeyIndexOptionWrite<I, X> for (Option<I>, Option<I>)
@@ -131,18 +101,48 @@ where
     I: KeyIndex<X> + Clone,
 {
     fn set(&mut self, is_negativ: bool, index: X) {
-        self.get_opt_mut(is_negativ).set(is_negativ, index);
+        if is_negativ { &mut self.0 } else { &mut self.1 }.set(is_negativ, index);
     }
 
     fn delete(&mut self, is_negativ: bool, index: &X) {
-        self.get_opt_mut(is_negativ).delete(is_negativ, index);
+        if is_negativ { &mut self.0 } else { &mut self.1 }.delete(is_negativ, index);
     }
+}
 
-    fn get_opt_mut(&mut self, is_negativ: bool) -> &mut Option<I> {
-        if is_negativ {
-            &mut self.0
+// ------------
+// --- Meta ---
+// ------------
+pub(crate) trait KeyIndexOptionMeta<I, X>
+where
+    I: KeyIndex<X>,
+{
+    type Output;
+
+    fn map_to_position(&self, _: usize) -> Option<Self::Output>;
+}
+
+impl<I, X> KeyIndexOptionMeta<I, X> for Option<I>
+where
+    I: KeyIndex<X>,
+{
+    type Output = usize;
+
+    fn map_to_position(&self, pos: usize) -> Option<Self::Output> {
+        self.as_ref().map(|_| pos)
+    }
+}
+
+impl<I, X> KeyIndexOptionMeta<I, X> for (Option<I>, Option<I>)
+where
+    I: KeyIndex<X>,
+{
+    type Output = (Option<usize>, Option<usize>);
+
+    fn map_to_position(&self, pos: usize) -> Option<Self::Output> {
+        if self.0.is_none() && self.1.is_none() {
+            None
         } else {
-            &mut self.1
+            Some((self.0.map_to_position(pos), self.1.map_to_position(pos)))
         }
     }
 }

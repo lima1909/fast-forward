@@ -39,14 +39,29 @@ where
     K: Into<i32>,
 {
     type Key = K;
-    type Filter = IVec<I, i32, X, Option<&'a I>>;
+    type Filter = IVec<I, i32, X, (Option<&'a I>, Option<&'a I>)>;
 
     fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
     where
         It: IntoIterator<Item = Self::Key>,
     {
-        let v = self.vec.create_view(keys.into_iter().map(|k| k.into()));
-        View(v)
+        let mut view = Self::Filter::new();
+        view.vec.resize(self.vec.len(), (None, None));
+
+        for key in keys {
+            let key: i32 = key.into();
+            let idx: usize = key.abs().try_into().unwrap();
+
+            if let Some(opt) = self.vec.get(idx) {
+                if key < 0 {
+                    view[idx].0 = opt.0.as_ref();
+                } else {
+                    view[idx].1 = opt.1.as_ref();
+                }
+            }
+        }
+
+        View(view)
     }
 }
 
@@ -229,17 +244,29 @@ mod tests {
         let mut i = UniqueIntIndex::<i8, u8>::default();
         i.insert(1, 1);
         i.insert(2, 2);
-        i.insert(-3, 3);
-        i.insert(5, 5);
+        i.insert(-2, 3);
+        i.insert(3, 4);
+        i.insert(-3, 5);
+        i.insert(-5, 6);
 
         assert!(i.contains(&-3));
 
         let view = i.create_view(-3..=3);
-        // assert!(view.contains(&-3));
+        assert!(view.contains(&-3));
+        assert!(view.contains(&3));
         assert!(view.contains(&1));
-        assert_eq!(None, view.get(&5).iter().next());
-        // assert_eq!(Some(&3u8), view.get(&-3).iter().next());
+        assert_eq!(None, view.get(&-5).iter().next());
+        assert_eq!(Some(&5), view.get(&-3).iter().next());
+
+        let view = i.create_view(-2..=3);
         assert_eq!(None, view.get(&-3).iter().next());
+        assert_eq!(Some(&4), view.get(&3).iter().next());
+        assert_eq!(Some(&2), view.get(&2).iter().next());
+        assert_eq!(Some(&3), view.get(&-2).iter().next());
+
+        let view = i.create_view(-3..3);
+        assert!(view.contains(&-3));
+        assert!(!view.contains(&3));
     }
 
     #[test]

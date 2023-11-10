@@ -6,7 +6,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use self::options::{KeyIndexOptionRead, KeyIndexOptionWrite};
+use self::options::{KeyIndexOptionMeta, KeyIndexOptionRead, KeyIndexOptionWrite};
 
 use super::{indices::KeyIndex, store::Filterable};
 
@@ -92,28 +92,9 @@ where
         }
     }
 
-    fn create_view<It, Ky>(&self, keys: It) -> IVec<I, Ky, X, Option<&I>>
-    where
-        It: IntoIterator<Item = Ky>,
-        Ky: Into<Key>,
-        Opt: KeyIndexOptionRead<I, X>,
-    {
-        let mut view = IVec::new();
-        view.vec.resize(self.vec.len(), None);
-
-        for key in keys {
-            let key = key.into();
-            if let Some(opt) = self.vec.get(key.value) {
-                view[key.value] = opt.get_opt(key.is_negative).as_ref();
-            }
-        }
-
-        view
-    }
-
     pub(crate) fn min_key_index(&self) -> Option<Opt::Output>
     where
-        Opt: KeyIndexOptionRead<I, X>,
+        Opt: KeyIndexOptionMeta<I, X>,
     {
         self.vec
             .iter()
@@ -123,7 +104,7 @@ where
 
     pub(crate) fn max_key_index(&self) -> Option<Opt::Output>
     where
-        Opt: KeyIndexOptionRead<I, X>,
+        Opt: KeyIndexOptionMeta<I, X>,
     {
         self.vec
             .iter()
