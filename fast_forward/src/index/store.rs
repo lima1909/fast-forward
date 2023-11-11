@@ -123,18 +123,6 @@ pub trait Filterable {
     /// If the `Key` not exist, than this method returns `empty array`.
     fn get(&self, key: &Self::Key) -> &[Self::Index];
 
-    /// Get all indices for a given `Key`, if the `check` functions returns `true`.
-    /// If the `Key` not exist, than this method returns `empty array`.
-    fn get_with_check<F>(&self, key: &Self::Key, check: F) -> &[Self::Index]
-    where
-        F: Fn(&Self::Key) -> bool,
-    {
-        if check(key) {
-            return self.get(key);
-        }
-        &[]
-    }
-
     /// Combined all given `keys` with an logical `OR`.
     ///
     /// # Example:
@@ -156,11 +144,10 @@ pub trait Filterable {
 /// Show a subset of `Indices` which a saved in the [`crate::index::store::Store`].
 pub trait ViewCreator<'a> {
     type Key;
-    type Filter;
+    type Filter: Filterable;
 
     fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
     where
-        <Self as ViewCreator<'a>>::Filter: Filterable,
         It: IntoIterator<Item = Self::Key>;
 }
 

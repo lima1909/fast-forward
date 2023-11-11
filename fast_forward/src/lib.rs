@@ -74,18 +74,15 @@
 //!                             Car(3, "Audi".into())]);
 //!
 //! // create a view: only for Car Name = "BMW" 0r "Audi"
-//! let view = l.idx().create_view(
-//!       [String::from("BMW"), String::from("Audi")],
-//!       |view| {
-//!             // Car with Name "VW" is NOT in the view
-//!             assert!(!view.contains(&String::from("VW")));
+//! let view = l.idx().create_view([String::from("BMW"), String::from("Audi")]);
+//! // Car with Name "VW" is NOT in the view
+//! assert!(!view.contains(&String::from("VW")));
 //!
-//!             // get the Care with the name "Audi"
-//!             assert_eq!(
-//!                 view.get(&String::from("Audi")).collect::<Vec<_>>(),
-//!                 vec![&Car(3, "Audi".into())],
-//!             );
-//!       });
+//! // get the Care with the name "Audi"
+//! assert_eq!(
+//!     view.get(&String::from("Audi")).collect::<Vec<_>>(),
+//!     vec![&Car(3, "Audi".into())],
+//! );
 //!
 //! // the original list contains of course the Car with ID "VW"
 //! assert!(l.idx().contains(&String::from("VW")));

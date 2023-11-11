@@ -362,8 +362,36 @@ mod tests {
     }
 
     #[rstest]
+    fn create_view(cars: Vec<Car>) {
+        let mut cars = IList::<MultiUIntIndex, _, _>::from_iter(|c| c.0, cars.into_iter());
+        let view = cars.idx().create_view([2, 5]);
+        assert!(view.contains(&5));
+        assert!(!view.contains(&99));
+
+        assert_eq!(
+            vec![&Car(2, "BMW".into()), &Car(2, "VW".into())],
+            view.get(&2).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![&Car(2, "BMW".into()), &Car(2, "VW".into())],
+            view.filter(|f| f.eq(&2)).collect::<Vec<_>>()
+        );
+
+        cars.push(Car(2, "Mercedes".into()));
+        let view = cars.idx().create_view([2, 5]);
+        assert_eq!(
+            vec![
+                &Car(2, "BMW".into()),
+                &Car(2, "VW".into()),
+                &Car(2, "Mercedes".into()),
+                &Car(5, "Audi".into())
+            ],
+            view.get_many([2, 5]).collect::<Vec<_>>()
+        );
+    }
+
+    #[rstest]
     fn item_from_idx(cars: Vec<Car>) {
-        #[allow(clippy::useless_conversion)]
         let cars = IList::<MultiUIntIndex, _, _>::from_iter(|c| c.0, cars.into_iter());
         assert_eq!(&Car(5, "Audi".into()), cars.get(1).unwrap());
     }

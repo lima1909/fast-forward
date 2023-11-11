@@ -24,6 +24,7 @@ where
         Self(Filter::new(filter, items))
     }
 
+    /// For combining two different indices.
     #[inline]
     pub fn eq(&self, key: &F::Key) -> Indices<'a, F::Index>
     where
@@ -186,31 +187,25 @@ where
     ///                                 Car(-3, "Mercedes".into()),
     ///                                 Car(-5, "Audi".into())]);
     ///
-    /// let view = l.idx().create_view([1, 2, -3], |view| {
-    ///     assert!(view.contains(&-3));
-    ///     assert!(view.contains(&1));
-    ///     assert_eq!(None, view.get(&-5).next());
-    /// });
+    /// let view = l.idx().create_view([1, 2, -3]);
+    /// assert!(view.contains(&-3));
+    /// assert!(view.contains(&1));
+    /// assert_eq!(None, view.get(&-5).next());
     ///
     /// // or by using a `Range`
-    /// let view = l.idx().create_view(-3..=3, |view| {
-    ///     assert!(view.contains(&-3));
-    ///     assert!(view.contains(&1));
-    ///     assert_eq!(None, view.get(&-5).next());
-    /// });
+    /// let view = l.idx().create_view(-3..=3);
+    /// assert!(view.contains(&-3));
+    /// assert!(view.contains(&1));
+    /// assert_eq!(None, view.get(&-5).next());
     /// ```
     #[inline]
-    pub fn create_view<It, V>(&self, keys: It, mut exec: V)
+    pub fn create_view<It>(self, keys: It) -> Viewer<'a, <F as ViewCreator<'a>>::Filter, I>
     where
-        <F as ViewCreator<'a>>::Filter: Filterable,
-        F: ViewCreator<'a> + 'a,
+        F: ViewCreator<'a>,
         It: IntoIterator<Item = <F as ViewCreator<'a>>::Key>,
         I: Indexable<F::Index>,
-        V: FnMut(&Retriever<'_, View<F::Filter>, I>),
     {
-        let view = self.0.filter.create_view(keys);
-        let retriever = Retriever::new(&view, self.0.items);
-        exec(&retriever);
+        Viewer::new(self.0.filter.create_view(keys), self.0.items)
     }
 
     /// Returns Meta data, if the [`crate::index::store::Store`] supports any.
@@ -220,5 +215,57 @@ where
         F: MetaData,
     {
         self.0.filter.meta()
+    }
+}
+
+/// A `Viewer` is a sub set of the given `Items`.
+pub struct Viewer<'a, F: Filterable, I> {
+    view: View<F>,
+    items: &'a I,
+}
+
+impl<'a, F: Filterable, I> Viewer<'a, F, I> {
+    /// Create a new instance of an [`Retriever`].
+    pub const fn new(view: View<F>, items: &'a I) -> Self {
+        Self { view, items }
+    }
+
+    #[inline]
+    pub fn contains(&self, key: &F::Key) -> bool {
+        self.view.contains(key)
+    }
+
+    #[inline]
+    pub fn get(&self, key: &F::Key) -> impl Iterator<Item = &'_ <I as Indexable<F::Index>>::Output>
+    where
+        I: Indexable<F::Index>,
+    {
+        self.items.items(self.view.get(key).iter())
+    }
+
+    #[inline]
+    pub fn get_many<II>(
+        &self,
+        keys: II,
+    ) -> impl Iterator<Item = &'_ <I as Indexable<F::Index>>::Output>
+    where
+        II: IntoIterator<Item = F::Key> + 'a,
+        I: Indexable<F::Index>,
+        <I as Indexable<F::Index>>::Output: Sized,
+    {
+        self.view.get_many(keys).items(self.items)
+    }
+
+    #[inline]
+    pub fn filter<P>(
+        &'a self,
+        predicate: P,
+    ) -> impl Iterator<Item = &'_ <I as Indexable<F::Index>>::Output>
+    where
+        P: Fn(&Filter<'a, View<F>, I>) -> Indices<'a, F::Index>,
+        I: Indexable<F::Index>,
+        F::Index: Clone + 'a,
+    {
+        predicate(&Filter::new(&self.view, self.items)).items(self.items)
     }
 }
