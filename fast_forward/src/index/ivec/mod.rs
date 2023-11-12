@@ -6,7 +6,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use self::options::{KeyIndexOptionMeta, KeyIndexOptionRead, KeyIndexOptionWrite};
+use self::options::{KeyIndexOptionRead, KeyIndexOptionWrite};
 
 use super::{indices::KeyIndex, store::Filterable};
 
@@ -91,27 +91,6 @@ where
             rm_idx.delete(key.is_negative, index)
         }
     }
-
-    pub(crate) fn min_key_index(&self) -> Option<Opt::Output>
-    where
-        Opt: KeyIndexOptionMeta<I, X>,
-    {
-        self.vec
-            .iter()
-            .enumerate()
-            .find_map(|(pos, o)| o.map_to_position(pos))
-    }
-
-    pub(crate) fn max_key_index(&self) -> Option<Opt::Output>
-    where
-        Opt: KeyIndexOptionMeta<I, X>,
-    {
-        self.vec
-            .iter()
-            .enumerate()
-            .rev()
-            .find_map(|(pos, o)| o.map_to_position(pos))
-    }
 }
 
 impl<I, K, X, Opt> Deref for IVec<I, K, X, Opt> {
@@ -170,71 +149,5 @@ impl From<i32> for Key {
             .expect("key could not convert into usize");
 
         Self { value, is_negative }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::index::indices::MultiKeyIndex;
-
-    impl<X> IVec<MultiKeyIndex<X>, usize, X, Option<MultiKeyIndex<X>>> {
-        pub(crate) const fn new_uint() -> Self {
-            Self {
-                vec: Vec::new(),
-                _key: PhantomData,
-                _index: PhantomData,
-                _key_index: PhantomData,
-            }
-        }
-    }
-
-    impl<X> IVec<MultiKeyIndex<X>, usize, X, (Option<MultiKeyIndex<X>>, Option<MultiKeyIndex<X>>)> {
-        pub(crate) const fn new_int() -> Self {
-            Self {
-                vec: Vec::new(),
-                _key: PhantomData,
-                _index: PhantomData,
-                _key_index: PhantomData,
-            }
-        }
-    }
-
-    #[test]
-    fn min_key_pos_uint() {
-        let mut v = IVec::new_uint();
-        assert_eq!(None, v.min_key_index());
-        assert_eq!(None, v.max_key_index());
-
-        v.insert(3, 1);
-        v.insert(5, 1);
-        v.insert(11, 1);
-
-        assert_eq!(Some(3), v.min_key_index());
-        assert_eq!(Some(11), v.max_key_index());
-
-        v.insert(0, 1);
-        assert_eq!(Some(0), v.min_key_index());
-    }
-
-    #[test]
-    fn min_key_index_int() {
-        let mut v = IVec::new_int();
-        assert_eq!(None, v.min_key_index());
-        assert_eq!(None, v.max_key_index());
-
-        v.insert(3, 1);
-        v.insert(-2, 1);
-        v.insert(5, 1);
-        v.insert(11, 1);
-
-        assert_eq!(Some((Some(2), None)), v.min_key_index());
-        assert_eq!(Some((None, Some(11))), v.max_key_index());
-
-        v.insert(-12, 1);
-        assert_eq!(Some((Some(12), None)), v.max_key_index());
-
-        v.insert(0, 1);
-        assert_eq!(Some((None, Some(0))), v.min_key_index());
     }
 }

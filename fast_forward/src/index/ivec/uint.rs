@@ -111,12 +111,19 @@ where
 {
     /// Get the smallest (`min`) `Key-Index` which is stored in `UIntIndex`.
     pub fn min_key_index(&self) -> Option<usize> {
-        self.0.min_key_index()
+        self.0
+            .iter()
+            .enumerate()
+            .find_map(|(pos, o)| o.as_ref().map(|_| pos))
     }
 
     /// Get the smallest (`max`) `Key-Index` which is stored in `UIntIndex`.
     pub fn max_key_index(&self) -> Option<usize> {
-        self.0.max_key_index()
+        self.0
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(pos, o)| o.as_ref().map(|_| pos))
     }
 }
 

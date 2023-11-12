@@ -112,19 +112,35 @@ where
     I: KeyIndex<X>,
 {
     /// Get the smallest (`min`) `Key-Index` which is stored in ``UIntIndex`.
-    pub fn min_key_index(&self) -> (Option<usize>, Option<usize>) {
-        if let Some(o) = self.0.min_key_index() {
-            return o;
-        }
-        (None, None)
+    pub fn min_neg_key_index(&self) -> Option<usize> {
+        self.0
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(pos, (n, _))| n.as_ref().map(|_| pos))
+    }
+
+    pub fn min_pos_key_index(&self) -> Option<usize> {
+        self.0
+            .iter()
+            .enumerate()
+            .find_map(|(pos, (_, p))| p.as_ref().map(|_| pos))
     }
 
     /// Get the smallest (`max`) `Key-Index` which is stored in ``UIntIndex`.
-    pub fn max_key_index(&self) -> (Option<usize>, Option<usize>) {
-        if let Some(o) = self.0.max_key_index() {
-            return o;
-        }
-        (None, None)
+    pub fn max_neg_key_index(&self) -> Option<usize> {
+        self.0
+            .iter()
+            .enumerate()
+            .find_map(|(pos, (n, _))| n.as_ref().map(|_| pos))
+    }
+
+    pub fn max_pos_key_index(&self) -> Option<usize> {
+        self.0
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(pos, (_, p))| p.as_ref().map(|_| pos))
     }
 }
 
@@ -274,12 +290,16 @@ mod tests {
         let mut i = MultiIntIndex::<i8, _>::with_capacity(3);
         i.insert(2, 4);
 
-        assert_eq!((None, Some(2)), i.meta().min_key_index());
-        assert_eq!((None, Some(2)), i.meta().max_key_index());
+        assert_eq!(None, i.meta().min_neg_key_index());
+        assert_eq!(Some(2), i.meta().min_pos_key_index());
+        assert_eq!(None, i.meta().max_neg_key_index());
+        assert_eq!(Some(2), i.meta().max_pos_key_index());
 
         i.insert(1, 3);
-        assert_eq!((None, Some(1)), i.meta().min_key_index());
-        assert_eq!((None, Some(2)), i.meta().max_key_index());
+        assert_eq!(None, i.meta().min_neg_key_index());
+        assert_eq!(Some(1), i.meta().min_pos_key_index());
+        assert_eq!(None, i.meta().max_neg_key_index());
+        assert_eq!(Some(2), i.meta().max_pos_key_index());
     }
 
     #[test]
@@ -442,56 +462,31 @@ mod tests {
         #[test]
         fn min() {
             let mut idx = UniqueIntIndex::<i16, _>::with_capacity(100);
-            assert_eq!((None, None), idx.meta().min_key_index());
+            assert_eq!(None, idx.meta().min_neg_key_index());
+            assert_eq!(None, idx.meta().min_pos_key_index());
 
             idx.insert(4, 4);
-            assert_eq!((None, Some(4)), idx.meta().min_key_index());
+            assert_eq!(None, idx.meta().min_neg_key_index());
+            assert_eq!(Some(4), idx.meta().min_pos_key_index());
 
             idx.insert(-2, 8);
-            assert_eq!((Some(2), None), idx.meta().min_key_index());
+            assert_eq!(Some(2), idx.meta().min_neg_key_index());
+            assert_eq!(Some(4), idx.meta().min_pos_key_index());
 
             idx.insert(99, 6);
-            assert_eq!((Some(2), None), idx.meta().min_key_index());
+            assert_eq!(Some(2), idx.meta().min_neg_key_index());
+            assert_eq!(Some(99), idx.meta().max_pos_key_index());
         }
-
-        // #[test]
-        // fn min_rm() {
-        //     let mut idx = IntIndex::<u16>::with_capacity(100);
-        //     idx.insert(4, 4);
-        //     assert_eq!(4, idx.meta().min_key());
-        //     assert_eq!(4, idx._find_min());
-
-        //     idx.insert(2, 8);
-        //     assert_eq!(2, idx.meta().min_key());
-        //     assert_eq!(2, idx._find_min());
-
-        //     idx.delete(2, &8);
-        //     assert_eq!(4, idx.meta().min_key()); // this cached value is now false
-        //     assert_eq!(4, idx._find_min()); // this is the correct value
-        // }
-
-        // #[test]
-        // fn max() {
-        //     let mut idx = IntIndex::<i16>::with_capacity(100);
-        //     assert_eq!(0, idx.meta().max_key());
-
-        //     idx.insert(4, 4);
-        //     assert_eq!(4, idx.meta().max_key());
-
-        //     idx.insert(-2, 8);
-        //     assert_eq!(4, idx.meta().max_key());
-
-        //     idx.insert(99, 6);
-        //     assert_eq!(99, idx.meta().max_key());
-        // }
 
         #[test]
         fn update() {
             let mut idx = UniqueIntIndex::default();
             idx.insert(2, 4);
 
-            assert_eq!((None, Some(2)), idx.meta().min_key_index());
-            assert_eq!((None, Some(2)), idx.meta().max_key_index());
+            assert_eq!(None, idx.meta().min_neg_key_index());
+            assert_eq!(Some(2), idx.meta().min_pos_key_index());
+            assert_eq!(Some(2), idx.meta().min_pos_key_index());
+            assert_eq!(Some(2), idx.meta().max_pos_key_index());
 
             // (old) Key: 99 do not exist, insert a (new) Key 100?
             idx.update(99, 4, 100);
@@ -503,8 +498,10 @@ mod tests {
         fn delete_empty() {
             let idx = UniqueIntIndex::<u8, u8>::default();
 
-            assert_eq!((None, None), idx.meta().min_key_index());
-            assert_eq!((None, None), idx.meta().max_key_index());
+            assert_eq!(None, idx.meta().min_neg_key_index());
+            assert_eq!(None, idx.meta().min_pos_key_index());
+            assert_eq!(None, idx.meta().max_neg_key_index());
+            assert_eq!(None, idx.meta().max_pos_key_index());
         }
     }
 
@@ -576,9 +573,6 @@ mod tests {
             let mut idx = MultiIntIndex::default();
             idx.insert(2, 4);
 
-            assert_eq!((None, Some(2)), idx.meta().min_key_index());
-            assert_eq!((None, Some(2)), idx.meta().max_key_index());
-
             // (old) Key: 99 do not exist, insert a (new) Key 100?
             idx.update(99, 4, 100);
             assert_eq!(200, idx.vec.len());
@@ -593,8 +587,10 @@ mod tests {
             assert_eq!([8], idx.get(&4));
             assert_eq!([4], idx.get(&2));
 
-            assert_eq!((None, Some(2)), idx.meta().min_key_index());
-            assert_eq!((None, Some(100)), idx.meta().max_key_index());
+            assert_eq!(None, idx.meta().min_neg_key_index());
+            assert_eq!(Some(2), idx.meta().min_pos_key_index());
+            assert_eq!(None, idx.meta().max_neg_key_index());
+            assert_eq!(Some(100), idx.meta().max_pos_key_index());
         }
 
         #[test]
@@ -604,8 +600,8 @@ mod tests {
             idx.insert(2, 3);
             idx.insert(3, 1);
 
-            assert_eq!((None, Some(2)), idx.meta().min_key_index());
-            assert_eq!((None, Some(3)), idx.meta().max_key_index());
+            assert_eq!(Some(2), idx.meta().min_pos_key_index());
+            assert_eq!(Some(3), idx.meta().max_pos_key_index());
 
             // delete correct Key with wrong Index, nothing happens
             idx.delete(2, &100);
@@ -614,20 +610,20 @@ mod tests {
             // delete correct Key with correct Index
             idx.delete(2, &3);
             assert_eq!([4], idx.get(&2));
-            assert_eq!((None, Some(2)), idx.meta().min_key_index());
-            assert_eq!((None, Some(3)), idx.meta().max_key_index());
+            assert_eq!(Some(2), idx.meta().min_pos_key_index());
+            assert_eq!(Some(3), idx.meta().max_pos_key_index());
 
             // delete correct Key with last correct Index, Key now longer exist
             idx.delete(2, &4);
             assert!(idx.get(&2).is_empty());
-            assert_eq!((None, Some(3)), idx.meta().min_key_index());
-            assert_eq!((None, Some(3)), idx.meta().max_key_index());
+            assert_eq!(Some(3), idx.meta().min_pos_key_index());
+            assert_eq!(Some(3), idx.meta().max_pos_key_index());
 
             idx.insert(2, 4);
             // remove max key
             idx.delete(3, &1);
-            assert_eq!((None, Some(2)), idx.meta().min_key_index());
-            assert_eq!((None, Some(2)), idx.meta().max_key_index());
+            assert_eq!(Some(2), idx.meta().min_pos_key_index());
+            assert_eq!(Some(2), idx.meta().max_pos_key_index());
         }
 
         #[test]
@@ -654,88 +650,27 @@ mod tests {
             // assert_eq!(-3, idx.meta().max_key());
         }
 
-        // #[test]
-        // fn delete_pos_neg() {
-        //     let mut idx = MultiIntIndex::default();
-        //     idx.insert(2, 4);
-        //     idx.insert(-2, 3);
-        //     idx.insert(-3, 1);
+        #[test]
+        fn delete_pos_neg() {
+            let mut idx = MultiIntIndex::default();
+            idx.insert(2, 4);
+            idx.insert(-2, 3);
+            idx.insert(-3, 1);
 
-        //     assert_eq!(-3, idx.meta().min_key());
-        //     assert_eq!(2, idx.meta().max_key());
+            assert_eq!(Some(3), idx.meta().min_neg_key_index());
+            assert_eq!(Some(2), idx.meta().max_pos_key_index());
 
-        //     idx.delete(-3, &1);
-        //     assert_eq!(-2, idx.meta().min_key());
-        //     assert_eq!(2, idx.meta().max_key());
+            idx.delete(-3, &1);
+            assert_eq!(Some(2), idx.meta().min_neg_key_index());
+            assert_eq!(Some(2), idx.meta().max_pos_key_index());
 
-        //     idx.insert(-3, 1);
-        //     assert_eq!(-3, idx.meta().min_key());
-        //     assert_eq!(2, idx.meta().max_key());
+            idx.insert(-3, 1);
+            assert_eq!(Some(3), idx.meta().min_neg_key_index());
+            assert_eq!(Some(2), idx.meta().max_pos_key_index());
 
-        //     idx.delete(2, &4);
-        //     assert_eq!(-3, idx.meta().min_key());
-        //     assert_eq!(-2, idx.meta().max_key());
-        // }
+            idx.delete(2, &4);
+            assert_eq!(Some(3), idx.meta().min_neg_key_index());
+            assert_eq!(None, idx.meta().max_pos_key_index());
+        }
     }
-
-    // mod keys {
-    //     use super::*;
-
-    //     #[test]
-    //     fn empty() {
-    //         let keys = IntIndex::from_iter(Vec::<i32>::new());
-    //         assert!(!keys.exist(&1));
-    //     }
-
-    //     #[test]
-    //     fn one() {
-    //         let keys = IntIndex::from_iter([2i32]);
-    //         assert!(!keys.exist(&1));
-    //         assert!(keys.exist(&2));
-
-    //         let keys = IntIndex::from_iter([-2i32]);
-    //         assert!(!keys.exist(&-1));
-    //         assert!(keys.exist(&-2));
-    //     }
-
-    //     #[test]
-    //     fn two() {
-    //         let keys = IntIndex::from_iter([2i32, -2]);
-    //         assert!(!keys.exist(&1));
-    //         assert!(keys.exist(&2));
-    //         assert!(!keys.exist(&-1));
-    //         assert!(keys.exist(&-2));
-    //     }
-
-    //     #[test]
-    //     fn keys() {
-    //         let keys = IntIndex::from_iter([5, 1, 3]);
-    //         assert_eq!(keys.iter().collect::<Vec<_>>(), vec![&1, &3, &5]);
-
-    //         let keys = IntIndex::from_iter([5u8, 1, 3]);
-    //         assert_eq!(keys.iter().collect::<Vec<_>>(), vec![&1, &3, &5]);
-
-    //         // true is twice, so it will be ignored ones
-    //         let keys = IntIndex::from_iter([true, false, true]);
-    //         assert_eq!(keys.iter().collect::<Vec<_>>(), vec![&false, &true]);
-    //     }
-
-    //     #[test]
-    //     fn keys_with_neg() {
-    //         let keys = IntIndex::from_iter([5, -1, -3]);
-    //         assert_eq!(keys.iter().collect::<Vec<_>>(), vec![&-1, &-3, &5]);
-
-    //         let keys = IntIndex::from_iter([-5, -1, -3]);
-    //         assert_eq!(keys.iter().collect::<Vec<_>>(), vec![&-1, &-3, &-5]);
-
-    //         let keys = IntIndex::from_iter([-5, 1, 3, 5]);
-    //         assert_eq!(keys.iter().collect::<Vec<_>>(), vec![&-5, &1, &3, &5]);
-
-    //         let keys = IntIndex::from_iter([1, 3, 5, -1, -3, -5]);
-    //         assert_eq!(
-    //             keys.iter().collect::<Vec<_>>(),
-    //             vec![&-1, &-3, &-5, &1, &3, &5]
-    //         );
-    //     }
-    // }
 }
