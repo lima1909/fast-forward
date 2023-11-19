@@ -1,44 +1,34 @@
-use std::marker::PhantomData;
+use std::{borrow::Borrow, marker::PhantomData};
 
-use crate::index::indices::KeyIndex;
+use crate::index::indices::{KeyIndex, MultiKeyIndex};
 
-pub trait XFilterable {
-    type Key;
+pub trait XFilterable<Key> {
     type Index;
 
-    /// Checks whether the `Key` exists.
-    fn contains(&self, key: Self::Key) -> bool;
-
-    /// Get all indices for a given `Key`.
-    /// If the `Key` not exist, than this method returns `empty array`.
-    fn get(&self, key: Self::Key) -> &[Self::Index];
+    fn contains(&self, key: Key) -> bool;
+    fn get(&self, key: Key) -> &[Self::Index];
 }
 
 pub trait XStore {
     type Key;
     type Index;
-    type Filter;
 
     fn insert(&mut self, key: Self::Key, idx: Self::Index);
     fn delete(&mut self, key: Self::Key, idx: &Self::Index);
-
-    fn create_filter(&self) -> &Self::Filter
-    where
-        Self::Filter: XFilterable;
 }
 
-pub struct IVec<'a, K, X, S> {
-    vec: Vec<Option<S>>,
+pub struct IVec<I, K = usize, X = usize> {
+    vec: Vec<Option<I>>,
     _index: PhantomData<X>,
-    _key: PhantomData<&'a K>,
+    _key: PhantomData<K>,
 }
 
-impl<K, X, S> IVec<'_, K, X, S>
+impl<I, K, X> IVec<I, K, X>
 where
     K: Into<usize>,
-    S: KeyIndex<X>,
+    I: KeyIndex<X>,
 {
-    pub fn new(vec: Vec<Option<S>>) -> Self {
+    pub fn new(vec: Vec<Option<I>>) -> Self {
         Self {
             vec,
             _index: PhantomData,
@@ -47,45 +37,33 @@ where
     }
 }
 
-impl<K, X, S> From<Vec<Option<S>>> for IVec<'_, K, X, S>
+impl<I, K, X> XFilterable<K> for IVec<I, K, X>
 where
     K: Into<usize>,
-    S: KeyIndex<X>,
+    I: KeyIndex<X>,
 {
-    fn from(vec: Vec<Option<S>>) -> Self {
-        IVec::new(vec)
-    }
-}
-
-impl<'a, K, X, S> XFilterable for IVec<'a, K, X, S>
-where
-    K: Into<usize> + Copy,
-    S: KeyIndex<X>,
-{
-    type Key = &'a K;
     type Index = X;
 
-    fn contains(&self, key: Self::Key) -> bool {
-        matches!(self.vec.get((*key).into()), Some(Some(_)))
+    fn contains<'a>(&self, key: K) -> bool {
+        matches!(self.vec.get((key).into()), Some(Some(_)))
     }
 
-    fn get(&self, key: Self::Key) -> &[Self::Index] {
-        match self.vec.get((*key).into()) {
+    fn get<'a>(&self, key: K) -> &[Self::Index] {
+        match self.vec.get((key).into()) {
             Some(Some(idx)) => idx.as_slice(),
             _ => &[],
         }
     }
 }
 
-impl<K, X, S> XStore for IVec<'_, K, X, S>
+impl<I, K, X> XStore for IVec<I, K, X>
 where
     K: Into<usize>,
-    S: KeyIndex<X> + Clone,
+    I: KeyIndex<X> + Clone,
     X: Ord + Clone,
 {
     type Key = K;
     type Index = X;
-    type Filter = Self;
 
     fn insert(&mut self, key: Self::Key, idx: Self::Index) {
         let k = key.into();
@@ -96,7 +74,7 @@ where
 
         match self.vec[k].as_mut() {
             Some(i) => i.add(idx),
-            None => self.vec[k] = Some(S::new(idx)),
+            None => self.vec[k] = Some(I::new(idx)),
         }
     }
 
@@ -109,68 +87,154 @@ where
             }
         }
     }
+}
 
-    fn create_filter(&self) -> &Self::Filter
+// --------------------
+use std::collections::HashMap;
+use std::hash::Hash;
+
+pub struct IMap<K = String, X = usize>(HashMap<K, MultiKeyIndex<X>>);
+
+impl<K, X> IMap<K, X> {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+}
+
+impl<K, X, Q> XFilterable<&Q> for IMap<K, X>
+where
+    Q: Hash + Eq + ?Sized,
+    K: Borrow<Q> + Hash + Eq,
+    X: Ord + PartialEq,
+{
+    type Index = X;
+
+    fn contains(&self, key: &Q) -> bool {
+        self.0.contains_key(key)
+    }
+
+    fn get(&self, key: &Q) -> &[Self::Index] {
+        match self.0.get(key) {
+            Some(i) => i.as_slice(),
+            None => &[],
+        }
+    }
+}
+
+impl<K, X> XStore for IMap<K, X>
+where
+    K: Hash + Eq,
+    X: Ord,
+{
+    type Key = K;
+    type Index = X;
+
+    fn insert(&mut self, key: Self::Key, idx: Self::Index) {
+        match self.0.get_mut(&key) {
+            Some(v) => v.add(idx),
+            None => {
+                self.0.insert(key, MultiKeyIndex::new(idx));
+            }
+        }
+    }
+
+    fn delete(&mut self, key: Self::Key, idx: &Self::Index) {
+        if let Some(rm_idx) = self.0.get_mut(&key) {
+            if rm_idx.remove(idx) {
+                self.0.remove(&key);
+            }
+        }
+    }
+}
+
+// --------------------
+struct XList<S: XStore>(S);
+
+impl<S> XList<S>
+where
+    S: XStore,
+{
+    fn contains<K>(&self, key: K) -> bool
     where
-        Self::Filter: XFilterable,
+        S: XFilterable<K>,
     {
-        self
+        self.0.contains(key)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::index::indices::{MultiKeyIndex, UniqueKeyIndex};
-
     use super::*;
+    use crate::index::indices::{MultiKeyIndex, UniqueKeyIndex};
 
     #[test]
     fn unique_ivec() {
-        let v: IVec<usize, _, UniqueKeyIndex<char>> = IVec::new(vec![
+        let v: IVec<UniqueKeyIndex<char>, u8, _> = IVec::new(vec![
             None,
             None,
             Some(['A'].into()),
             None,
             Some(['B'].into()),
         ]);
-        assert!(!v.contains(&1usize));
-        assert!(v.contains(&2));
+        assert!(!v.contains(1));
+        assert!(v.contains(2));
 
-        assert_eq!(v.get(&2), &['A']);
+        assert_eq!(v.get(2), &['A']);
     }
 
     #[test]
     fn many_ivec() {
-        let mut idxs = MultiKeyIndex::new('A');
-        idxs.add('C');
+        let mut idx = MultiKeyIndex::new(String::from("A"));
+        idx.add(String::from("C"));
 
-        let v = IVec::new(vec![
+        let v: IVec<MultiKeyIndex<String>, usize, _> = IVec::new(vec![
             None,
-            Some(idxs),
+            Some(idx),
             None,
             None,
-            Some(MultiKeyIndex::new('B')),
+            Some(MultiKeyIndex::new("B".into())),
         ]);
-        assert!(!v.contains(&0));
-        assert!(v.contains(&1usize));
+        assert!(!v.contains(0));
+        assert!(v.contains(1));
 
-        assert_eq!(v.get(&1), &['A', 'C']);
+        assert_eq!(v.get(1), &[String::from("A"), String::from("C")]);
     }
 
-    // struct MyString(String);
+    #[test]
+    fn imap() {
+        let mut m: IMap<String, usize> = IMap::new();
+        m.insert(String::from("A"), 1);
+        m.insert(String::from("A"), 2);
 
-    // impl From<&MyString> for usize {
-    //     fn from(s: &MyString) -> Self {
-    //         s.0.len()
-    //     }
-    // }
+        assert!(m.contains("A"));
+        assert!(!m.contains("Z"));
 
-    // #[test]
-    // fn mystring_unique_ivec() {
-    //     let v: IVec<usize, _, UniqueKeyIndex<char>>  = IVec::new(vec![None, Some([1]), None, None, Some([2])]);
-    //     assert!(!v.contains(&MyString(String::from("aa"))));
-    //     assert!(v.contains(&MyString(String::from("a"))));
+        assert_eq!(m.get("A"), &[1, 2]);
+    }
 
-    //     assert_eq!(v.get(&MyString(String::from("a"))), &[1]);
-    // }
+    #[test]
+    fn xlist_imap() {
+        let mut m: IMap<String, usize> = IMap::new();
+        m.insert(String::from("A"), 1);
+        m.insert(String::from("A"), 2);
+        let l = XList(m);
+
+        assert!(l.contains("A"));
+        assert!(!l.contains("Z"));
+    }
+
+    #[test]
+    fn xlist_ivec() {
+        let v: IVec<UniqueKeyIndex<char>, u8, _> = IVec::new(vec![
+            None,
+            None,
+            Some(['A'].into()),
+            None,
+            Some(['B'].into()),
+        ]);
+        let l = XList(v);
+
+        assert!(l.contains(2));
+        assert!(!l.contains(1));
+    }
 }
