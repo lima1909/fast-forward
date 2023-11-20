@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use crate::{
     collections::{rw::Editable, Retriever},
-    index::store::{Filterable, Store},
+    index::store::Store,
 };
 
 /// Is a Wrapper for an [`std::collections::HashMap`], which has trigger functions for insert and remove operations
@@ -136,6 +136,7 @@ where
     F: Fn(&I) -> S::Key,
     X: Hash + Eq,
 {
+    type Key = S::Key;
     type Index = X;
 
     /// Update the item on the given key (index).
@@ -157,20 +158,8 @@ where
             self.store.delete((self.field)(item), index);
         })
     }
-}
 
-impl<S, I, X, F> Filterable for Map<S, I, X, F>
-where
-    S: Store<Index = X>,
-{
-    type Key = S::Key;
-    type Index = S::Index;
-
-    fn contains(&self, key: &Self::Key) -> bool {
-        self.store.contains(key)
-    }
-
-    fn get(&self, key: &Self::Key) -> &[Self::Index] {
+    fn get_indices_by_key(&self, key: &Self::Key) -> &[Self::Index] {
         self.store.get(key)
     }
 }
@@ -223,14 +212,14 @@ mod tests {
         assert!(m.insert("Mrs X", Person::new(-3, "Mrs X")));
 
         assert!(m.idx().contains(&-2));
-        assert!(m.contains(&-3));
+        assert!(m.idx().contains(&-3));
 
         assert!(!m.idx().contains(&-1));
 
         // remove
         assert_eq!(4, m.len());
         assert_eq!(Person::new(-3, "Mrs X"), m.remove("Mrs X").unwrap());
-        assert!(!m.contains(&-3));
+        assert!(!m.idx().contains(&-3));
         assert_eq!(3, m.len());
         assert_eq!(Some(&Person::new(2, "Jasmin")), m.idx().get(&2).next());
 
@@ -242,7 +231,9 @@ mod tests {
             })
         );
         assert_eq!(Some(&Person::new(2, "Jasmin 2")), m.idx().get(&2).next());
-        assert_eq!(["Jasmin"], m.get(&2));
+
+        use crate::index::store::Filterable;
+        assert_eq!(["Jasmin"], m.store.get(&2));
     }
 
     #[test]

@@ -5,7 +5,7 @@ use std::{fmt::Debug, ops::Deref};
 
 use crate::{
     collections::{rw::Editable, Retriever},
-    index::store::{Filterable, Store},
+    index::store::Store,
 };
 
 /// Is a Wrapper for an [`Vec`], which has trigger functions for insert and remove operations
@@ -156,6 +156,7 @@ where
     S: Store<Index = usize>,
     F: Fn(&I) -> S::Key,
 {
+    type Key = S::Key;
     type Index = usize;
 
     /// Update the item on the given position.
@@ -181,20 +182,8 @@ where
             StoreOp::Insert => self.store.insert((self.field)(i), idx),
         })
     }
-}
 
-impl<S, I, F> Filterable for List<S, I, F>
-where
-    S: Store<Index = usize>,
-{
-    type Key = S::Key;
-    type Index = S::Index;
-
-    fn contains(&self, key: &Self::Key) -> bool {
-        self.store.contains(key)
-    }
-
-    fn get(&self, key: &Self::Key) -> &[Self::Index] {
+    fn get_indices_by_key(&self, key: &Self::Key) -> &[Self::Index] {
         self.store.get(key)
     }
 }

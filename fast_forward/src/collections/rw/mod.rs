@@ -6,11 +6,11 @@ pub mod map_base;
 
 pub use list::IList;
 
-use crate::index::store::Filterable;
 use std::marker::PhantomData;
 
 /// `Editable` describe the operations for changing (update and remove) `Items` in a collection.
 pub trait Editable<I> {
+    type Key;
     type Index;
 
     /// Update the item on the given position.
@@ -20,6 +20,9 @@ pub trait Editable<I> {
 
     /// The Item on the given position will be removed from the list.
     fn remove(&mut self, index: Self::Index) -> Option<I>;
+
+    // Get all `Indices` by a given `Key`
+    fn get_indices_by_key(&self, key: &Self::Key) -> &[Self::Index];
 }
 
 /// `Editor` used a given`Editable` to execute change operation by `Key` instead of an `Index`.
@@ -30,7 +33,7 @@ pub struct Editor<'a, I, E> {
 
 impl<'a, I, E> Editor<'a, I, E>
 where
-    E: Editable<I, Index = usize> + Filterable<Index = usize>,
+    E: Editable<I, Index = usize>,
 {
     pub fn new(editor: &'a mut E) -> Self {
         Self {
@@ -45,7 +48,7 @@ where
         U: FnMut(&mut I),
     {
         #[allow(clippy::unnecessary_to_owned)]
-        for idx in self.editor.get(key).to_vec() {
+        for idx in self.editor.get_indices_by_key(key).to_vec() {
             self.editor.update(idx, &mut update);
         }
     }
@@ -58,7 +61,7 @@ where
         C: FnMut(&I),
     {
         #[allow(clippy::unnecessary_to_owned)]
-        for idx in self.editor.get(key).to_vec() {
+        for idx in self.editor.get_indices_by_key(key).to_vec() {
             if let Some(item) = self.editor.update(idx, &mut update) {
                 callback(item);
             }
@@ -67,7 +70,7 @@ where
 
     /// Remove all items by a given `Key`.
     pub fn remove_by_key(&mut self, key: &E::Key) {
-        while let Some(idx) = self.editor.get(key).iter().next() {
+        while let Some(idx) = self.editor.get_indices_by_key(key).iter().next() {
             self.editor.remove(*idx);
         }
     }
@@ -77,7 +80,7 @@ where
     where
         C: FnMut(I),
     {
-        while let Some(idx) = self.editor.get(key).iter().next() {
+        while let Some(idx) = self.editor.get_indices_by_key(key).iter().next() {
             if let Some(item) = self.editor.remove(*idx) {
                 callback(item);
             }
