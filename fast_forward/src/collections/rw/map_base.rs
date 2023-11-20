@@ -232,8 +232,7 @@ mod tests {
         );
         assert_eq!(Some(&Person::new(2, "Jasmin 2")), m.idx().get(&2).next());
 
-        use crate::index::store::Filterable;
-        assert_eq!(["Jasmin"], m.store.get(&2));
+        assert_eq!(["Jasmin"], m.get_indices_by_key(&2));
     }
 
     #[test]

@@ -365,5 +365,36 @@ mod tests {
             assert!(idx.contains(&"Jasmin"));
             assert!(!idx.contains(&"Paul"));
         }
+
+        #[test]
+        fn create_view() {
+            let mut i = MapIndex::default();
+            i.insert("Jasmin", 5);
+            i.insert("Jasmin", 2);
+            i.insert("Mario", 3);
+            i.insert("Paul", 4);
+
+            {
+                let view = i.create_view(["Jasmin", "Mario"]);
+                assert!(view.contains(&"Jasmin"));
+                assert!(view.contains(&"Mario"));
+                assert!(!view.contains(&"Paul"));
+
+                assert_eq!(view.get(&"Jasmin"), &[2, 5]);
+                assert_eq!(view.get(&"Mario"), &[3]);
+                assert_eq!(view.get(&"Paul"), &[]);
+
+                assert_eq!(
+                    view.get_many(["Jasmin", "Mario"]).collect::<Vec<_>>(),
+                    vec![&2, &5, &3]
+                );
+            }
+
+            i.update("Paul", 4, "NEW");
+
+            let view = i.create_view(["Jasmin", "NEW"]);
+            assert_eq!(view.get(&"NEW"), &[4]);
+            assert_eq!(view.get(&"Jasmin"), &[2, 5]);
+        }
     }
 }
