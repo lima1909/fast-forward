@@ -17,6 +17,40 @@ pub trait Store {
     fn delete(&mut self, key: Self::Key, idx: &Self::Index);
 }
 
+// -------------------------
+pub trait ViewCreator<'a, Q> {
+    type Key;
+    type Filter: Filterable<Q>;
+
+    fn create_view<It>(&'a self, keys: It) -> View<Q, Self::Filter>
+    where
+        It: IntoIterator<Item = Self::Key>;
+}
+
+/// A wrapper for a `Filterable` implementation
+#[repr(transparent)]
+pub struct View<Q, F: Filterable<Q>>(pub(crate) F, PhantomData<Q>);
+
+impl<Q, F: Filterable<Q>> View<Q, F> {
+    pub fn new(filter: F) -> Self {
+        Self(filter, PhantomData)
+    }
+}
+
+impl<Q, F: Filterable<Q>> Filterable<Q> for View<Q, F> {
+    type Index = F::Index;
+
+    fn contains_key(&self, key: Q) -> bool {
+        self.0.contains_key(key)
+    }
+
+    fn get_indices_by_key(&self, key: Q) -> &[Self::Index] {
+        self.0.get_indices_by_key(key)
+    }
+}
+
+// -------------------------
+
 pub struct IVec<I, K = usize, X = usize> {
     vec: Vec<Option<I>>,
     _index: PhantomData<X>,
@@ -80,11 +114,12 @@ where
     K: Into<usize>,
     I: KeyIndex<X> + 'a,
 {
+    type Key = K;
     type Filter = Vec<Option<(&'a I, PhantomData<X>)>>;
 
     fn create_view<It>(&'a self, keys: It) -> View<K, Self::Filter>
     where
-        It: IntoIterator<Item = K>,
+        It: IntoIterator<Item = Self::Key>,
     {
         let mut view = Self::Filter::new();
         view.resize(self.vec.len(), None);
@@ -165,40 +200,43 @@ where
     }
 }
 
-impl<'a, K, X> Filterable<K> for HashMap<K, &'a MultiKeyIndex<X>>
+impl<'a, K, X, Q> Filterable<&Q> for HashMap<K, &'a MultiKeyIndex<X>>
 where
-    K: Hash + Eq,
+    Q: Hash + Eq + ?Sized,
+    K: Borrow<Q> + Hash + Eq,
     X: Ord + PartialEq,
 {
     type Index = X;
 
-    fn contains_key(&self, key: K) -> bool {
-        self.contains_key(&key)
+    fn contains_key(&self, key: &Q) -> bool {
+        self.contains_key(key)
     }
 
-    fn get_indices_by_key(&self, key: K) -> &[Self::Index] {
-        match self.get(&key) {
-            Some(i) => i.as_slice(),
+    fn get_indices_by_key(&self, key: &Q) -> &[Self::Index] {
+        match self.get(key) {
+            Some(i) => (*i).as_slice(),
             None => &[],
         }
     }
 }
 
-impl<'a, K, X> ViewCreator<'a, K> for IMap<K, X>
+impl<'a, K, X, Q> ViewCreator<'a, &'a Q> for IMap<K, X>
 where
-    K: Hash + Eq,
+    Q: Hash + Eq + ?Sized,
+    K: Borrow<Q> + Hash + Eq,
     X: Ord + PartialEq + 'a,
 {
+    type Key = K;
     type Filter = HashMap<K, &'a MultiKeyIndex<X>>;
 
-    fn create_view<It>(&'a self, keys: It) -> View<K, Self::Filter>
+    fn create_view<It>(&'a self, keys: It) -> View<&'a Q, Self::Filter>
     where
-        It: IntoIterator<Item = K>,
+        It: IntoIterator<Item = Self::Key>,
     {
         let mut view = Self::Filter::new();
 
         for key in keys {
-            if let Some(idx) = self.0.get(&key) {
+            if let Some(idx) = self.0.get(key.borrow()) {
                 view.insert(key, idx);
             }
         }
@@ -245,37 +283,6 @@ where
         S: Filterable<K>,
     {
         self.0.contains_key(key)
-    }
-}
-
-// -------------------------
-pub trait ViewCreator<'a, K> {
-    type Filter: Filterable<K>;
-
-    fn create_view<It>(&'a self, keys: It) -> View<K, Self::Filter>
-    where
-        It: IntoIterator<Item = K>;
-}
-
-/// A wrapper for a `Filterable` implementation
-#[repr(transparent)]
-pub struct View<K, F: Filterable<K>>(pub(crate) F, PhantomData<K>);
-
-impl<K, F: Filterable<K>> View<K, F> {
-    pub fn new(filter: F) -> Self {
-        Self(filter, PhantomData)
-    }
-}
-
-impl<K, F: Filterable<K>> Filterable<K> for View<K, F> {
-    type Index = F::Index;
-
-    fn contains_key(&self, key: K) -> bool {
-        self.0.contains_key(key)
-    }
-
-    fn get_indices_by_key(&self, key: K) -> &[Self::Index] {
-        self.0.get_indices_by_key(key)
     }
 }
 
@@ -349,14 +356,15 @@ mod tests {
         assert_eq!(m.get_indices_by_key("A"), &[1, 2]);
 
         let view = m.create_view([String::from("A"), String::from("ZZ")]);
-        assert!(view.contains_key(String::from("A")));
-        assert!(!view.contains_key(String::from("ZZ")));
+        assert!(view.contains_key("A"));
+        assert!(view.contains_key("A"));
+        assert!(!view.contains_key(&String::from("ZZ")));
 
         assert_eq!(
             None,
-            view.get_indices_by_key(String::from("ZZ")).iter().next()
+            view.get_indices_by_key(&String::from("ZZ")).iter().next()
         );
-        assert_eq!(&[1, 2], view.get_indices_by_key(String::from("A")));
+        assert_eq!(&[1, 2], view.get_indices_by_key(&String::from("A")));
     }
 
     #[test]
