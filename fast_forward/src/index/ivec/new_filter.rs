@@ -1,67 +1,57 @@
+use std::ops::Deref;
 use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::index::indices::{KeyIndex, MultiKeyIndex};
 
-pub trait Filterable<Key> {
+pub trait Filterable {
+    type Key;
     type Index;
 
-    fn contains_key(&self, key: Key) -> bool;
-    fn get_indices_by_key(&self, key: Key) -> &[Self::Index];
+    fn contains_key(&self, key: Self::Key) -> bool;
+    fn get_indices(&self, key: Self::Key) -> &[Self::Index];
 }
 
 pub trait Store {
     type Key;
     type Index;
+    type Filter: Filterable<Index = Self::Index>;
 
     fn insert(&mut self, key: Self::Key, idx: Self::Index);
     fn delete(&mut self, key: Self::Key, idx: &Self::Index);
+
+    fn filter(&self) -> &Self::Filter;
 }
 
 // -------------------------
-pub trait ViewCreator<'a, Q> {
+pub trait ViewCreator<'a> {
     type Key;
-    type Filter: Filterable<Q>;
+    type Filter: Filterable;
 
-    fn create_view<It>(&'a self, keys: It) -> View<Q, Self::Filter>
+    fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
     where
         It: IntoIterator<Item = Self::Key>;
 }
 
 /// A wrapper for a `Filterable` implementation
 #[repr(transparent)]
-pub struct View<Q, F: Filterable<Q>>(pub(crate) F, PhantomData<Q>);
+pub struct View<F: Filterable>(F);
 
-impl<Q, F: Filterable<Q>> View<Q, F> {
-    pub fn new(filter: F) -> Self {
-        Self(filter, PhantomData)
-    }
-}
+impl<F: Filterable> Deref for View<F> {
+    type Target = F;
 
-impl<Q, F: Filterable<Q>> Filterable<Q> for View<Q, F> {
-    type Index = F::Index;
-
-    fn contains_key(&self, key: Q) -> bool {
-        self.0.contains_key(key)
-    }
-
-    fn get_indices_by_key(&self, key: Q) -> &[Self::Index] {
-        self.0.get_indices_by_key(key)
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
 // -------------------------
-
 pub struct IVec<I, K = usize, X = usize> {
     vec: Vec<Option<I>>,
     _index: PhantomData<X>,
     _key: PhantomData<K>,
 }
 
-impl<I, K, X> IVec<I, K, X>
-where
-    K: Into<usize>,
-    I: KeyIndex<X>,
-{
+impl<I, K, X> IVec<I, K, X> {
     pub fn new(vec: Vec<Option<I>>) -> Self {
         Self {
             vec,
@@ -71,18 +61,19 @@ where
     }
 }
 
-impl<I, K, X> Filterable<K> for IVec<I, K, X>
+impl<I, K, X> Filterable for IVec<I, K, X>
 where
     K: Into<usize>,
     I: KeyIndex<X>,
 {
+    type Key = K;
     type Index = X;
 
-    fn contains_key<'a>(&self, key: K) -> bool {
+    fn contains_key(&self, key: K) -> bool {
         matches!(self.vec.get((key).into()), Some(Some(_)))
     }
 
-    fn get_indices_by_key<'a>(&self, key: K) -> &[Self::Index] {
+    fn get_indices(&self, key: K) -> &[Self::Index] {
         match self.vec.get((key).into()) {
             Some(Some(idx)) => idx.as_slice(),
             _ => &[],
@@ -90,18 +81,19 @@ where
     }
 }
 
-impl<'a, I, K, X> Filterable<K> for Vec<Option<(&'a I, PhantomData<X>)>>
+impl<'a, I, K, X> Filterable for Vec<Option<(&'a I, PhantomData<K>, PhantomData<X>)>>
 where
     K: Into<usize>,
     I: KeyIndex<X>,
 {
+    type Key = K;
     type Index = X;
 
     fn contains_key(&self, key: K) -> bool {
         matches!(self.get((key).into()), Some(Some(_)))
     }
 
-    fn get_indices_by_key(&self, key: K) -> &[Self::Index] {
+    fn get_indices(&self, key: K) -> &[Self::Index] {
         match self.get((key).into()) {
             Some(Some(idx)) => idx.0.as_slice(),
             _ => &[],
@@ -109,15 +101,15 @@ where
     }
 }
 
-impl<'a, I, K, X> ViewCreator<'a, K> for IVec<I, K, X>
+impl<'a, I, K, X> ViewCreator<'a> for IVec<I, K, X>
 where
     K: Into<usize>,
     I: KeyIndex<X> + 'a,
 {
     type Key = K;
-    type Filter = Vec<Option<(&'a I, PhantomData<X>)>>;
+    type Filter = Vec<Option<(&'a I, PhantomData<K>, PhantomData<X>)>>;
 
-    fn create_view<It>(&'a self, keys: It) -> View<K, Self::Filter>
+    fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
     where
         It: IntoIterator<Item = Self::Key>,
     {
@@ -127,11 +119,11 @@ where
         for key in keys {
             let idx: usize = key.into();
             if let Some(opt) = self.vec.get(idx) {
-                view[idx] = Some((opt.as_ref().unwrap(), PhantomData));
+                view[idx] = Some((opt.as_ref().unwrap(), PhantomData, PhantomData));
             }
         }
 
-        View::new(view)
+        View(view)
     }
 }
 
@@ -143,6 +135,7 @@ where
 {
     type Key = K;
     type Index = X;
+    type Filter = Self;
 
     fn insert(&mut self, key: Self::Key, idx: Self::Index) {
         let k = key.into();
@@ -166,33 +159,41 @@ where
             }
         }
     }
+
+    fn filter(&self) -> &Self::Filter {
+        self
+    }
 }
 
 // --------------------
 use std::collections::HashMap;
 use std::hash::Hash;
 
-pub struct IMap<K = String, X = usize>(HashMap<K, MultiKeyIndex<X>>);
+pub struct IMap<'a, Q: ?Sized, K = String, X = usize>(
+    HashMap<K, MultiKeyIndex<X>>,
+    PhantomData<&'a Q>,
+);
 
-impl<K, X> IMap<K, X> {
+impl<'a, Q: ?Sized, K, X> IMap<'a, Q, K, X> {
     pub fn new() -> Self {
-        Self(HashMap::new())
+        Self(HashMap::new(), PhantomData)
     }
 }
 
-impl<K, X, Q> Filterable<&Q> for IMap<K, X>
+impl<'a, Q, K, X> Filterable for IMap<'a, Q, K, X>
 where
     Q: Hash + Eq + ?Sized,
     K: Borrow<Q> + Hash + Eq,
-    X: Ord + PartialEq,
+    X: Ord,
 {
+    type Key = &'a Q;
     type Index = X;
 
-    fn contains_key(&self, key: &Q) -> bool {
+    fn contains_key(&self, key: Self::Key) -> bool {
         self.0.contains_key(key)
     }
 
-    fn get_indices_by_key(&self, key: &Q) -> &[Self::Index] {
+    fn get_indices(&self, key: Self::Key) -> &[Self::Index] {
         match self.0.get(key) {
             Some(i) => i.as_slice(),
             None => &[],
@@ -200,61 +201,64 @@ where
     }
 }
 
-impl<'a, K, X, Q> Filterable<&Q> for HashMap<K, &'a MultiKeyIndex<X>>
+impl<'a, Q, K, X> Filterable for (HashMap<K, &'a MultiKeyIndex<X>>, PhantomData<&'a Q>)
 where
     Q: Hash + Eq + ?Sized,
     K: Borrow<Q> + Hash + Eq,
-    X: Ord + PartialEq,
+    X: Ord,
 {
+    type Key = &'a Q;
     type Index = X;
 
-    fn contains_key(&self, key: &Q) -> bool {
-        self.contains_key(key)
+    fn contains_key(&self, key: Self::Key) -> bool {
+        self.0.contains_key(key)
     }
 
-    fn get_indices_by_key(&self, key: &Q) -> &[Self::Index] {
-        match self.get(key) {
+    fn get_indices(&self, key: Self::Key) -> &[Self::Index] {
+        match self.0.get(key) {
             Some(i) => (*i).as_slice(),
             None => &[],
         }
     }
 }
 
-impl<'a, K, X, Q> ViewCreator<'a, &'a Q> for IMap<K, X>
+impl<'a, Q, K, X> ViewCreator<'a> for IMap<'a, Q, K, X>
 where
     Q: Hash + Eq + ?Sized,
     K: Borrow<Q> + Hash + Eq,
-    X: Ord + PartialEq + 'a,
+    X: Ord + 'a,
 {
     type Key = K;
-    type Filter = HashMap<K, &'a MultiKeyIndex<X>>;
+    type Filter = (HashMap<K, &'a MultiKeyIndex<X>>, PhantomData<&'a Q>);
 
-    fn create_view<It>(&'a self, keys: It) -> View<&'a Q, Self::Filter>
+    fn create_view<It>(&'a self, keys: It) -> View<Self::Filter>
     where
         It: IntoIterator<Item = Self::Key>,
     {
-        let mut view = Self::Filter::new();
+        let mut view = (HashMap::<K, &MultiKeyIndex<X>>::new(), PhantomData);
 
         for key in keys {
             if let Some(idx) = self.0.get(key.borrow()) {
-                view.insert(key, idx);
+                view.0.insert(key, idx);
             }
         }
 
-        View::new(view)
+        View(view)
     }
 }
 
-impl<K, X> Store for IMap<K, X>
+impl<'a, Q, K, X> Store for IMap<'a, Q, K, X>
 where
-    K: Hash + Eq,
+    Q: Hash + Eq + ?Sized,
+    K: Borrow<Q> + Hash + Eq,
     X: Ord,
 {
     type Key = K;
     type Index = X;
+    type Filter = Self;
 
     fn insert(&mut self, key: Self::Key, idx: Self::Index) {
-        match self.0.get_mut(&key) {
+        match self.0.get_mut(key.borrow()) {
             Some(v) => v.add(idx),
             None => {
                 self.0.insert(key, MultiKeyIndex::new(idx));
@@ -263,11 +267,15 @@ where
     }
 
     fn delete(&mut self, key: Self::Key, idx: &Self::Index) {
-        if let Some(rm_idx) = self.0.get_mut(&key) {
+        if let Some(rm_idx) = self.0.get_mut(key.borrow()) {
             if rm_idx.remove(idx) {
-                self.0.remove(&key);
+                self.0.remove(key.borrow());
             }
         }
+    }
+
+    fn filter(&self) -> &Self::Filter {
+        self
     }
 }
 
@@ -278,11 +286,8 @@ impl<S> XList<S>
 where
     S: Store,
 {
-    fn contains<K>(&self, key: K) -> bool
-    where
-        S: Filterable<K>,
-    {
-        self.0.contains_key(key)
+    fn contains(&self, key: <S::Filter as Filterable>::Key) -> bool {
+        self.0.filter().contains_key(key)
     }
 }
 
@@ -302,15 +307,17 @@ mod tests {
         ]);
         assert!(!v.contains_key(1));
         assert!(v.contains_key(2));
+        assert!(v.filter().contains_key(2));
 
-        assert_eq!(v.get_indices_by_key(2), &['A']);
+        assert_eq!(v.get_indices(2), &['A']);
+        assert_eq!(v.filter().get_indices(2), &['A']);
 
         let view = v.create_view([2, 100]);
         assert!(!view.contains_key(100));
         assert!(view.contains_key(2));
 
-        assert_eq!(None, view.get_indices_by_key(100).iter().next());
-        assert_eq!(&['A'], view.get_indices_by_key(2));
+        assert_eq!(None, view.get_indices(100).iter().next());
+        assert_eq!(&['A'], view.get_indices(2));
     }
 
     #[test]
@@ -328,54 +335,68 @@ mod tests {
         assert!(!v.contains_key(0));
         assert!(v.contains_key(1));
 
-        assert_eq!(
-            v.get_indices_by_key(1),
-            &[String::from("A"), String::from("C")]
-        );
+        assert_eq!(v.get_indices(1), &[String::from("A"), String::from("C")]);
 
         let view = v.create_view([1, 100]);
         assert!(!view.contains_key(100));
         assert!(view.contains_key(1));
 
-        assert_eq!(None, view.get_indices_by_key(100).iter().next());
-        assert_eq!(
-            &[String::from("A"), String::from("C")],
-            view.get_indices_by_key(1)
-        );
+        assert_eq!(None, view.get_indices(100).iter().next());
+        assert_eq!(&[String::from("A"), String::from("C")], view.get_indices(1));
     }
 
-    #[test]
     fn imap() {
-        let mut m: IMap<String, usize> = IMap::new();
+        let mut m = IMap::new();
         m.insert(String::from("A"), 1);
         m.insert(String::from("A"), 2);
 
-        assert!(m.contains_key("A"));
         assert!(!m.contains_key("Z"));
+        assert!(m.contains_key("A"));
+        assert!(m.filter().contains_key("A"));
+        assert!(m.filter().contains_key(&String::from("A")));
 
-        assert_eq!(m.get_indices_by_key("A"), &[1, 2]);
+        assert_eq!(m.get_indices("A"), &[1, 2]);
+        assert_eq!(m.filter().get_indices("A"), &[1, 2]);
 
         let view = m.create_view([String::from("A"), String::from("ZZ")]);
         assert!(view.contains_key("A"));
         assert!(view.contains_key("A"));
         assert!(!view.contains_key(&String::from("ZZ")));
 
-        assert_eq!(
-            None,
-            view.get_indices_by_key(&String::from("ZZ")).iter().next()
-        );
-        assert_eq!(&[1, 2], view.get_indices_by_key(&String::from("A")));
+        assert_eq!(None, view.get_indices(&String::from("ZZ")).iter().next());
+        assert_eq!(&[1, 2], view.get_indices(&String::from("A")));
+    }
+
+    #[test]
+    fn imap_i32_char() {
+        let mut m = IMap::new();
+        m.insert(1, 'A');
+        m.insert(2, 'B');
+
+        assert!(!m.contains_key(&9));
+        assert!(m.contains_key(&1));
+        assert!(m.filter().contains_key(&2));
+
+        assert_eq!(m.get_indices(&1), &['A']);
+        assert_eq!(m.filter().get_indices(&2), &['B']);
+
+        let view = m.create_view([1]);
+        assert!(view.contains_key(&1));
+        assert!(!view.contains_key(&2));
+
+        assert_eq!(None, view.get_indices(&2).iter().next());
+        assert_eq!(&['A'], view.get_indices(&1));
     }
 
     #[test]
     fn xlist_imap() {
-        let mut m: IMap<String, usize> = IMap::new();
+        let mut m: IMap<'_, str, _, _> = IMap::new();
         m.insert(String::from("A"), 1);
         m.insert(String::from("A"), 2);
         let l = XList(m);
 
-        assert!(l.contains("A"));
         assert!(!l.contains("Z"));
+        assert!(l.contains("A"));
     }
 
     #[test]
@@ -389,7 +410,7 @@ mod tests {
         ]);
         let l = XList(v);
 
-        assert!(l.contains(2));
         assert!(!l.contains(1));
+        assert!(l.contains(2));
     }
 }
